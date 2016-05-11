@@ -1,0 +1,21 @@
+{
+    "name": "hrzg/yii2-filefly-module",
+    "description": "FlySystem API for Filemanager",
+    "type": "yii2-extension",
+    "keywords": ["yii2","extension"],
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "Tobias Munk",
+            "email": "tobias@diemeisterei.de"
+        }
+    ],
+    "require": {
+        "yiisoft/yii2": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "hrzg\\filefly\\": ""
+        }
+    }
+}
