@@ -343,10 +343,9 @@ class FileManagerApi
         return $files;
     }
 
-
     /**
      * WORKS
-     * 
+     *
      * @param $oldPath
      * @param $newPath
      *
@@ -360,21 +359,25 @@ class FileManagerApi
         return $this->_filesystem->get($oldPath)->rename($newPath);
     }
 
+    /**
+     * WORKS
+     *
+     * @param $oldPaths
+     * @param $newPath
+     *
+     * @return bool
+     */
     private function moveAction($oldPaths, $newPath)
     {
-        $newPath = $this->_filesystem->path . rtrim($newPath, '/') . '/';
-
         foreach ($oldPaths as $oldPath) {
-            if (!file_exists($this->_filesystem->path . $oldPath)) {
+            if (!$this->_filesystem->get($oldPath)->isFile() && !$this->_filesystem->get($oldPath)->isDir()) {
                 return false;
             }
-
-            $renamed = rename($this->_filesystem->path . $oldPath, $newPath . basename($oldPath));
+            $renamed = $this->_filesystem->get($oldPath)->rename($newPath . '/' . basename($oldPath));
             if ($renamed === false) {
                 return false;
             }
         }
-
         return true;
     }
 
