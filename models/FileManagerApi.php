@@ -58,9 +58,10 @@ class FileManagerApi
     private $_translate;
 
     /**
+     * @param Filesystem $fs
      * @param bool|true $muteErrors
      */
-    public function __construct(Filesystem $fs, $muteErrors = true)
+    public function __construct(Filesystem $fs, $muteErrors = false)
     {
         if (!$muteErrors) {
             ini_set('display_errors', 1);
@@ -71,6 +72,8 @@ class FileManagerApi
     }
 
     /**
+     * WORKS
+     *
      * @param $query
      * @param $request
      * @param $files
@@ -229,6 +232,8 @@ class FileManagerApi
     }
 
     /**
+     * WORKS
+     *
      * @param $queries
      *
      * @return Response
@@ -313,7 +318,7 @@ class FileManagerApi
     }
 
     /**
-     * WORKS
+     * WORKS TODO permissions
      *
      * @param $path
      *
@@ -323,15 +328,13 @@ class FileManagerApi
     {
         $contents = $this->_filesystem->listContents($path);
 
+
         $files = [];
         foreach ($contents AS $file) {
-
             $date    = new \DateTime('@' . $this->_filesystem->getTimestamp($file['path']));
             $files[] = [
                 'name' => utf8_encode(basename($file['basename'])),
-                //                'rights' => $this->parsePerms(fileperms($this->_filesystem->path . '/' . $file['path'])),
-                /*'size'   => (array_key_exists('size', $file)) ? $file['size'] :
-                    filesize($this->_filesystem->path . '/' . $file['path']),*/
+                // 'rights' => $this->_filesystem->getMetadata($file['path']),
                 'size' => $this->_filesystem->getSize($file['path']),
                 'date' => $date->format('Y-m-d H:i:s'),
                 'type' => $file['type'],
@@ -340,16 +343,21 @@ class FileManagerApi
         return $files;
     }
 
+
+    /**
+     * WORKS
+     * 
+     * @param $oldPath
+     * @param $newPath
+     *
+     * @return string
+     */
     private function renameAction($oldPath, $newPath)
     {
-        $oldPath = $this->_filesystem->path . $oldPath;
-        $newPath = $this->_filesystem->path . $newPath;
-
-        if (!file_exists($oldPath)) {
+        if (!$this->_filesystem->get($oldPath)->isFile() && !$this->_filesystem->get($oldPath)->isDir()) {
             return 'notfound';
         }
-
-        return rename($oldPath, $newPath);
+        return $this->_filesystem->get($oldPath)->rename($newPath);
     }
 
     private function moveAction($oldPaths, $newPath)
@@ -393,7 +401,10 @@ class FileManagerApi
 
     private function removeAction($paths)
     {
+
         foreach ($paths as $path) {
+
+            //        $this->_filesystem->delete($oldPath);
             $path = $this->_filesystem->path . $path;
 
             if (is_dir($path)) {
@@ -444,7 +455,7 @@ class FileManagerApi
         return mkdir($path);
     }
 
-    private function changePermissionsAction($paths, $permissions, $recursive)
+    /*private function changePermissionsAction($paths, $permissions, $recursive)
     {
         foreach ($paths as $path) {
             if (!file_exists($this->_filesystem->path . $path)) {
@@ -468,9 +479,9 @@ class FileManagerApi
 
             return chmod($this->_filesystem->path . $path, octdec($permissions));
         }
-    }
+    }*/
 
-    private function compressAction($paths, $destination, $archiveName)
+    /*private function compressAction($paths, $destination, $archiveName)
     {
         $archivePath = $this->_filesystem->path . $destination . $archiveName;
 
@@ -484,9 +495,9 @@ class FileManagerApi
         }
 
         return $zip->close();
-    }
+    }*/
 
-    private function extractAction($destination, $archivePath, $folderName)
+    /*private function extractAction($destination, $archivePath, $folderName)
     {
         $archivePath = $this->_filesystem->path . $archivePath;
         $folderPath  = $this->_filesystem->path . rtrim($destination, '/') . '/' . $folderName;
@@ -499,7 +510,7 @@ class FileManagerApi
         mkdir($folderPath);
         $zip->extractTo($folderPath);
         return $zip->close();
-    }
+    }*/
 
     private function simpleSuccessResponse()
     {
