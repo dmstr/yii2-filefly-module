@@ -496,10 +496,20 @@ class FileManagerApi
         return $this->_filesystem->createDir($path, ['visibility' => AdapterInterface::VISIBILITY_PUBLIC]);
     }
 
-    /*private function changePermissionsAction($paths, $permissions, $recursive)
+    /**
+     * TODO implement with permissions file decorator
+     *
+     * @param $paths
+     * @param $permissions
+     * @param $recursive
+     *
+     * @return bool|string
+     */
+    private function changePermissionsAction($paths, $permissions, $recursive)
     {
-        foreach ($paths as $path) {
-            if (!file_exists($this->_filesystem->path . $path)) {
+        return true;
+        /*foreach ($paths as $path) {
+            if (!file_exists($$path)) {
                 return 'missing';
             }
 
@@ -510,7 +520,7 @@ class FileManagerApi
                 );
 
                 foreach ($iterator as $item) {
-                    $changed = chmod($this->_filesystem->path . $item, octdec($permissions));
+                    $changed = chmod($item, octdec($permissions));
 
                     if ($changed === false) {
                         return false;
@@ -518,13 +528,23 @@ class FileManagerApi
                 }
             }
 
-            return chmod($this->_filesystem->path . $path, octdec($permissions));
-        }
-    }*/
+            return chmod($path, octdec($permissions));
+        }*/
+    }
 
-    /*private function compressAction($paths, $destination, $archiveName)
+    /**
+     * TODO implement
+     *
+     * @param $paths
+     * @param $destination
+     * @param $archiveName
+     *
+     * @return bool
+     */
+    private function compressAction($paths, $destination, $archiveName)
     {
-        $archivePath = $this->_filesystem->path . $destination . $archiveName;
+        return true;
+        /*$archivePath = $this->_filesystem->getAdapter()->getPathPrefix() . ltrim($destination, '/') . $archiveName;
 
         $zip = new ZipArchive();
         if ($zip->open($archivePath, ZipArchive::CREATE) !== true) {
@@ -532,16 +552,26 @@ class FileManagerApi
         }
 
         foreach ($paths as $path) {
-            $zip->addFile($this->_filesystem->path . $path, basename($path));
+            $zip->addFile($this->_filesystem->getAdapter()->getPathPrefix() . $path, basename($path));
         }
 
-        return $zip->close();
-    }*/
+        return $zip->close();*/
+    }
 
-    /*private function extractAction($destination, $archivePath, $folderName)
+    /**
+     * TODO implement
+     *
+     * @param $destination
+     * @param $archivePath
+     * @param $folderName
+     *
+     * @return bool|string
+     */
+    private function extractAction($destination, $archivePath, $folderName)
     {
-        $archivePath = $this->_filesystem->path . $archivePath;
-        $folderPath  = $this->_filesystem->path . rtrim($destination, '/') . '/' . $folderName;
+        return true;
+        /*$archivePath = $this->_filesystem->getAdapter()->getPathPrefix() . $archivePath;
+        $folderPath  = $this->_filesystem->getAdapter()->getPathPrefix() . rtrim($destination, '/') . '/' . $folderName;
 
         $zip = new ZipArchive;
         if ($zip->open($archivePath) === false) {
@@ -550,9 +580,12 @@ class FileManagerApi
 
         mkdir($folderPath);
         $zip->extractTo($folderPath);
-        return $zip->close();
-    }*/
+        return $zip->close();*/
+    }
 
+    /**
+     * @return Response
+     */
     private function simpleSuccessResponse()
     {
         $response = new Response();
@@ -567,6 +600,11 @@ class FileManagerApi
         return $response;
     }
 
+    /**
+     * @param $message
+     *
+     * @return Response
+     */
     private function simpleErrorResponse($message)
     {
         $response = new Response();
@@ -582,57 +620,5 @@ class FileManagerApi
             );
 
         return $response;
-    }
-
-    private function parsePerms($perms)
-    {
-        if (($perms & 0xC000) == 0xC000) {
-            // Socket
-            $info = 's';
-        } elseif (($perms & 0xA000) == 0xA000) {
-            // Symbolic Link
-            $info = 'l';
-        } elseif (($perms & 0x8000) == 0x8000) {
-            // Regular
-            $info = '-';
-        } elseif (($perms & 0x6000) == 0x6000) {
-            // Block special
-            $info = 'b';
-        } elseif (($perms & 0x4000) == 0x4000) {
-            // Directory
-            $info = 'd';
-        } elseif (($perms & 0x2000) == 0x2000) {
-            // Character special
-            $info = 'c';
-        } elseif (($perms & 0x1000) == 0x1000) {
-            // FIFO pipe
-            $info = 'p';
-        } else {
-            // Unknown
-            $info = 'u';
-        }
-
-        // Owner
-        $info .= (($perms & 0x0100) ? 'r' : '-');
-        $info .= (($perms & 0x0080) ? 'w' : '-');
-        $info .= (($perms & 0x0040) ?
-            (($perms & 0x0800) ? 's' : 'x') :
-            (($perms & 0x0800) ? 'S' : '-'));
-
-        // Group
-        $info .= (($perms & 0x0020) ? 'r' : '-');
-        $info .= (($perms & 0x0010) ? 'w' : '-');
-        $info .= (($perms & 0x0008) ?
-            (($perms & 0x0400) ? 's' : 'x') :
-            (($perms & 0x0400) ? 'S' : '-'));
-
-        // World
-        $info .= (($perms & 0x0004) ? 'r' : '-');
-        $info .= (($perms & 0x0002) ? 'w' : '-');
-        $info .= (($perms & 0x0001) ?
-            (($perms & 0x0200) ? 't' : 'x') :
-            (($perms & 0x0200) ? 'T' : '-'));
-
-        return $info;
     }
 }
