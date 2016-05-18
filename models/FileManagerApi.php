@@ -3,6 +3,7 @@ namespace hrzg\filefly\models;
 
 use creocoder\flysystem\Filesystem;
 use League\Flysystem\AdapterInterface;
+use League\Flysystem\Util;
 
 /**
  * Class FileManagerApi
@@ -326,16 +327,27 @@ class FileManagerApi
      */
     private function listAction($path)
     {
-        $contents = $this->_filesystem->listContents($path);
-
-
         $files = [];
-        foreach ($contents AS $file) {
-            $date    = new \DateTime('@' . $this->_filesystem->getTimestamp($file['path']));
+        foreach ($this->_filesystem->listContents($path) AS $file) {
+
+            // fix for filesystems where folders has no date
+            if (array_key_exists('timestamp', $file)) {
+                $date = new \DateTime('@' . $this->_filesystem->getTimestamp($file['path']));
+            } else {
+                $date = new \DateTime();
+            }
+
+            // fix for filesystems where folders has no size
+            if (array_key_exists('size', $file)) {
+                $size = $file['size'];
+            } else {
+                $size = 0;
+            }
+
             $files[] = [
-                'name' => utf8_encode(basename($file['basename'])),
+                'name' => $file['basename'],
                 // 'rights' => $this->_filesystem->getMetadata($file['path']),
-                'size' => $this->_filesystem->getSize($file['path']),
+                'size' => $size,
                 'date' => $date->format('Y-m-d H:i:s'),
                 'type' => $file['type'],
             ];
@@ -381,45 +393,50 @@ class FileManagerApi
         return true;
     }
 
+    /**
+     * WORKS TODO set new filename on copy doesn't works, BUG
+     *
+     * @param $oldPaths
+     * @param $newPath
+     *
+     * @return bool
+     */
     private function copyAction($oldPaths, $newPath)
     {
-        $newPath = $this->_filesystem->path . rtrim($newPath, '/') . '/';
-
+        $newPath = ltrim($newPath, '/');
         foreach ($oldPaths as $oldPath) {
-            if (!file_exists($this->_filesystem->path . $oldPath)) {
+            if (!$this->_filesystem->get($oldPath)->isFile()) {
                 return false;
             }
-
-            $copied = copy(
-                $this->_filesystem->path . $oldPath,
-                $newPath . basename($oldPath)
-            );
+            $copied = $this->_filesystem->get($oldPath)->copy($newPath . '/' . basename($oldPath));
             if ($copied === false) {
                 return false;
             }
         }
-
         return true;
     }
 
+    /**
+     * WORKS
+     *
+     * @param $paths
+     *
+     * @return bool|string
+     */
     private function removeAction($paths)
     {
-
         foreach ($paths as $path) {
 
-            //        $this->_filesystem->delete($oldPath);
-            $path = $this->_filesystem->path . $path;
+            if ($this->_filesystem->get($path)->isDir()) {
 
-            if (is_dir($path)) {
-                $dirEmpty = (new \FilesystemIterator($path))->valid();
+                $dirEmpty = (new \FilesystemIterator($this->_filesystem->getAdapter()->getPathPrefix() . $path))->valid();
 
                 if ($dirEmpty) {
                     return 'notempty';
-                } else {
-                    $removed = rmdir($path);
                 }
+                $removed = $this->_filesystem->get($path)->deleteDir($path);
             } else {
-                $removed = unlink($path);
+                $removed = $this->_filesystem->get($path)->delete($path);
             }
 
             if ($removed === false) {
@@ -430,32 +447,53 @@ class FileManagerApi
         return true;
     }
 
+    /**
+     * WORKS
+     *
+     * @param $path
+     * @param $content
+     *
+     * @return int
+     */
     private function editAction($path, $content)
     {
-        $path = $this->_filesystem->path . $path;
-        return file_put_contents($path, $content);
-    }
-
-    private function getContentAction($path)
-    {
-        $path = $this->_filesystem->path . $path;
-
-        if (!file_exists($path)) {
+        if (!$this->_filesystem->get($path)->isFile()) {
             return false;
         }
 
-        return file_get_contents($path);
+        return file_put_contents($this->_filesystem->getAdapter()->getPathPrefix() . $path, $content);
     }
 
+    /**
+     * WORKS
+     *
+     * @param $path
+     *
+     * @return bool|string
+     */
+    private function getContentAction($path)
+    {
+        if (!$this->_filesystem->get($path)->isFile()) {
+            return false;
+        }
+
+        return file_get_contents($this->_filesystem->getAdapter()->getPathPrefix() . $path);
+    }
+
+    /**
+     * WORKS
+     *
+     * @param $path
+     *
+     * @return bool|string
+     */
     private function createFolderAction($path)
     {
-        $path = $this->_filesystem->path . $path;
-
-        if (file_exists($path) && is_dir($path)) {
+        if ($this->_filesystem->has($path)) {
             return 'exists';
         }
 
-        return mkdir($path);
+        return $this->_filesystem->createDir($path, ['visibility' => AdapterInterface::VISIBILITY_PUBLIC]);
     }
 
     /*private function changePermissionsAction($paths, $permissions, $recursive)
