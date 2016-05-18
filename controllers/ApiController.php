@@ -2,7 +2,8 @@
 
 namespace hrzg\filefly\controllers;
 
-use yii\web\HttpException;
+use hrzg\filefly\models\FileManagerApi;
+use hrzg\filefly\models\Rest;
 
 class ApiController extends \yii\rest\Controller
 {
@@ -24,23 +25,13 @@ class ApiController extends \yii\rest\Controller
 
     public function actionIndex()
     {
-        switch (true) {
-            case 'list':
-                $contents = \Yii::$app->fs->listContents();
-                $result   = [];
-                foreach ($contents AS $file) {
-                    $result[] = [
-                        'name' => $file['filename'],
-                        'date' => date('Y-m-d H:m:i', $file['timestamp']),
-                        'type' => $file['type'],
-                        'size' => (array_key_exists('size', $file)) ? $file['size'] : null,
-                    ];
-                }
-                return ['result' => $result];
-                break;
-            default:
-                throw new HttpException('Not implemented.');
-        }
+
+        $fileManagerApi = new FileManagerApi(\Yii::$app->fs);
+
+        $rest = new Rest();
+        $rest->post([$fileManagerApi, 'postHandler'])
+            ->get([$fileManagerApi, 'getHandler'])
+            ->handle();
     }
 
 }
