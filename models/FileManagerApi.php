@@ -307,8 +307,7 @@ class FileManagerApi
             $stream   = fopen($file['tmp_name'], 'r+');
             $uploaded = $this->_filesystem->writeStream(
                 $path . '/' . $file['name'],
-                $stream,
-                ['visibility' => AdapterInterface::VISIBILITY_PUBLIC]
+                $stream
             );
             if ($uploaded === false) {
                 return false;
@@ -493,7 +492,7 @@ class FileManagerApi
             return 'exists';
         }
 
-        return $this->_filesystem->createDir($path, ['visibility' => AdapterInterface::VISIBILITY_PUBLIC]);
+        return $this->_filesystem->createDir($path);
     }
 
     /**
