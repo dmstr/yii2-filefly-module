@@ -23,9 +23,6 @@ use yii\behaviors\TimestampBehavior;
  */
 abstract class FileflyHashmap extends \yii\db\ActiveRecord
 {
-
-
-
     /**
      * @inheritdoc
      */
@@ -34,25 +31,13 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
         return 'filefly_hashmap';
     }
 
-
-    /**
-     * @inheritdoc
-     */
-    public function behaviors()
-    {
-        return [
-            [
-                'class' => TimestampBehavior::className(),
-            ],
-        ];
-    }
-
     /**
      * @inheritdoc
      */
     public function rules()
     {
         return [
+            [['path'], 'required'],
             [['access_owner'], 'integer'],
             [['path'], 'string', 'max' => 745],
             [['access_domain', 'access_read', 'access_update', 'access_delete'], 'string', 'max' => 255],
@@ -77,8 +62,4 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
             'updated_at' => Yii::t('app', 'Updated At'),
         ];
     }
-
-
-
-
 }

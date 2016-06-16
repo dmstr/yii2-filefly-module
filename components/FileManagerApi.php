@@ -2,10 +2,12 @@
 namespace hrzg\filefly\components;
 
 use creocoder\flysystem\Filesystem;
+use hrzg\filefly\plugins\CheckPermission;
 use hrzg\filefly\plugins\FindPermissions;
 use hrzg\filefly\plugins\GrandPermission;
 use hrzg\filefly\plugins\Permissions;
-use League\Flysystem\AdapterInterface;
+use hrzg\filefly\plugins\RemovePermission;
+use hrzg\filefly\plugins\SetPermission;
 use League\Flysystem\Util;
 use yii\base\Component;
 
@@ -79,10 +81,12 @@ class FileManagerApi extends Component
 
         // add plugins
         $this->_filesystem->addPlugin(new FindPermissions());
-        $this->_filesystem->addPlugin(new GrandPermission());
+        $this->_filesystem->addPlugin(new CheckPermission());
+        $this->_filesystem->addPlugin(new SetPermission());
+        $this->_filesystem->addPlugin(new RemovePermission());
 
         // init language handler
-        $this->_translate  = new Translate(\Yii::$app->language);
+        $this->_translate = new Translate(\Yii::$app->language);
     }
 
     /**
@@ -248,67 +252,6 @@ class FileManagerApi extends Component
     /**
      * WORKS
      *
-     * @param $queries
-     *
-     * @return Response
-     */
-    public function getHandler($queries)
-    {
-
-        switch ($queries['action']) {
-            case 'download':
-                $downloaded = $this->downloadAction($queries['path']);
-                if ($downloaded === true) {
-                    exit;
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
-                }
-
-                break;
-
-            default:
-                $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
-                break;
-        }
-
-        return $response;
-    }
-
-    /**
-     * WORKS
-     *
-     * @param $file
-     *
-     * @return bool
-     */
-    private function downloadAction($file)
-    {
-        if (!$this->_filesystem->get($file)->isFile()) {
-            return false;
-        }
-
-        $quoted = sprintf('"%s"', addcslashes(basename($file), '"\\'));
-        $size   = $this->_filesystem->getSize($file);
-
-        header('Content-Description: File Transfer');
-        header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename=' . $quoted);
-        header('Content-Transfer-Encoding: binary');
-        header('Connection: Keep-Alive');
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
-        header('Pragma: public');
-        header('Content-Length: ' . $size);
-
-        $stream = $this->_filesystem->readStream($file);
-        echo stream_get_contents($stream);
-        fclose($stream);
-        return true;
-    }
-
-    /**
-     * WORKS
-     *
      * @param $path
      * @param $files
      *
@@ -318,16 +261,60 @@ class FileManagerApi extends Component
     {
         foreach ($files as $file) {
             $stream   = fopen($file['tmp_name'], 'r+');
-            $uploaded = $this->_filesystem->writeStream(
-                $path . '/' . $file['name'],
-                $stream
-            );
+            $fullPath = $path . '/' . $file['name'];
+            $uploaded = $this->_filesystem->writeStream($fullPath, $stream);
             if ($uploaded === false) {
+                return false;
+            }
+
+            // set permission
+            $setPermission = $this->_filesystem->setPermission($fullPath);
+            if ($setPermission === false) {
+                // TODO error output
                 return false;
             }
         }
 
         return true;
+    }
+
+    /**
+     * @return Response
+     */
+    private function simpleSuccessResponse()
+    {
+        $response = new Response();
+        $response->setData(
+            [
+                'result' => [
+                    'success' => true
+                ]
+            ]
+        );
+
+        return $response;
+    }
+
+    /**
+     * @param $message
+     *
+     * @return Response
+     */
+    private function simpleErrorResponse($message)
+    {
+        $response = new Response();
+        $response
+            ->setStatus(500, 'Internal Server Error')
+            ->setData(
+                [
+                    'result' => [
+                        'success' => false,
+                        'error'   => $message
+                    ]
+                ]
+            );
+
+        return $response;
     }
 
     /**
@@ -351,7 +338,7 @@ class FileManagerApi extends Component
 
         foreach ($contents AS $item) {
 
-            if (!$this->_filesystem->check($item, $allowedFiles)) {
+            if (!$this->_filesystem->checkPermission($item, $allowedFiles)) {
                 continue;
             }
 
@@ -393,7 +380,21 @@ class FileManagerApi extends Component
         if (!$this->_filesystem->get($oldPath)->isFile() && !$this->_filesystem->get($oldPath)->isDir()) {
             return 'notfound';
         }
-        return $this->_filesystem->get($oldPath)->rename($newPath);
+
+        // rename
+        $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
+        if ($renamed === false) {
+            return false;
+        }
+
+        // Update permissions
+        $updatePermission = $this->_filesystem->setPermission($oldPath, $newPath);
+        if ($updatePermission === false) {
+            // TODO error output
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -410,10 +411,19 @@ class FileManagerApi extends Component
             if (!$this->_filesystem->get($oldPath)->isFile() && !$this->_filesystem->get($oldPath)->isDir()) {
                 return false;
             }
-            $renamed = $this->_filesystem->get($oldPath)->rename($newPath . '/' . basename($oldPath));
+            $newPath = $newPath . '/' . basename($oldPath);
+            $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
             if ($renamed === false) {
                 return false;
             }
+
+            // Update permissions
+            $updatePermission = $this->_filesystem->setPermission($oldPath, $newPath);
+            if ($updatePermission === false) {
+                // TODO error output
+                return false;
+            }
+
         }
         return true;
     }
@@ -433,8 +443,18 @@ class FileManagerApi extends Component
             if (!$this->_filesystem->get($oldPath)->isFile()) {
                 return false;
             }
-            $copied = $this->_filesystem->get($oldPath)->copy($newPath . '/' . basename($oldPath));
+
+            $newPath = $newPath . '/' . basename($oldPath);
+            $copied  = $this->_filesystem->get($oldPath)->copy($newPath);
             if ($copied === false) {
+                // TODO error output
+                return false;
+            }
+
+            // Update permissions
+            $setPermission = $this->_filesystem->setPermission($newPath);
+            if ($setPermission === false) {
+                // TODO error output
                 return false;
             }
         }
@@ -454,7 +474,8 @@ class FileManagerApi extends Component
 
             if ($this->_filesystem->get($path)->isDir()) {
 
-                $dirEmpty = (new \FilesystemIterator($this->_filesystem->getAdapter()->getPathPrefix() . $path))->valid();
+                $dirEmpty = (new \FilesystemIterator($this->_filesystem->getAdapter()->getPathPrefix() . $path))
+                    ->valid();
 
                 if ($dirEmpty) {
                     return 'notempty';
@@ -465,6 +486,12 @@ class FileManagerApi extends Component
             }
 
             if ($removed === false) {
+                return false;
+            }
+
+            $removedPermission = $this->_filesystem->removePermission($path);
+            if ($removedPermission === false) {
+                // TODO error output
                 return false;
             }
         }
@@ -517,8 +544,19 @@ class FileManagerApi extends Component
         if ($this->_filesystem->has($path)) {
             return 'exists';
         }
+        $newDir = $this->_filesystem->createDir($path);
+        if ($newDir === false) {
+            return false;
+        }
 
-        return $this->_filesystem->createDir($path);
+        // set permissions
+        $setPermission = $this->_filesystem->setPermission($path);
+        if ($setPermission === false) {
+            // TODO error output
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -609,41 +647,64 @@ class FileManagerApi extends Component
     }
 
     /**
+     * WORKS
+     *
+     * @param $queries
+     *
      * @return Response
      */
-    private function simpleSuccessResponse()
+    public function getHandler($queries)
     {
-        $response = new Response();
-        $response->setData(
-            [
-                'result' => [
-                    'success' => true
-                ]
-            ]
-        );
+
+        switch ($queries['action']) {
+            case 'download':
+                $downloaded = $this->downloadAction($queries['path']);
+                if ($downloaded === true) {
+                    exit;
+                } else {
+                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
+                }
+
+                break;
+
+            default:
+                $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
+                break;
+        }
 
         return $response;
     }
 
     /**
-     * @param $message
+     * WORKS
      *
-     * @return Response
+     * @param $file
+     *
+     * @return bool
      */
-    private function simpleErrorResponse($message)
+    private function downloadAction($file)
     {
-        $response = new Response();
-        $response
-            ->setStatus(500, 'Internal Server Error')
-            ->setData(
-                [
-                    'result' => [
-                        'success' => false,
-                        'error'   => $message
-                    ]
-                ]
-            );
+        if (!$this->_filesystem->get($file)->isFile()) {
+            return false;
+        }
 
-        return $response;
+        $quoted = sprintf('"%s"', addcslashes(basename($file), '"\\'));
+        $size   = $this->_filesystem->getSize($file);
+
+        header('Content-Description: File Transfer');
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename=' . $quoted);
+        header('Content-Transfer-Encoding: binary');
+        header('Connection: Keep-Alive');
+        header('Expires: 0');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Pragma: public');
+        header('Content-Length: ' . $size);
+
+
+        $stream = $this->_filesystem->readStream($file);
+        echo stream_get_contents($stream);
+        fclose($stream);
+        return true;
     }
 }

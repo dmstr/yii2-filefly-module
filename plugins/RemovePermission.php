@@ -9,16 +9,17 @@
 
 namespace hrzg\filefly\plugins;
 
+use hrzg\filefly\models\FileflyHashmap;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
 
 
 /**
- * Class GrandPermission
+ * Class RemovePermission
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class GrandPermission implements PluginInterface
+class RemovePermission implements PluginInterface
 {
     protected $filesystem;
 
@@ -35,29 +36,34 @@ class GrandPermission implements PluginInterface
      */
     public function getMethod()
     {
-        return 'check';
+        return 'removePermission';
     }
 
-
     /**
-     * @param string $item the path string of the file or directory
-     * @param array $files
+     * The full path strings of the file or directory to be removed
+     *
+     * @param string $temPath
      *
      * @return bool
      */
-    public function handle($item = null, array $files)
+    public function handle($temPath = null)
     {
-        if (empty($files)) {
+        $temPath = ltrim($temPath, '/');
+
+        // find has for item
+        $oldHash = FileflyHashmap::find()
+            ->where(['path' => $temPath])
+            ->one();
+
+        if (empty($oldHash)) {
+            \Yii::error('Could not find item [' . $temPath . '] in hash table!', __METHOD__);
             return false;
         }
 
-        foreach ($files as $file) {
-            #\Yii::error($item['path'], 'can.$item');
-            #\Yii::error($file['path'], 'can.$file');
-            if (in_array($item['path'], $file)) {
-                return true;
-            }
+        if (!$oldHash->delete()) {
+            \Yii::error('Could not delete item [' . $temPath . '] in hash table!', __METHOD__);
+            return false;
         }
-        return false;
+        return true;
     }
 }
