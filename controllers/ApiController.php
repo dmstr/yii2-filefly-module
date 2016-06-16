@@ -2,11 +2,14 @@
 
 namespace hrzg\filefly\controllers;
 
-use hrzg\filefly\models\FileManagerApi;
-use hrzg\filefly\models\Rest;
+use hrzg\filefly\components\FileManagerApi;
+use hrzg\filefly\components\Rest;
+use hrzg\filefly\plugins\Permissions;
+use yii\helpers\VarDumper;
 
 class ApiController extends \yii\rest\Controller
 {
+
     public function behaviors()
     {
         $behaviors               = parent::behaviors();
@@ -25,7 +28,7 @@ class ApiController extends \yii\rest\Controller
 
     public function actionIndex()
     {
-
+        // Manager API
         $fileManagerApi = new FileManagerApi(\Yii::$app->fs);
 
         $rest = new Rest();

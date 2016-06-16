@@ -1,9 +1,13 @@
 <?php
-namespace hrzg\filefly\models;
+namespace hrzg\filefly\components;
 
 use creocoder\flysystem\Filesystem;
+use hrzg\filefly\plugins\FindPermissions;
+use hrzg\filefly\plugins\GrandPermission;
+use hrzg\filefly\plugins\Permissions;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Util;
+use yii\base\Component;
 
 /**
  * Class FileManagerApi
@@ -46,7 +50,7 @@ use League\Flysystem\Util;
  * @method boolean writeStream(string $path, resource $resource, array $config = [])
  *
  */
-class FileManagerApi
+class FileManagerApi extends Component
 {
     /**
      * @var null
@@ -64,11 +68,20 @@ class FileManagerApi
      */
     public function __construct(Filesystem $fs, $muteErrors = false)
     {
+        parent::__construct();
+
         if (!$muteErrors) {
             ini_set('display_errors', 1);
         }
 
+        // set filesystem
         $this->_filesystem = $fs;
+
+        // add plugins
+        $this->_filesystem->addPlugin(new FindPermissions());
+        $this->_filesystem->addPlugin(new GrandPermission());
+
+        // init language handler
         $this->_translate  = new Translate(\Yii::$app->language);
     }
 
@@ -327,28 +340,41 @@ class FileManagerApi
     private function listAction($path)
     {
         $files = [];
-        foreach ($this->_filesystem->listContents($path) AS $file) {
+
+        // get all filesystem path contents
+        $contents = $this->_filesystem->listContents($path);
+
+        /**
+         * @var $readPermissions array
+         */
+        $readPermissions = $this->_filesystem->getPermissions('read', $contents);
+
+        foreach ($contents AS $item) {
+
+            if (!$this->_filesystem->can($item, $readPermissions)) {
+                continue;
+            }
 
             // fix for filesystems where folders has no date
-            if (array_key_exists('timestamp', $file)) {
-                $date = new \DateTime('@' . $this->_filesystem->getTimestamp($file['path']));
+            if (array_key_exists('timestamp', $item)) {
+                $date = new \DateTime('@' . $this->_filesystem->getTimestamp($item['path']));
             } else {
                 $date = new \DateTime();
             }
 
             // fix for filesystems where folders has no size
-            if (array_key_exists('size', $file)) {
-                $size = $file['size'];
+            if (array_key_exists('size', $item)) {
+                $size = $item['size'];
             } else {
                 $size = 0;
             }
 
             $files[] = [
-                'name' => $file['basename'],
-                // 'rights' => $this->_filesystem->getMetadata($file['path']),
+                'name' => $item['basename'],
+                // 'rights' => $this->_filesystem->getMetadata($item['path']),
                 'size' => $size,
                 'date' => $date->format('Y-m-d H:i:s'),
-                'type' => $file['type'],
+                'type' => $item['type'],
             ];
         }
         return $files;

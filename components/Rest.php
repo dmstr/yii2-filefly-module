@@ -1,5 +1,5 @@
 <?php
-namespace hrzg\filefly\models;
+namespace hrzg\filefly\components;
 
 /**
  * REST class
