@@ -351,7 +351,7 @@ class FileManagerApi extends Component
 
         foreach ($contents AS $item) {
 
-            if (!$this->_filesystem->can($item, $readPermissions)) {
+            if (!$this->_filesystem->check($item, $readPermissions)) {
                 continue;
             }
 

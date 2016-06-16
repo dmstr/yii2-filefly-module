@@ -51,10 +51,7 @@ class FindPermissions implements PluginInterface
         \Yii::error($action, 'readPermission.$action');
 
 
-        // TODO query contents permissions by giben action
-
-
-        // TODO return array with files/folders which are accessible for the user
+        // TODO query contents permissions by given action
         switch ($action) {
             case 'read':
 
@@ -71,6 +68,9 @@ class FindPermissions implements PluginInterface
             default:
                 return [];
         }
+
+        // TODO return array with files/folders which are accessible for the user
+
         return [
             'Test',
             'Test/file_2.jpeg',

@@ -35,7 +35,7 @@ class GrandPermission implements PluginInterface
      */
     public function getMethod()
     {
-        return 'can';
+        return 'check';
     }
 
 
