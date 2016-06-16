@@ -39,7 +39,8 @@ class CheckPermission implements PluginInterface
     }
 
     /**
-     * @param string $item the path string of the file or directory
+     * the path string of the file or directory to be checked
+     * @param string $item
      * @param array $files
      *
      * @return bool

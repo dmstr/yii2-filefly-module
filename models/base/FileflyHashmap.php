@@ -19,7 +19,6 @@ use yii\behaviors\TimestampBehavior;
  * @property string $access_delete
  * @property string $created_at
  * @property string $updated_at
- * @property string $aliasModel
  */
 abstract class FileflyHashmap extends \yii\db\ActiveRecord
 {
