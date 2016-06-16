@@ -345,13 +345,13 @@ class FileManagerApi extends Component
         $contents = $this->_filesystem->listContents($path);
 
         /**
-         * @var $readPermissions array
+         * @var $allowedFiles array
          */
-        $readPermissions = $this->_filesystem->getPermissions('read', $contents);
+        $allowedFiles = $this->_filesystem->getPermissions($contents);
 
         foreach ($contents AS $item) {
 
-            if (!$this->_filesystem->check($item, $readPermissions)) {
+            if (!$this->_filesystem->check($item, $allowedFiles)) {
                 continue;
             }
 

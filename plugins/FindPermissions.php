@@ -9,6 +9,7 @@
 
 namespace hrzg\filefly\plugins;
 
+use hrzg\filefly\models\FileflyHashmap;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
 
@@ -39,43 +40,30 @@ class FindPermissions implements PluginInterface
     }
 
     /**
-     * @param null $action
      * @param array $contents
      *
      * @return bool
      */
-    public function handle($action = null, array $contents)
+    public function handle(array $contents)
     {
-        \Yii::error(\Yii::$app->user->id, 'user.id');
-        \Yii::error($contents, 'readPermission.$contents');
-        \Yii::error($action, 'readPermission.$action');
+        $files = [];
 
+        \Yii::info($contents, 'getPermissions.$contents');
 
-        // TODO query contents permissions by given action
-        switch ($action) {
-            case 'read':
-
-                break;
-
-            case 'update':
-
-                break;
-
-            case 'delete':
-
-                break;
-
-            default:
-                return [];
+        foreach ($contents as $file) {
+            $files[] = $file['path'];
         }
 
-        // TODO return array with files/folders which are accessible for the user
+        \Yii::info($files, 'getPermissions.$files');
 
-        return [
-            'Test',
-            'Test/file_2.jpeg',
-            'Test/Unterordner_1',
-            'Test/Unterordner_1/file_3.jpeg',
-        ];
+        $hashes = FileflyHashmap::find()
+            ->select(['path'])
+            ->andWhere(['IN', 'path', $files])
+            ->asArray()
+            ->all();
+
+        \Yii::info($hashes, 'getPermissions.$hashes');
+
+        return $hashes;
     }
 }

@@ -40,16 +40,24 @@ class GrandPermission implements PluginInterface
 
 
     /**
-     * @param null $item
-     * @param array $permissions
+     * @param string $item the path string of the file or directory
+     * @param array $files
      *
      * @return bool
      */
-    public function handle($item = null, array $permissions)
+    public function handle($item = null, array $files)
     {
-        \Yii::error($item, 'can.$item');
-        \Yii::error($permissions, 'can.$permissions');
+        if (empty($files)) {
+            return false;
+        }
 
-        return (in_array($item['path'], $permissions)) ? true : false;
+        foreach ($files as $file) {
+            #\Yii::error($item['path'], 'can.$item');
+            #\Yii::error($file['path'], 'can.$file');
+            if (in_array($item['path'], $file)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

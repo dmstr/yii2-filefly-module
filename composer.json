@@ -3,11 +3,15 @@
     "description": "FlySystem API for Filemanager",
     "type": "yii2-extension",
     "keywords": ["yii2","extension"],
-    "license": "Apache-2.0",
+    "license": "proprietary",
     "authors": [
         {
             "name": "Tobias Munk",
             "email": "tobias@diemeisterei.de"
+        },
+        {
+            "name": "Christopher Stebe",
+            "email": "c.stebe@herzogkommunikation.de"
         }
     ],
     "require": {

@@ -19,7 +19,7 @@ use yii\base\BootstrapInterface;
 class Bootstrap implements BootstrapInterface
 {
     /**
-     * Register module as `moxiemanager`
+     * Register module as `filefly`
      *
      * @param \yii\base\Application $app
      */
