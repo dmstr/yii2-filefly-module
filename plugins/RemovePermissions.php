@@ -16,11 +16,11 @@ use yii\helpers\StringHelper;
 
 
 /**
- * Class RemovePermission
+ * Class RemovePermissions
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class RemovePermission implements PluginInterface
+class RemovePermissions implements PluginInterface
 {
     protected $filesystem;
 
@@ -46,33 +46,42 @@ class RemovePermission implements PluginInterface
     /**
      * The full path strings of the file or directory to be removed
      *
-     * @param string $temPath
+     * @param string $itemPath
      *
      * @return bool
      */
-    public function handle($temPath = null)
+    public function handle($itemPath = null)
     {
-        $temPath = ltrim($temPath, '/');
+        $itemPath = ltrim($itemPath, '/');
 
-        // find has for item
-        $oldHash = FileflyHashmap::find()
-            ->where(
-                [
-                    'filesystem' => $this->adapterName,
-                    'path'       => $temPath,
-                ]
-            )
-            ->one();
+        return $this->removeRecursive($itemPath);
+    }
 
-        if (empty($oldHash)) {
-            \Yii::error('Could not find item [' . $temPath . '] in hash table!', __METHOD__);
+    /**
+     * @param null $itemPath
+     *
+     * @return bool
+     */
+    private function removeRecursive($itemPath = null)
+    {
+        $items = FileflyHashmap::find()
+            ->andWhere(['filesystem' => $this->adapterName])
+            ->andWhere(['like', 'path', $itemPath . '%', false])
+            ->all();
+
+        if ($items === null) {
+            \Yii::error('Could not find items in [' . $itemPath . '] in hash table!', __METHOD__);
             return false;
         }
 
-        if (!$oldHash->delete()) {
-            \Yii::error('Could not delete item [' . $temPath . '] in hash table!', __METHOD__);
-            return false;
+        foreach ($items as $item) {
+
+            if (!$item->delete()) {
+                \Yii::error('Could not delete item [' . $itemPath . '] in hash table!', __METHOD__);
+                return false;
+            }
         }
+
         return true;
     }
 }

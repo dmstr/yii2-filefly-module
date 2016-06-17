@@ -4,9 +4,7 @@ namespace hrzg\filefly\components;
 use creocoder\flysystem\Filesystem;
 use hrzg\filefly\plugins\CheckPermission;
 use hrzg\filefly\plugins\FindPermissions;
-use hrzg\filefly\plugins\GrandPermission;
-use hrzg\filefly\plugins\Permissions;
-use hrzg\filefly\plugins\RemovePermission;
+use hrzg\filefly\plugins\RemovePermissions;
 use hrzg\filefly\plugins\SetPermission;
 use League\Flysystem\Util;
 use yii\base\Component;
@@ -83,7 +81,7 @@ class FileManagerApi extends Component
         $this->_filesystem->addPlugin(new FindPermissions());
         $this->_filesystem->addPlugin(new CheckPermission());
         $this->_filesystem->addPlugin(new SetPermission());
-        $this->_filesystem->addPlugin(new RemovePermission());
+        $this->_filesystem->addPlugin(new RemovePermissions());
 
         // init language handler
         $this->_translate = new Translate(\Yii::$app->language);
