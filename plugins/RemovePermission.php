@@ -12,6 +12,7 @@ namespace hrzg\filefly\plugins;
 use hrzg\filefly\models\FileflyHashmap;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
+use yii\helpers\StringHelper;
 
 
 /**
@@ -23,12 +24,15 @@ class RemovePermission implements PluginInterface
 {
     protected $filesystem;
 
+    protected $adapterName;
+
     /**
      * @param FilesystemInterface $filesystem
      */
     public function setFilesystem(FilesystemInterface $filesystem)
     {
-        $this->filesystem = $filesystem;
+        $this->filesystem  = $filesystem;
+        $this->adapterName = StringHelper::basename(get_class($filesystem->getAdapter()));
     }
 
     /**
@@ -52,7 +56,12 @@ class RemovePermission implements PluginInterface
 
         // find has for item
         $oldHash = FileflyHashmap::find()
-            ->where(['path' => $temPath])
+            ->where(
+                [
+                    'filesystem' => $this->adapterName,
+                    'path'       => $temPath,
+                ]
+            )
             ->one();
 
         if (empty($oldHash)) {

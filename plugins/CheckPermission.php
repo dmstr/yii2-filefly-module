@@ -39,7 +39,8 @@ class CheckPermission implements PluginInterface
     }
 
     /**
-     * the path string of the file or directory to be checked
+     * The path string of the file or directory to be checked
+     *
      * @param string $item
      * @param array $files
      *
@@ -52,8 +53,6 @@ class CheckPermission implements PluginInterface
         }
 
         foreach ($files as $file) {
-            #\Yii::error($item['path'], 'can.$item');
-            #\Yii::error($file['path'], 'can.$file');
             if (in_array($item['path'], $file)) {
                 return true;
             }
