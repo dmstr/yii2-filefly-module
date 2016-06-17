@@ -37,12 +37,13 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['path'], 'required'],
+            [['filesystem', 'path'], 'required'],
             [['access_owner'], 'integer'],
+            [['created_at', 'updated_at'], 'safe'],
             [['filesystem'], 'string', 'max' => 45],
             [['path'], 'string', 'max' => 745],
             [['access_domain', 'access_read', 'access_update', 'access_delete'], 'string', 'max' => 255],
-            [['path'], 'unique']
+            [['filesystem', 'path'], 'unique', 'targetAttribute' => ['filesystem', 'path'], 'message' => 'The combination of Filesystem and Path has already been taken.']
         ];
     }
 
