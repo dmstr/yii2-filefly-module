@@ -6,8 +6,7 @@ use dmstr\web\traits\AccessBehaviorTrait;
 
 class Module extends \yii\base\Module
 {
-    // TODO Api controller!
-    #use AccessBehaviorTrait;
+    use AccessBehaviorTrait;
 
     public $controllerNamespace = 'hrzg\filefly\controllers';
 
