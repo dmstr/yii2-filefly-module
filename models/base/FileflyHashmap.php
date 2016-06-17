@@ -11,6 +11,7 @@ use yii\behaviors\TimestampBehavior;
  * This is the base-model class for table "filefly_hashmap".
  *
  * @property integer $id
+ * @property string $filesystem
  * @property string $path
  * @property string $access_domain
  * @property integer $access_owner
@@ -38,6 +39,7 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
         return [
             [['path'], 'required'],
             [['access_owner'], 'integer'],
+            [['filesystem'], 'string', 'max' => 45],
             [['path'], 'string', 'max' => 745],
             [['access_domain', 'access_read', 'access_update', 'access_delete'], 'string', 'max' => 255],
             [['path'], 'unique']
@@ -51,6 +53,7 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
     {
         return [
             'id' => Yii::t('app', 'ID'),
+            'filesystem' => Yii::t('app', 'Filesystem'),
             'path' => Yii::t('app', 'Path'),
             'access_domain' => Yii::t('app', 'Access Domain'),
             'access_owner' => Yii::t('app', 'Access Owner'),
