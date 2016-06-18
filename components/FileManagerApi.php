@@ -510,8 +510,8 @@ class FileManagerApi extends Component
         if (!$this->_filesystem->get($path)->isFile()) {
             return false;
         }
-
-        return file_put_contents($this->_filesystem->getAdapter()->getPathPrefix() . $path, $content);
+        $fullPath = $this->_filesystem->getAdapter()->getPathPrefix() . $path;
+        return file_put_contents($fullPath, $content);
     }
 
     /**
@@ -526,8 +526,8 @@ class FileManagerApi extends Component
         if (!$this->_filesystem->get($path)->isFile()) {
             return false;
         }
-
-        return file_get_contents($this->_filesystem->getAdapter()->getPathPrefix() . $path);
+        $fullPath = $this->_filesystem->getAdapter()->getPathPrefix() . $path;
+        return file_get_contents($fullPath);
     }
 
     /**
