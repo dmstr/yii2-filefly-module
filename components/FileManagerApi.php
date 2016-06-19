@@ -379,16 +379,16 @@ class FileManagerApi extends Component
             return 'notfound';
         }
 
-        // rename
-        $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
-        if ($renamed === false) {
-            return false;
-        }
-
         // Update permissions
         $updatePermission = $this->_filesystem->setPermission($oldPath, $newPath);
         if ($updatePermission === false) {
             // TODO error output
+            return false;
+        }
+
+        // rename
+        $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
+        if ($renamed === false) {
             return false;
         }
 
@@ -409,11 +409,6 @@ class FileManagerApi extends Component
             if (!$this->_filesystem->get($oldPath)->isFile() && !$this->_filesystem->get($oldPath)->isDir()) {
                 return false;
             }
-            $newPath = $newPath . '/' . basename($oldPath);
-            $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
-            if ($renamed === false) {
-                return false;
-            }
 
             // Update permissions
             $updatePermission = $this->_filesystem->setPermission($oldPath, $newPath);
@@ -422,6 +417,11 @@ class FileManagerApi extends Component
                 return false;
             }
 
+            $newPath = $newPath . '/' . basename($oldPath);
+            $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
+            if ($renamed === false) {
+                return false;
+            }
         }
         return true;
     }
@@ -442,16 +442,16 @@ class FileManagerApi extends Component
                 return false;
             }
 
-            $newPath = $newPath . '/' . basename($oldPath);
-            $copied  = $this->_filesystem->get($oldPath)->copy($newPath);
-            if ($copied === false) {
+            // Update permissions
+            $setPermission = $this->_filesystem->setPermission($newPath);
+            if ($setPermission === false) {
                 // TODO error output
                 return false;
             }
 
-            // Update permissions
-            $setPermission = $this->_filesystem->setPermission($newPath);
-            if ($setPermission === false) {
+            $newPath = $newPath . '/' . basename($oldPath);
+            $copied  = $this->_filesystem->get($oldPath)->copy($newPath);
+            if ($copied === false) {
                 // TODO error output
                 return false;
             }
@@ -470,6 +470,12 @@ class FileManagerApi extends Component
     {
         foreach ($paths as $path) {
 
+            $removedPermission = $this->_filesystem->removePermission($path);
+            if ($removedPermission === false) {
+                // TODO error output
+                return false;
+            }
+
             if ($this->_filesystem->get($path)->isDir()) {
 
                 $dirEmpty = (new \FilesystemIterator($this->_filesystem->getAdapter()->getPathPrefix() . $path))
@@ -484,12 +490,6 @@ class FileManagerApi extends Component
             }
 
             if ($removed === false) {
-                return false;
-            }
-
-            $removedPermission = $this->_filesystem->removePermission($path);
-            if ($removedPermission === false) {
-                // TODO error output
                 return false;
             }
         }
