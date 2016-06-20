@@ -132,41 +132,68 @@ class FileManagerApi extends Component
 
             case 'rename':
                 $renamed = $this->renameAction($request['item'], $request['newItemPath']);
-                if ($renamed === true) {
-                    $response = $this->simpleSuccessResponse();
-                } elseif ($renamed === 'notfound') {
-                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->renaming_failed);
+                switch (true) {
+                    case $renamed === 'notfound':
+                        $response = $this->simpleErrorResponse($this->_translate->file_not_found);
+                        break;
+                    case $renamed === 'nopermission':
+                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied);
+                        break;
+                    case $renamed === 'renamefailed':
+                        $response = $this->simpleErrorResponse($this->_translate->renaming_failed);
+                        break;
+                    case $renamed === true:
+                        $response = $this->simpleSuccessResponse();
+                        break;
                 }
                 break;
 
             case 'move':
                 $moved = $this->moveAction($request['items'], $request['newPath']);
-                if ($moved === true) {
-                    $response = $this->simpleSuccessResponse();
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->moving_failed);
+                switch (true) {
+                    case $moved === 'notfound':
+                        \Yii::error($moved, '$moved');
+                        $response = $this->simpleErrorResponse($this->_translate->file_not_found);
+                        break;
+                    case $moved === 'nopermission':
+                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied);
+                        break;
+                    case $moved === 'movefailed':
+                        $response = $this->simpleErrorResponse($this->_translate->moving_failed);
+                        break;
+                    case $moved === true:
+                        $response = $this->simpleSuccessResponse();
+                        break;
                 }
                 break;
 
             case 'copy':
                 $copied = $this->copyAction($request['items'], $request['newPath']);
-                if ($copied === true) {
-                    $response = $this->simpleSuccessResponse();
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->copying_failed);
+                switch (true) {
+                    case $copied === 'copyfailed':
+                        $response = $this->simpleErrorResponse($this->_translate->copying_failed);
+                        break;
+                    case $copied === true:
+                        $response = $this->simpleSuccessResponse();
+                        break;
                 }
                 break;
 
             case 'remove':
                 $removed = $this->removeAction($request['items']);
-                if ($removed === true) {
-                    $response = $this->simpleSuccessResponse();
-                } elseif ($removed === 'notempty') {
-                    $response = $this->simpleErrorResponse($this->_translate->removing_failed_directory_not_empty);
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->removing_failed);
+                switch (true) {
+                    case $removed === 'notempty':
+                        $response = $this->simpleErrorResponse($this->_translate->removing_failed_directory_not_empty);
+                        break;
+                    case $removed === 'nopermission':
+                        $response = $this->simpleErrorResponse($this->_translate->permission_delete_denied);
+                        break;
+                    case $removed === 'removefailed':
+                        $response = $this->simpleErrorResponse($this->_translate->removing_failed);
+                        break;
+                    case $removed === true:
+                        $response = $this->simpleSuccessResponse();
+                        break;
                 }
                 break;
 
@@ -195,13 +222,20 @@ class FileManagerApi extends Component
 
             case 'createFolder':
                 $created = $this->createFolderAction($request['newPath']);
-                if ($created === true) {
-                    $response = $this->simpleSuccessResponse();
-                } elseif ($created === 'exists') {
-                    $response = $this->simpleErrorResponse($this->_translate->folder_already_exists);
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->folder_creation_failed);
+                switch (true) {
+                    case $created === 'exists':
+                        $response = $this->simpleErrorResponse($this->_translate->folder_already_exists);
+                        break;
+                    case $created === 'nopermission':
+                        $response = $this->simpleErrorResponse($this->_translate->permission_folder_creation_failed);
+                        break;
+                    case $created === true:
+                        $response = $this->simpleSuccessResponse();
+                        break;
+                    default:
+                        $response = $this->simpleErrorResponse($this->_translate->folder_creation_failed);
                 }
+
                 break;
 
             case 'changePermissions':
@@ -215,7 +249,7 @@ class FileManagerApi extends Component
                 }
                 break;
 
-            case 'compress':
+            /*case 'compress':
                 $compressed = $this->compressAction(
                     $request['items'],
                     $request['destination'],
@@ -237,7 +271,7 @@ class FileManagerApi extends Component
                 } else {
                     $response = $this->simpleErrorResponse($this->_translate->extraction_failed);
                 }
-                break;
+                break;*/
 
             default:
                 $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
@@ -376,14 +410,13 @@ class FileManagerApi extends Component
         // Update permissions
         $updatePermission = $this->_filesystem->setPermission($oldPath, $newPath);
         if ($updatePermission === false) {
-            // TODO error output
-            return false;
+            return 'nopermission';
         }
 
         // rename
         $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
         if ($renamed === false) {
-            return false;
+            return 'renamefailed';
         }
 
         return true;
@@ -399,7 +432,7 @@ class FileManagerApi extends Component
     {
         foreach ($oldPaths as $oldPath) {
             if (!$this->_filesystem->get($oldPath)->isFile() && !$this->_filesystem->get($oldPath)->isDir()) {
-                return false;
+                return 'notfound';
             }
 
             // Build new path
@@ -408,14 +441,13 @@ class FileManagerApi extends Component
             // Update permissions
             $updatePermission = $this->_filesystem->setPermission($oldPath, $newPath);
             if ($updatePermission === false) {
-                // TODO error output
-                return false;
+                return 'nopermission';
             }
 
             // Move file
-            $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
-            if ($renamed === false) {
-                return false;
+            $moved = $this->_filesystem->get($oldPath)->rename($newPath);
+            if ($moved === false) {
+                return 'movefailed';
             }
         }
         return true;
@@ -443,14 +475,12 @@ class FileManagerApi extends Component
             // Update permissions
             $setPermission = $this->_filesystem->setPermission($newPath);
             if ($setPermission === false) {
-                // TODO error output
-                return false;
+                return 'nopermission';
             }
 
             $copied  = $this->_filesystem->get($oldPath)->copy($newPath);
             if ($copied === false) {
-                // TODO error output
-                return false;
+                return 'copyfailed';
             }
         }
         return true;
@@ -465,21 +495,19 @@ class FileManagerApi extends Component
     {
         foreach ($paths as $path) {
 
+            // permission handling
+            $removedPermission = $this->_filesystem->removePermission($path);
+            if ($removedPermission === false) {
+                return 'nopermission';
+            }
+
             if ($this->_filesystem->get($path)->isDir()) {
 
-                \Yii::error($this->_filesystem->getAdapter()->getPathPrefix() . $path, '$remove');
                 $dirEmpty = (new \FilesystemIterator($this->_filesystem->getAdapter()->getPathPrefix() . $path))
                     ->valid();
 
                 if ($dirEmpty) {
                     return 'notempty';
-                }
-
-                // permission handling
-                $removedPermission = $this->_filesystem->removePermission($path);
-                if ($removedPermission === false) {
-                    // TODO error output
-                    return false;
                 }
 
                 $removed = $this->_filesystem->get($path)->deleteDir($path);
@@ -488,7 +516,7 @@ class FileManagerApi extends Component
             }
 
             if ($removed === false) {
-                return false;
+                return 'removefailed';
             }
         }
 
@@ -542,8 +570,7 @@ class FileManagerApi extends Component
         // set permissions
         $setPermission = $this->_filesystem->setPermission($path);
         if ($setPermission === false) {
-            // TODO error output
-            return false;
+            return 'nopermission';
         }
 
         return true;
