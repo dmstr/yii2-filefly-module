@@ -465,20 +465,23 @@ class FileManagerApi extends Component
     {
         foreach ($paths as $path) {
 
-            $removedPermission = $this->_filesystem->removePermission($path);
-            if ($removedPermission === false) {
-                // TODO error output
-                return false;
-            }
-
             if ($this->_filesystem->get($path)->isDir()) {
 
+                \Yii::error($this->_filesystem->getAdapter()->getPathPrefix() . $path, '$remove');
                 $dirEmpty = (new \FilesystemIterator($this->_filesystem->getAdapter()->getPathPrefix() . $path))
                     ->valid();
 
                 if ($dirEmpty) {
                     return 'notempty';
                 }
+
+                // permission handling
+                $removedPermission = $this->_filesystem->removePermission($path);
+                if ($removedPermission === false) {
+                    // TODO error output
+                    return false;
+                }
+
                 $removed = $this->_filesystem->get($path)->deleteDir($path);
             } else {
                 $removed = $this->_filesystem->get($path)->delete($path);

@@ -5,27 +5,22 @@ FlySystem API for Filemanager
 Installation
 ------------
 
-The preferred way to install this extension is through [composer](http://getcomposer.org/download/).
+#### ENV variables
 
-Either run
+Variable | Value
+------------- | -------------
+AFM_FILESYSTEM | 'yii component name'
+
+i.e. `AFM_FILESYSTEM=fsLocal`
+
+:info: How to configure a filesystem component [Filesystem docs](https://github.com/creocoder/yii2-flysystem/blob/master/README.md)
+
+#### Yii config
 
 ```
-php composer.phar require --prefer-dist hrzg/yii2-filefly-module "*"
+'filefly' => [
+    'class' => 'hrzg\filefly\Module',
+    'layout' => '@backend/views/layouts/main',
+    'filesystem' => getenv('FILEFLY_FILESYSTEM')
+],
 ```
-
-or add
-
-```
-"hrzg/yii2-filefly-module": "*"
-```
-
-to the require section of your `composer.json` file.
-
-
-Usage
------
-
-Once the extension is installed, simply use it in your code by  :
-
-```php
-<?= \hrzg\filefly\AutoloadExample::widget(); ?>```
