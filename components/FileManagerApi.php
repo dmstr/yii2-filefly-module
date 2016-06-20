@@ -410,6 +410,9 @@ class FileManagerApi extends Component
                 return false;
             }
 
+            // Build new path
+            $newPath = $newPath . '/' . basename($oldPath);
+
             // Update permissions
             $updatePermission = $this->_filesystem->setPermission($oldPath, $newPath);
             if ($updatePermission === false) {
@@ -417,7 +420,7 @@ class FileManagerApi extends Component
                 return false;
             }
 
-            $newPath = $newPath . '/' . basename($oldPath);
+            // Move file
             $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
             if ($renamed === false) {
                 return false;
