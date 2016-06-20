@@ -12,7 +12,7 @@ namespace hrzg\filefly\plugins;
 use hrzg\filefly\models\FileflyHashmap;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
-use yii\helpers\StringHelper;
+use yii\base\Component;
 
 
 /**
@@ -20,19 +20,22 @@ use yii\helpers\StringHelper;
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class RemovePermissions implements PluginInterface
+class RemovePermissions extends Component implements PluginInterface
 {
-    protected $filesystem;
+    /**
+     * The yii component name of this filesystem
+     * @var string
+     */
+    public $component;
 
-    protected $adapterName;
+    protected $filesystem;
 
     /**
      * @param FilesystemInterface $filesystem
      */
     public function setFilesystem(FilesystemInterface $filesystem)
     {
-        $this->filesystem  = $filesystem;
-        $this->adapterName = StringHelper::basename(get_class($filesystem->getAdapter()));
+        $this->filesystem = $filesystem;
     }
 
     /**
@@ -65,7 +68,7 @@ class RemovePermissions implements PluginInterface
     private function removeRecursive($itemPath = null)
     {
         $items = FileflyHashmap::find()
-            ->andWhere(['filesystem' => $this->adapterName])
+            ->andWhere(['component' => $this->component])
             ->andWhere(['like', 'path', $itemPath . '%', false])
             ->all();
 

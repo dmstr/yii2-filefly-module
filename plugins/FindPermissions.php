@@ -12,7 +12,7 @@ namespace hrzg\filefly\plugins;
 use hrzg\filefly\models\FileflyHashmap;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
-use yii\helpers\StringHelper;
+use yii\base\Component;
 
 
 /**
@@ -20,19 +20,22 @@ use yii\helpers\StringHelper;
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class FindPermissions implements PluginInterface
+class FindPermissions extends Component implements PluginInterface
 {
-    protected $filesystem;
+    /**
+     * The yii component name of this filesystem
+     * @var string
+     */
+    public $component;
 
-    protected $adapterName;
+    protected $filesystem;
 
     /**
      * @param FilesystemInterface $filesystem
      */
     public function setFilesystem(FilesystemInterface $filesystem)
     {
-        $this->filesystem  = $filesystem;
-        $this->adapterName = StringHelper::basename(get_class($filesystem->getAdapter()));
+        $this->filesystem = $filesystem;
     }
 
     /**
@@ -52,22 +55,16 @@ class FindPermissions implements PluginInterface
     {
         $files = [];
 
-        \Yii::info($contents, 'getPermissions.$contents');
-
         foreach ($contents as $file) {
             $files[] = $file['path'];
         }
 
-        \Yii::info($files, 'getPermissions.$files');
-
         $hashes = FileflyHashmap::find()
             ->select(['path'])
-            ->andWhere(['filesystem' => $this->adapterName])
+            ->andWhere(['component' => $this->component])
             ->andWhere(['IN', 'path', $files])
             ->asArray()
             ->all();
-
-        \Yii::info($hashes, 'getPermissions.$hashes');
 
         return $hashes;
     }

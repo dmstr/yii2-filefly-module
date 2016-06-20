@@ -12,7 +12,7 @@ namespace hrzg\filefly\plugins;
 use hrzg\filefly\models\FileflyHashmap;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
-use yii\helpers\StringHelper;
+use yii\base\Component;
 
 
 /**
@@ -20,19 +20,22 @@ use yii\helpers\StringHelper;
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class SetPermission implements PluginInterface
+class SetPermission extends Component implements PluginInterface
 {
-    protected $filesystem;
+    /**
+     * The yii component name of this filesystem
+     * @var string
+     */
+    public $component;
 
-    protected $adapterName;
+    protected $filesystem;
 
     /**
      * @param FilesystemInterface $filesystem
      */
     public function setFilesystem(FilesystemInterface $filesystem)
     {
-        $this->filesystem  = $filesystem;
-        $this->adapterName = StringHelper::basename(get_class($filesystem->getAdapter()));
+        $this->filesystem = $filesystem;
     }
 
     /**
@@ -60,16 +63,17 @@ class SetPermission implements PluginInterface
         $oldHash = FileflyHashmap::find()
             ->where(
                 [
-                    'filesystem' => $this->adapterName,
-                    'path'       => $oldItemPath,
+                    'component' => $this->component,
+                    'path'      => $oldItemPath,
                 ]
             )
             ->one();
 
         // upload / create
         if (empty($oldHash)) {
-            $newHash = new FileflyHashmap(['filesystem' => $this->adapterName, 'path' => $oldItemPath]);
+            $newHash = new FileflyHashmap(['component' => $this->component, 'path' => $oldItemPath]);
             if (!$newHash->save()) {
+                \Yii::error($newHash->getErrors(), __METHOD__);
                 \Yii::error('Could not save new item [' . $oldItemPath . '] to hash table!', __METHOD__);
                 return false;
             }
@@ -90,7 +94,7 @@ class SetPermission implements PluginInterface
     private function updateRecursive($oldItemPath, $newItemPath = null)
     {
         $items = FileflyHashmap::find()
-            ->andWhere(['filesystem' => $this->adapterName])
+            ->andWhere(['component' => $this->component])
             ->andWhere(['like', 'path', $oldItemPath . '%', false])
             ->all();
 

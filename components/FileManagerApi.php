@@ -66,7 +66,7 @@ class FileManagerApi extends Component
      * @param Filesystem $fs
      * @param bool|true $muteErrors
      */
-    public function __construct(Filesystem $fs, $muteErrors = false)
+    public function __construct(Filesystem $fs, $fsComponent = null, $muteErrors = false)
     {
         parent::__construct();
 
@@ -78,18 +78,18 @@ class FileManagerApi extends Component
         $this->_filesystem = $fs;
 
         // add plugins
-        $this->_filesystem->addPlugin(new FindPermissions());
+        $component = ['component' => $fsComponent];
+        $this->_filesystem->addPlugin(new FindPermissions($component));
+        $this->_filesystem->addPlugin(new SetPermission($component));
+        $this->_filesystem->addPlugin(new RemovePermissions($component));
+
         $this->_filesystem->addPlugin(new CheckPermission());
-        $this->_filesystem->addPlugin(new SetPermission());
-        $this->_filesystem->addPlugin(new RemovePermissions());
 
         // init language handler
         $this->_translate = new Translate(\Yii::$app->language);
     }
 
     /**
-     * WORKS
-     *
      * @param $query
      * @param $request
      * @param $files
@@ -248,8 +248,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS
-     *
      * @param $path
      * @param $files
      *
@@ -316,8 +314,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS TODO permissions
-     *
      * @param $path
      *
      * @return array
@@ -366,8 +362,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS
-     *
      * @param $oldPath
      * @param $newPath
      *
@@ -396,8 +390,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS
-     *
      * @param $oldPaths
      * @param $newPath
      *
@@ -430,7 +422,7 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS TODO set new filename on copy doesn't works, BUG
+     * TODO set new filename on copy doesn't works -> BUG
      *
      * @param $oldPaths
      * @param $newPath
@@ -445,6 +437,9 @@ class FileManagerApi extends Component
                 return false;
             }
 
+            // Build new path
+            $newPath = $newPath . '/' . basename($oldPath);
+
             // Update permissions
             $setPermission = $this->_filesystem->setPermission($newPath);
             if ($setPermission === false) {
@@ -452,7 +447,6 @@ class FileManagerApi extends Component
                 return false;
             }
 
-            $newPath = $newPath . '/' . basename($oldPath);
             $copied  = $this->_filesystem->get($oldPath)->copy($newPath);
             if ($copied === false) {
                 // TODO error output
@@ -463,8 +457,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS
-     *
      * @param $paths
      *
      * @return bool|string
@@ -501,8 +493,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS
-     *
      * @param $path
      * @param $content
      *
@@ -518,8 +508,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS
-     *
      * @param $path
      *
      * @return bool|string
@@ -534,8 +522,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS
-     *
      * @param $path
      *
      * @return bool|string
@@ -648,8 +634,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS
-     *
      * @param $queries
      *
      * @return Response
@@ -677,8 +661,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * WORKS
-     *
      * @param $file
      *
      * @return bool

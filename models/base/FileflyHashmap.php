@@ -11,7 +11,7 @@ use yii\behaviors\TimestampBehavior;
  * This is the base-model class for table "filefly_hashmap".
  *
  * @property integer $id
- * @property string $filesystem
+ * @property string $component
  * @property string $path
  * @property string $access_domain
  * @property integer $access_owner
@@ -37,13 +37,13 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['filesystem', 'path'], 'required'],
+            [['component', 'path'], 'required'],
             [['access_owner'], 'integer'],
             [['created_at', 'updated_at'], 'safe'],
-            [['filesystem'], 'string', 'max' => 45],
+            [['component'], 'string', 'max' => 45],
             [['path'], 'string', 'max' => 745],
             [['access_domain', 'access_read', 'access_update', 'access_delete'], 'string', 'max' => 255],
-            [['filesystem', 'path'], 'unique', 'targetAttribute' => ['filesystem', 'path'], 'message' => 'The combination of Filesystem and Path has already been taken.']
+            [['component', 'path'], 'unique', 'targetAttribute' => ['component', 'path'], 'message' => 'The combination of Component and Path has already been taken.']
         ];
     }
 
@@ -54,7 +54,7 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
     {
         return [
             'id' => Yii::t('app', 'ID'),
-            'filesystem' => Yii::t('app', 'Filesystem'),
+            'component' => Yii::t('app', 'Component'),
             'path' => Yii::t('app', 'Path'),
             'access_domain' => Yii::t('app', 'Access Domain'),
             'access_owner' => Yii::t('app', 'Access Owner'),

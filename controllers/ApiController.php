@@ -5,7 +5,6 @@ namespace hrzg\filefly\controllers;
 use hrzg\filefly\components\FileManagerApi;
 use hrzg\filefly\components\Rest;
 use hrzg\filefly\plugins\Permissions;
-use yii\helpers\VarDumper;
 
 class ApiController extends \yii\rest\Controller
 {
@@ -28,13 +27,15 @@ class ApiController extends \yii\rest\Controller
 
     public function actionIndex()
     {
+        // set the yii component name of the filesystem
+        $fsComponent = 'fsLocal';
+
         // Manager API
-        $fileManagerApi = new FileManagerApi(\Yii::$app->fs);
+        $fileManagerApi = new FileManagerApi(\Yii::$app->{$fsComponent}, $fsComponent);
 
         $rest = new Rest();
         $rest->post([$fileManagerApi, 'postHandler'])
             ->get([$fileManagerApi, 'getHandler'])
             ->handle();
     }
-
 }
