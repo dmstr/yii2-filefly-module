@@ -5,7 +5,6 @@
 namespace hrzg\filefly\models\base;
 
 use Yii;
-use yii\behaviors\TimestampBehavior;
 
 /**
  * This is the base-model class for table "filefly_hashmap".
