@@ -24,6 +24,7 @@ class FileflyHashmap extends BaseFileflyHashmap
         // disable session flash messages in ActiveRecordAccessTrait
         $this->enableFlashMessages = false;
     }
+
     /**
      * @inheritdoc
      */

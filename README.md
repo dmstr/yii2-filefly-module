@@ -24,3 +24,25 @@ i.e. `AFM_FILESYSTEM=fsLocal`
     'filesystem' => getenv('FILEFLY_FILESYSTEM')
 ],
 ```
+
+### RBAC
+
+Auf das Root eines Filesystems gibt es 1...n berechtigte Admins.
+
+Von ihm können dort Ordner angelegt und Berechtigungen für andere User gesetzt werden.
+
+
+
+
+#### Roles
+
+TBD
+
+#### Permissions
+
+TBD
+
+
+##TODOS
+
+- input validation of file and folder names !

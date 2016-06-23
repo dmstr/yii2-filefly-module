@@ -104,10 +104,16 @@ class FileManagerApi extends Component
                 && strpos($_SERVER["CONTENT_TYPE"], 'multipart/form-data') !== false)
         ) {
             $uploaded = $this->uploadAction($request['destination'], $files);
-            if ($uploaded === true) {
-                $response = $this->simpleSuccessResponse();
-            } else {
-                $response = $this->simpleErrorResponse($this->_translate->upload_failed);
+            switch (true) {
+                case $uploaded === 'uploadfailed':
+                    $response = $this->simpleErrorResponse($this->_translate->upload_failed);
+                    break;
+                case $uploaded === 'nopermission':
+                    $response = $this->simpleErrorResponse($this->_translate->permission_upload_denied);
+                    break;
+                case $uploaded === true:
+                    $response = $this->simpleSuccessResponse();
+                    break;
             }
 
             return $response;
@@ -239,7 +245,7 @@ class FileManagerApi extends Component
                 break;
 
             case 'changePermissions':
-                $changed = $this->changePermissionsAction($request['items'], $request['perms'], $request['recursive']);
+                $changed = $this->changePermissionsAction($request['itemPath'], $request['rights']);
                 if ($changed === true) {
                     $response = $this->simpleSuccessResponse();
                 } elseif ($changed === 'missing') {
@@ -283,29 +289,25 @@ class FileManagerApi extends Component
 
     /**
      * @param $path
-     * @param $files
+     * @param $permissionType
+     * @param bool|false $findRaw
      *
      * @return bool
      */
-    private function uploadAction($path, $files)
+    private function grantPermission($path, $permissionType, $findRaw = false)
     {
-        foreach ($files as $file) {
-            $stream   = fopen($file['tmp_name'], 'r+');
-            $fullPath = $path . '/' . $file['name'];
-            $uploaded = $this->_filesystem->writeStream($fullPath, $stream);
-            if ($uploaded === false) {
-                return false;
-            }
+        $permission    = $this->_filesystem->getPermissions(['path' => $path], $permissionType, $findRaw);
+        $canPermission = array_walk_recursive(
+            $permission,
+            function ($perm, $key, $item) {
+                if ($perm === $item) {
+                    return true;
+                }
+            },
+            $path
+        );
 
-            // set permission
-            $setPermission = $this->_filesystem->setPermission($fullPath);
-            if ($setPermission === false) {
-                // TODO error output
-                return false;
-            }
-        }
-
-        return true;
+        return !empty($permission) && $canPermission;
     }
 
     /**
@@ -349,6 +351,36 @@ class FileManagerApi extends Component
 
     /**
      * @param $path
+     * @param $files
+     *
+     * @return bool
+     */
+    private function uploadAction($path, $files)
+    {
+        if ($this->grantPermission($path, 'access_read', true)) {
+
+            if ($this->grantPermission($path, 'access_update', false)) {
+
+                foreach ($files as $file) {
+                    $stream   = fopen($file['tmp_name'], 'r+');
+                    $fullPath = $path . '/' . $file['name'];
+                    $uploaded = $this->_filesystem->writeStream($fullPath, $stream);
+                    if ($uploaded === false) {
+                        return 'uploadfailed';
+                    }
+
+                    // set permission
+                    $this->_filesystem->setPermission($fullPath);
+                }
+                return true;
+            }
+            return 'nopermission';
+        }
+        return 'nopermission';
+    }
+
+    /**
+     * @param $path
      *
      * @return array
      */
@@ -363,6 +395,8 @@ class FileManagerApi extends Component
          * @var $allowedFiles array
          */
         $allowedFiles = $this->_filesystem->getPermissions($contents);
+
+        //        \Yii::error($allowedFiles, '$allowedFiles');
 
         foreach ($contents AS $item) {
 
@@ -478,7 +512,7 @@ class FileManagerApi extends Component
                 return 'nopermission';
             }
 
-            $copied  = $this->_filesystem->get($oldPath)->copy($newPath);
+            $copied = $this->_filesystem->get($oldPath)->copy($newPath);
             if ($copied === false) {
                 return 'copyfailed';
             }
@@ -559,6 +593,8 @@ class FileManagerApi extends Component
      */
     private function createFolderAction($path)
     {
+        // TODO check folder updated permissions
+
         if ($this->_filesystem->has($path)) {
             return 'exists';
         }
@@ -577,17 +613,20 @@ class FileManagerApi extends Component
     }
 
     /**
-     * TODO implement with permissions file decorator
+     * TODO WIP
      *
      * @param $paths
-     * @param $permissions
+     * @param $rights
      * @param $recursive
      *
      * @return bool|string
      */
-    private function changePermissionsAction($paths, $permissions, $recursive)
+    private function changePermissionsAction($path, $rights, $recursive = null)
     {
+        \Yii::error($path, 'changePermissions.$path');
+        \Yii::error($rights, 'changePermissions.$rights');
         return true;
+
         /*foreach ($paths as $path) {
             if (!file_exists($$path)) {
                 return 'missing';

@@ -30,6 +30,8 @@ class FindPermissions extends Component implements PluginInterface
 
     protected $filesystem;
 
+    private $_allowedFiles = [];
+
     /**
      * @param FilesystemInterface $filesystem
      */
@@ -47,25 +49,89 @@ class FindPermissions extends Component implements PluginInterface
     }
 
     /**
-     * @param array $contents
+     * Find permissions for paths by permission type
      *
-     * @return bool
+     * - Parent permission support if no direct permission can be granted
+     *
+     * @param array $contents
+     * @param string $permissionType
+     * @param bool $findRaw
+     *
+     * @return array|\yii\db\ActiveRecord[]
      */
-    public function handle(array $contents)
+    public function handle(array $contents, $permissionType = 'access_read', $findRaw = false)
     {
-        $files = [];
-
+        $this->_allowedFiles = [];
+        
         foreach ($contents as $file) {
-            $files[] = $file['path'];
+
+            if (is_array($file) && array_key_exists('path', $file)) {
+                $filePath = $file['path'];
+            } else {
+                $filePath = $file;
+            }
+
+            $pathIterator = '';
+            $pathParts    = explode('/', ltrim($filePath, '/'));
+
+            foreach ($pathParts as $subPath) {
+
+                $directAccess = false;
+                $parentAccess = false;
+
+                $pathIterator .= '/' . $subPath;
+
+//                if ($permissionType === 'access_read') {
+//                    \Yii::error($pathIterator, '$pathIterator');
+//                }
+
+                /** @var $hash \hrzg\filefly\models\FileflyHashmap */
+                $query = FileflyHashmap::find($findRaw);
+                $query->andWhere(['component' => $this->component]);
+                $query->andWhere(['path' => ltrim($pathIterator, '/')]);
+
+                // for direct permission check the permission type column is not null
+                if (ltrim($pathIterator, '/') === '/' . $filePath) {
+                    //                    $query->andWhere(['not', [$permissionType => null]]);
+                    $hash = $query->one();
+
+                    if ($hash !== null) {
+
+//                        if ($permissionType === 'access_read') {
+//                            \Yii::error($hash->hasPermission($permissionType), '$hasPermission.direct');
+//                        }
+                        if ($hash->hasPermission($permissionType)) {
+                            $directAccess = true;
+                        }
+                    }
+                } else {
+                    $hash = $query->one();
+
+                    if ($hash !== null) {
+//                        if ($permissionType === 'access_read') {
+//                            \Yii::error($hash->hasPermission($permissionType), '$hasPermission.parent');
+//                        }
+                        if ($hash->hasPermission($permissionType)) {
+                            $parentAccess = true;
+                        }
+                    }
+                }
+            }
+
+//            if ($permissionType === 'access_read') {
+//                \Yii::error($directAccess, '$directAccess');
+//                \Yii::error($parentAccess, '$parentAccess');
+//                \Yii::error($this->_allowedFiles, '$this->_allowedFiles.before');
+//            }
+            if ($directAccess || $parentAccess) {
+                $this->_allowedFiles[] = ['path' => $filePath];
+            }
+//            if ($permissionType === 'access_read') {
+//                \Yii::error($directAccess, '$directAccess');
+//                \Yii::error($parentAccess, '$parentAccess');
+//                \Yii::error($this->_allowedFiles, '$this->_allowedFiles.after');
+//            }
         }
-
-        $hashes = FileflyHashmap::find()
-            ->select(['path'])
-            ->andWhere(['component' => $this->component])
-            ->andWhere(['IN', 'path', $files])
-            ->asArray()
-            ->all();
-
-        return $hashes;
+        return $this->_allowedFiles;
     }
 }

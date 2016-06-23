@@ -53,7 +53,12 @@ class CheckPermission implements PluginInterface
         }
 
         foreach ($files as $file) {
-            if (in_array($item['path'], $file)) {
+
+//            if (!is_array($file)){
+//                continue;
+//            }
+
+            if ($item['path'] === $file['path']) {
                 return true;
             }
         }

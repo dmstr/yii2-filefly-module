@@ -103,6 +103,8 @@ class SetPermission extends Component implements PluginInterface
         }
 
         foreach ($items as $item) {
+
+            // TODO replace only this folder, not subfolders with same name
             $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
 
             if (!$item->save()) {
