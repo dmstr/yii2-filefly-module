@@ -52,7 +52,7 @@ class FindPermissions extends Component implements PluginInterface
      */
     public function getMethod()
     {
-        return 'getPermissions';
+        return 'findPermissions';
     }
 
     /**
@@ -104,7 +104,7 @@ class FindPermissions extends Component implements PluginInterface
                 }
             }
         }
-        return [];
+        return $this->_iterator;
     }
 
     /**

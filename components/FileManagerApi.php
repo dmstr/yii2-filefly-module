@@ -236,7 +236,7 @@ class FileManagerApi extends Component
      */
     private function grantPermission($path, $permissionType, $findRaw = false)
     {
-        $permission = $this->_filesystem->sindPermissions(['path' => $path], $permissionType, $findRaw);
+        $permission = $this->_filesystem->findPermissions(['path' => $path], $permissionType, $findRaw);
         $canPath    = array_walk_recursive(
             $permission,
             function ($perm, $key, $item) {
