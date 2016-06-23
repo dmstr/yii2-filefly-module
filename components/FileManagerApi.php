@@ -299,9 +299,9 @@ class FileManagerApi extends Component
     private function grantPermission($path, $permissionType, $findRaw = false)
     {
         $permission = $this->_filesystem->getPermissions(['path' => $path], $permissionType, $findRaw);
-        \Yii::error($path, '$path');
-        \Yii::error($permission, '$permission');
-        \Yii::error($permissionType, '$permissionType');
+//        \Yii::error($path, '$path');
+//        \Yii::error($permission, '$permission');
+//        \Yii::error($permissionType, '$permissionType');
         $canPath = array_walk_recursive(
             $permission,
             function ($perm, $key, $item) {

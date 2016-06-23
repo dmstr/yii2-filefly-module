@@ -73,7 +73,6 @@ class FindPermissions extends Component implements PluginInterface
 
             $pathIterator = '';
             $pathParts    = explode('/', ltrim($filePath, '/'));
-
             $directAccess = false;
             $parentAccess = false;
 
@@ -88,20 +87,19 @@ class FindPermissions extends Component implements PluginInterface
                 $hash = $query->one();
 
                 // for direct permission check the permission type column is not null
-                if (ltrim($pathIterator, '/') === $filePath) {
-
+                if ($pathIterator === $filePath) {
                     if ($hash !== null && !$hash->hasPermission($permissionType)) {
-
                         if ($hash->{$permissionType} !== null) {
                             $parentAccess = false;
                         }
                     } else {
                         $directAccess = true;
+                        break;
                     }
-                } else {
-                    if ($hash !== null && $hash->hasPermission($permissionType)) {
-                        $parentAccess = true;
-                    }
+                }
+
+                if ($hash !== null && $hash->hasPermission($permissionType)) {
+                    $parentAccess = true;
                 }
             }
             // add file or path if direct or parent access was granted
