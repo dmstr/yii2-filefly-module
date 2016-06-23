@@ -218,31 +218,6 @@ class FileManagerApi extends Component
                     $response = $this->simpleErrorResponse($this->_translate->permissions_change_failed);
                 }
                 break;
-
-            /*case 'compress':
-                $compressed = $this->compressAction(
-                    $request['items'],
-                    $request['destination'],
-                    $request['compressedFilename']
-                );
-                if ($compressed === true) {
-                    $response = $this->simpleSuccessResponse();
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->compression_failed);
-                }
-                break;
-
-            case 'extract':
-                $extracted = $this->extractAction($request['destination'], $request['item'], $request['folderName']);
-                if ($extracted === true) {
-                    $response = $this->simpleSuccessResponse();
-                } elseif ($extracted === 'unsupported') {
-                    $response = $this->simpleErrorResponse($this->_translate->archive_opening_failed);
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->extraction_failed);
-                }
-                break;*/
-
             default:
                 $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
                 break;
@@ -252,6 +227,7 @@ class FileManagerApi extends Component
     }
 
     /**
+     * TODO to a plugin grantPermission
      * @param $path
      * @param $permissionType
      * @param bool|false $findRaw
@@ -260,7 +236,7 @@ class FileManagerApi extends Component
      */
     private function grantPermission($path, $permissionType, $findRaw = false)
     {
-        $permission = $this->_filesystem->getPermissions(['path' => $path], $permissionType, $findRaw);
+        $permission = $this->_filesystem->sindPermissions(['path' => $path], $permissionType, $findRaw);
         $canPath    = array_walk_recursive(
             $permission,
             function ($perm, $key, $item) {
