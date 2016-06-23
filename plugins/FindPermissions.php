@@ -28,9 +28,16 @@ class FindPermissions extends Component implements PluginInterface
      */
     public $component;
 
+    /**
+     * @var FilesystemInterface $filesystem
+     */
     protected $filesystem;
 
-    private $_allowedFiles = [];
+    /**
+     * List of tree parents to be checked
+     * @var array
+     */
+    private $_iterator = [];
 
     /**
      * @param FilesystemInterface $filesystem
@@ -61,52 +68,62 @@ class FindPermissions extends Component implements PluginInterface
      */
     public function handle(array $contents, $permissionType = 'access_read', $findRaw = false)
     {
-        $this->_allowedFiles = [];
+        $this->_iterator     = [];
 
         foreach ($contents as $file) {
 
             if (is_array($file) && array_key_exists('path', $file)) {
-                $filePath = $file['path'];
+                $filePath = ltrim($file['path'], '/');
             } else {
                 $filePath = $file;
             }
 
-            $pathIterator = '';
-            $pathParts    = explode('/', ltrim($filePath, '/'));
-            $directAccess = false;
-            $parentAccess = false;
+            // built path iterations
+            $this->buildPathIterator($filePath);
 
-            foreach ($pathParts as $subPath) {
+            foreach ($this->_iterator as $subPath) {
 
-                $pathIterator .= '/' . $subPath;
+                $subPath = ltrim($subPath, '/');
 
                 /** @var $hash \hrzg\filefly\models\FileflyHashmap */
                 $query = FileflyHashmap::find($findRaw);
                 $query->andWhere(['component' => $this->component]);
-                $query->andWhere(['path' => ltrim($pathIterator, '/')]);
+                $query->andWhere(['path' => $subPath]);
                 $hash = $query->one();
 
-                // for direct permission check the permission type column is not null
-                if ($pathIterator === $filePath) {
-                    if ($hash !== null && !$hash->hasPermission($permissionType)) {
-                        if ($hash->{$permissionType} !== null) {
-                            $parentAccess = false;
-                        }
-                    } else {
-                        $directAccess = true;
-                        break;
-                    }
+                if ($hash === null) {
+                    continue;
                 }
 
-                if ($hash !== null && $hash->hasPermission($permissionType)) {
-                    $parentAccess = true;
+                if (!empty($hash->{$permissionType})) {
+                    if (!$hash->hasPermission($permissionType)) {
+                        break;
+                    } else {
+                        return ['path' => $filePath];
+                    }
                 }
             }
-            // add file or path if direct or parent access was granted
-            if ($directAccess || $parentAccess) {
-                $this->_allowedFiles[] = ['path' => $filePath];
-            }
         }
-        return $this->_allowedFiles;
+        return [];
+    }
+
+    /**
+     * built the the path iterations down -> up
+     * @param $path
+     */
+    private function buildPathIterator($path) {
+        $parts          = explode('/', $path);
+        $countPathParts = count($parts);
+        $subCounter = count($parts);
+
+        for ($i = 0; $i < $countPathParts; $i++) {
+            $tmp = '';
+            for ($j = 0; $j < $subCounter; $j++) {
+                $tmp .= '/' . $parts[$j];
+
+            }
+            $subCounter--;
+            $this->_iterator[] = $tmp;
+        }
     }
 }
