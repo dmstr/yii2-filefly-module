@@ -62,7 +62,7 @@ class FindPermissions extends Component implements PluginInterface
     public function handle(array $contents, $permissionType = 'access_read', $findRaw = false)
     {
         $this->_allowedFiles = [];
-        
+
         foreach ($contents as $file) {
 
             if (is_array($file) && array_key_exists('path', $file)) {
@@ -74,63 +74,40 @@ class FindPermissions extends Component implements PluginInterface
             $pathIterator = '';
             $pathParts    = explode('/', ltrim($filePath, '/'));
 
+            $directAccess = false;
+            $parentAccess = false;
+
             foreach ($pathParts as $subPath) {
 
-                $directAccess = false;
-                $parentAccess = false;
-
                 $pathIterator .= '/' . $subPath;
-
-//                if ($permissionType === 'access_read') {
-//                    \Yii::error($pathIterator, '$pathIterator');
-//                }
 
                 /** @var $hash \hrzg\filefly\models\FileflyHashmap */
                 $query = FileflyHashmap::find($findRaw);
                 $query->andWhere(['component' => $this->component]);
                 $query->andWhere(['path' => ltrim($pathIterator, '/')]);
+                $hash = $query->one();
 
                 // for direct permission check the permission type column is not null
-                if (ltrim($pathIterator, '/') === '/' . $filePath) {
-                    //                    $query->andWhere(['not', [$permissionType => null]]);
-                    $hash = $query->one();
+                if (ltrim($pathIterator, '/') === $filePath) {
 
-                    if ($hash !== null) {
+                    if ($hash !== null && !$hash->hasPermission($permissionType)) {
 
-//                        if ($permissionType === 'access_read') {
-//                            \Yii::error($hash->hasPermission($permissionType), '$hasPermission.direct');
-//                        }
-                        if ($hash->hasPermission($permissionType)) {
-                            $directAccess = true;
+                        if ($hash->{$permissionType} !== null) {
+                            $parentAccess = false;
                         }
+                    } else {
+                        $directAccess = true;
                     }
                 } else {
-                    $hash = $query->one();
-
-                    if ($hash !== null) {
-//                        if ($permissionType === 'access_read') {
-//                            \Yii::error($hash->hasPermission($permissionType), '$hasPermission.parent');
-//                        }
-                        if ($hash->hasPermission($permissionType)) {
-                            $parentAccess = true;
-                        }
+                    if ($hash !== null && $hash->hasPermission($permissionType)) {
+                        $parentAccess = true;
                     }
                 }
             }
-
-//            if ($permissionType === 'access_read') {
-//                \Yii::error($directAccess, '$directAccess');
-//                \Yii::error($parentAccess, '$parentAccess');
-//                \Yii::error($this->_allowedFiles, '$this->_allowedFiles.before');
-//            }
+            // add file or path if direct or parent access was granted
             if ($directAccess || $parentAccess) {
                 $this->_allowedFiles[] = ['path' => $filePath];
             }
-//            if ($permissionType === 'access_read') {
-//                \Yii::error($directAccess, '$directAccess');
-//                \Yii::error($parentAccess, '$parentAccess');
-//                \Yii::error($this->_allowedFiles, '$this->_allowedFiles.after');
-//            }
         }
         return $this->_allowedFiles;
     }

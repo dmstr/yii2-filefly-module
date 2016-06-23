@@ -2,10 +2,10 @@
 namespace hrzg\filefly\components;
 
 use creocoder\flysystem\Filesystem;
-use hrzg\filefly\plugins\CheckPermission;
 use hrzg\filefly\plugins\FindPermissions;
 use hrzg\filefly\plugins\RemovePermissions;
 use hrzg\filefly\plugins\SetPermission;
+use League\Flysystem\FileExistsException;
 use League\Flysystem\Util;
 use yii\base\Component;
 
@@ -83,7 +83,7 @@ class FileManagerApi extends Component
         $this->_filesystem->addPlugin(new SetPermission($component));
         $this->_filesystem->addPlugin(new RemovePermissions($component));
 
-        $this->_filesystem->addPlugin(new CheckPermission());
+        //        $this->_filesystem->addPlugin(new CheckPermission());
 
         // init language handler
         $this->_translate = new Translate(\Yii::$app->language);
@@ -105,6 +105,9 @@ class FileManagerApi extends Component
         ) {
             $uploaded = $this->uploadAction($request['destination'], $files);
             switch (true) {
+                case $uploaded === 'fileexists':
+                    $response = $this->simpleErrorResponse($this->_translate->file_already_exists);
+                    break;
                 case $uploaded === 'uploadfailed':
                     $response = $this->simpleErrorResponse($this->_translate->upload_failed);
                     break;
@@ -115,7 +118,6 @@ class FileManagerApi extends Component
                     $response = $this->simpleSuccessResponse();
                     break;
             }
-
             return $response;
         }
 
@@ -296,8 +298,11 @@ class FileManagerApi extends Component
      */
     private function grantPermission($path, $permissionType, $findRaw = false)
     {
-        $permission    = $this->_filesystem->getPermissions(['path' => $path], $permissionType, $findRaw);
-        $canPermission = array_walk_recursive(
+        $permission = $this->_filesystem->getPermissions(['path' => $path], $permissionType, $findRaw);
+        \Yii::error($path, '$path');
+        \Yii::error($permission, '$permission');
+        \Yii::error($permissionType, '$permissionType');
+        $canPath = array_walk_recursive(
             $permission,
             function ($perm, $key, $item) {
                 if ($perm === $item) {
@@ -307,7 +312,7 @@ class FileManagerApi extends Component
             $path
         );
 
-        return !empty($permission) && $canPermission;
+        return !empty($permission) && $canPath;
     }
 
     /**
@@ -357,26 +362,31 @@ class FileManagerApi extends Component
      */
     private function uploadAction($path, $files)
     {
-        if ($this->grantPermission($path, 'access_read', true)) {
+        //        if ($this->grantPermission($path, 'access_read', true)) {
 
-            if ($this->grantPermission($path, 'access_update', false)) {
+        if ($this->grantPermission($path, 'access_update', true)) {
+            foreach ($files as $file) {
+                $stream   = fopen($file['tmp_name'], 'r+');
+                $fullPath = $path . '/' . $file['name'];
 
-                foreach ($files as $file) {
-                    $stream   = fopen($file['tmp_name'], 'r+');
-                    $fullPath = $path . '/' . $file['name'];
+                try {
                     $uploaded = $this->_filesystem->writeStream($fullPath, $stream);
-                    if ($uploaded === false) {
-                        return 'uploadfailed';
-                    }
+                } catch (FileExistsException $e) {
+                    return 'fileexists';
 
-                    // set permission
-                    $this->_filesystem->setPermission($fullPath);
                 }
-                return true;
+                if ($uploaded === false) {
+                    return 'uploadfailed';
+                }
+
+                // set permission
+                $this->_filesystem->setPermission($fullPath);
             }
-            return 'nopermission';
+            return true;
         }
         return 'nopermission';
+        //        }
+        //        return 'nopermission';
     }
 
     /**
@@ -391,16 +401,9 @@ class FileManagerApi extends Component
         // get all filesystem path contents
         $contents = $this->_filesystem->listContents($path);
 
-        /**
-         * @var $allowedFiles array
-         */
-        $allowedFiles = $this->_filesystem->getPermissions($contents);
-
-        //        \Yii::error($allowedFiles, '$allowedFiles');
-
         foreach ($contents AS $item) {
 
-            if (!$this->_filesystem->checkPermission($item, $allowedFiles)) {
+            if (!$this->grantPermission($item['path'], 'access_read', true)) {
                 continue;
             }
 
