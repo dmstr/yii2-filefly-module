@@ -3,8 +3,8 @@
 namespace hrzg\filefly\models;
 
 use dmstr\db\traits\ActiveRecordAccessTrait;
+use hrzg\filefly\models\base\FileflyHashmap as BaseFileflyHashmap;
 use Yii;
-use \hrzg\filefly\models\base\FileflyHashmap as BaseFileflyHashmap;
 use yii\behaviors\TimestampBehavior;
 use yii\db\Expression;
 use yii\helpers\ArrayHelper;
@@ -19,6 +19,8 @@ class FileflyHashmap extends BaseFileflyHashmap
     const ACCESS_READ = 'access_read';
     const ACCESS_UPDATE = 'access_update';
     const ACCESS_DELETE = 'access_delete';
+
+    const ADMIN_ACCESS_ALL = 'FileflyAdmin';
 
     /**
      * @inheritdoc
