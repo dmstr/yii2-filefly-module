@@ -10,6 +10,7 @@
 namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
+use hrzg\filefly\Module;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
 use yii\base\Component;
@@ -71,7 +72,7 @@ class FindPermissions extends Component implements PluginInterface
         $this->_iterator = [];
 
         // Grand ALL access for admins
-        if (in_array(FileflyHashmap::ADMIN_ACCESS_ALL, array_keys(FileflyHashmap::getUsersAuthItems()))) {
+        if (in_array(Module::ADMIN_ACCESS_ALL, array_keys(FileflyHashmap::getUsersAuthItems()))) {
             return true;
         }
 

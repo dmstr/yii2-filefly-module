@@ -27,9 +27,14 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 
 ### RBAC
 
-Auf das Root eines Filesystems gibt es 1...n berechtigte Admins.
+Filefly Admins dürfen/können alles!
 
-Von ihm können dort Ordner angelegt und Berechtigungen für andere User gesetzt werden.
+Solange keine Berechtigungen gesetzt sind, wird down up geschaut ob irgendwo das geforderte Recht gegeben ist.
+
+
+Sobald auf diesem Weg ein Recht vorhanden -> berechtigt
+Sobald auf diesem Weg ein Recht verweigert -> untersagt
+
 
 
 

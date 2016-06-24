@@ -2,7 +2,7 @@
 namespace hrzg\filefly\components;
 
 use creocoder\flysystem\Filesystem;
-use hrzg\filefly\models\FileflyHashmap;
+use hrzg\filefly\Module;
 use hrzg\filefly\plugins\FindPermissions;
 use hrzg\filefly\plugins\RemovePermissions;
 use hrzg\filefly\plugins\SetPermission;
@@ -274,7 +274,7 @@ class FileManagerApi extends Component
      */
     private function uploadAction($path, $files)
     {
-        if ($this->_filesystem->grantPermission([$path], FileflyHashmap::ACCESS_UPDATE, true)) {
+        if ($this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE, true)) {
             foreach ($files as $file) {
                 $stream   = fopen($file['tmp_name'], 'r+');
                 $fullPath = $path . '/' . $file['name'];
@@ -312,7 +312,7 @@ class FileManagerApi extends Component
         foreach ($contents AS $item) {
 
             $path = '/' . $item['path'];
-            if (!$this->_filesystem->grantPermission([$path], FileflyHashmap::ACCESS_READ, true)) {
+            if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_READ, true)) {
                 continue;
             }
 
