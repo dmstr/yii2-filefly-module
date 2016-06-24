@@ -85,6 +85,7 @@ class FindPermissions extends Component implements PluginInterface
                 $query = FileflyHashmap::find($findRaw);
                 $query->andWhere(['component' => $this->component]);
                 $query->andWhere(['path' => $subPath]);
+                $query->andWhere(['access_domain' => \Yii::$app->language]);
                 $hash = $query->one();
 
                 if ($hash === null) {
