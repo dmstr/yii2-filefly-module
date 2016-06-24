@@ -104,7 +104,7 @@ class FindPermissions extends Component implements PluginInterface
                 }
             }
         }
-        return $this->_iterator;
+        return [];
     }
 
     /**
