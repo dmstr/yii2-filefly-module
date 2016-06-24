@@ -28,6 +28,9 @@ class SetPermission extends Component implements PluginInterface
      */
     public $component;
 
+    /**
+     * @var FilesystemInterface $filesystem
+     */
     protected $filesystem;
 
     /**
