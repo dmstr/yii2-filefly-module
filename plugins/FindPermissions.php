@@ -90,7 +90,7 @@ class FindPermissions extends Component implements PluginInterface
                 $hash = $query->one();
 
                 if ($hash === null) {
-                    continue;
+                    return false;
                 }
 
                 // if permissions for type are set
