@@ -16,6 +16,10 @@ class FileflyHashmap extends BaseFileflyHashmap
 {
     use ActiveRecordAccessTrait;
 
+    const ACCESS_READ = 'access_read';
+    const ACCESS_UPDATE = 'access_update';
+    const ACCESS_DELETE = 'access_delete';
+
     /**
      * @inheritdoc
      */
