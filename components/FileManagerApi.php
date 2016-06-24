@@ -228,29 +228,6 @@ class FileManagerApi extends Component
     }
 
     /**
-     * TODO to a plugin grantPermission
-     * @param $path
-     * @param $permissionType
-     * @param bool|false $findRaw
-     *
-     * @return bool
-     */
-    private function grantPermission($path, $permissionType, $findRaw = false)
-    {
-        $permission = $this->_filesystem->findPermissions(['path' => $path], $permissionType, $findRaw);
-        $canPath    = array_walk_recursive(
-            $permission,
-            function ($perm, $key, $item) {
-                if ($perm === $item) {
-                    return true;
-                }
-            },
-            $path
-        );
-        return !empty($permission) && $canPath;
-    }
-
-    /**
      * @return Response
      */
     private function simpleSuccessResponse()
@@ -297,7 +274,7 @@ class FileManagerApi extends Component
      */
     private function uploadAction($path, $files)
     {
-        if ($this->grantPermission(ltrim($path, '/'), FileflyHashmap::ACCESS_UPDATE, true)) {
+        if ($this->_filesystem->grantPermission([$path], FileflyHashmap::ACCESS_UPDATE, true)) {
             foreach ($files as $file) {
                 $stream   = fopen($file['tmp_name'], 'r+');
                 $fullPath = $path . '/' . $file['name'];
@@ -334,7 +311,8 @@ class FileManagerApi extends Component
 
         foreach ($contents AS $item) {
 
-            if (!$this->grantPermission($item['path'], FileflyHashmap::ACCESS_READ, true)) {
+            $path = '/' . $item['path'];
+            if (!$this->_filesystem->grantPermission([$path], FileflyHashmap::ACCESS_READ, true)) {
                 continue;
             }
 
@@ -551,11 +529,10 @@ class FileManagerApi extends Component
      *
      * @param $paths
      * @param $rights
-     * @param $recursive
      *
      * @return bool|string
      */
-    private function changePermissionsAction($path, $rights, $recursive = null)
+    private function changePermissionsAction($path, $rights)
     {
         \Yii::error($path, 'changePermissions.$path');
         \Yii::error($rights, 'changePermissions.$rights');

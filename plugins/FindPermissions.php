@@ -52,7 +52,7 @@ class FindPermissions extends Component implements PluginInterface
      */
     public function getMethod()
     {
-        return 'findPermissions';
+        return 'grantPermission';
     }
 
     /**
@@ -68,23 +68,14 @@ class FindPermissions extends Component implements PluginInterface
      */
     public function handle(array $contents, $permissionType = 'access_read', $findRaw = false)
     {
-        $this->_iterator     = [];
+        $this->_iterator = [];
 
-        foreach ($contents as $file) {
-
-            if (is_array($file) && array_key_exists('path', $file)) {
-                $filePath = ltrim($file['path'], '/');
-            } else {
-                $filePath = $file;
-            }
+        foreach ($contents as $path) {
 
             // built path iterations
-            $this->buildPathIterator($filePath);
+            $this->buildPathIterator($path);
 
             foreach ($this->_iterator as $subPath) {
-
-                $subPath = ltrim($subPath, '/');
-
                 /** @var $hash \hrzg\filefly\models\FileflyHashmap */
                 $query = FileflyHashmap::find($findRaw);
                 $query->andWhere(['component' => $this->component]);
@@ -95,26 +86,37 @@ class FindPermissions extends Component implements PluginInterface
                     continue;
                 }
 
+                // if permissions for type are set
                 if (!empty($hash->{$permissionType})) {
+
+                    // on permission deny break else grant
                     if (!$hash->hasPermission($permissionType)) {
-                        break;
+                        return false;
                     } else {
-                        return ['path' => $filePath];
+                        return true;
                     }
+                }
+
+                // to match if full owner rights can be granted
+                if ($hash->hasPermission($permissionType)) {
+                    return true;
                 }
             }
         }
-        return [];
+        return false;
     }
 
     /**
      * built the the path iterations down -> up
+     *
      * @param $path
      */
-    private function buildPathIterator($path) {
+    private function buildPathIterator($path)
+    {
+        $path           = ltrim($path, '/');
         $parts          = explode('/', $path);
         $countPathParts = count($parts);
-        $subCounter = count($parts);
+        $subCounter     = $countPathParts;
 
         for ($i = 0; $i < $countPathParts; $i++) {
             $tmp = '';

@@ -56,9 +56,6 @@ class SetPermission extends Component implements PluginInterface
      */
     public function handle($oldItemPath = null, $newItemPath = null)
     {
-        $oldItemPath = ltrim($oldItemPath, '/');
-        $newItemPath = ltrim($newItemPath, '/');
-
         // find has for item
         $oldHash = FileflyHashmap::find()
             ->where(
