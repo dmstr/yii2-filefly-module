@@ -27,15 +27,11 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 
 ### RBAC
 
-Filefly Admins dürfen/können alles!
-
-Solange keine Berechtigungen gesetzt sind, wird down up geschaut ob irgendwo das geforderte Recht gegeben ist.
-
-
-Sobald auf diesem Weg ein Recht vorhanden -> berechtigt
-Sobald auf diesem Weg ein Recht verweigert -> untersagt
-
-
+- Filefly Admins dürfen/können alles!
+- Solange keine Berechtigungen gesetzt sind, wird down up geschaut ob irgendwo das geforderte Recht gegeben ist.
+- Besitzer Berechtigungen gehen über die gesetzten Rechte in `access_read`, `access_update`, `access_delete`
+- Sobald auf diesem Weg ein Recht vorhanden -> berechtigt
+- Sobald auf diesem Weg ein Recht verweigert -> untersagt
 
 
 
