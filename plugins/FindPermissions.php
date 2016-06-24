@@ -70,6 +70,11 @@ class FindPermissions extends Component implements PluginInterface
     {
         $this->_iterator = [];
 
+        // Grand ALL access for admins
+        if (in_array('FileflyAdmin', array_keys(FileflyHashmap::getUsersAuthItems()))) {
+            return true;
+        }
+
         foreach ($contents as $path) {
 
             // built path iterations

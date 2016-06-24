@@ -36,13 +36,23 @@ Von ihm können dort Ordner angelegt und Berechtigungen für andere User gesetzt
 
 #### Roles
 
-TBD
+- FileflyAdmin
+	- filefly
+	
+- FileflyDefault
+	- filefly_default_index
+	
+- FileflyApi
+	- filefly_api_index
+	
 
 #### Permissions
 
-TBD
+- filefly
+- filefly_default_index
+- filefly_api_index
 
 
-##TODOS
+## TODOs
 
 - input validation of file and folder names !
