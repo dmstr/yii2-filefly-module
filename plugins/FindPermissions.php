@@ -97,7 +97,7 @@ class FindPermissions extends Component implements PluginInterface
 
                 if ($hash === null) {
                     \Yii::error($hash, '$hash');
-                    break;
+                    continue;
                 }
                 \Yii::error($hash->hasPermission($permissionType), '$perm');
 

@@ -60,7 +60,7 @@ class SetPermission extends Component implements PluginInterface
     public function handle($oldItemPath = null, $newItemPath = null)
     {
         \Yii::error($oldItemPath, '$oldItemPath.setPerm');
-        // find has for item
+
         $oldHash = FileflyHashmap::find()
             ->where(
                 [
@@ -117,12 +117,10 @@ class SetPermission extends Component implements PluginInterface
 
         foreach ($items as $item) {
             \Yii::error($item->path, '$item->path.setperm');
+            \Yii::error($oldItemPath, '$oldItemPath.setperm');
             \Yii::error($newItemPath, '$newItemPath.setperm');
 
-            $item->path = $newItemPath;
-
-            // TODO use for move ?
-            //            $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
+            $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
 
             if (!$item->save()) {
                 \Yii::error($item->getErrors(), 'ERRORS.setPerm');
