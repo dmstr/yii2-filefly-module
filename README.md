@@ -57,3 +57,18 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 ## TODOs
 
 - input validation of file and folder names !
+
+Probs:
+------
+1. Die DB hat ein Index über (Filesystem / Path / Owner / Domain)
+Jetzt kommt ein 2. Benutzer und will einen Ordner mit selben Namen auf der selben Ebene anlegen.
+Die DB kanns aufgrund des 4er Index verarbeiten, das Filesystem aber nicht !! 
+Von unterschiedlichen Sprachen ist da noch nichtmal die Rede.
+
+Mögliche Lösungen:
+---
+1. Ordner dürfen nur von einem Owner angelegt werden oder die Fehlermeldung weisst eben darauf hin,
+dass es an dieser Stelle schon ein Ordner mit selben Namen existiert?!
+
+
+
