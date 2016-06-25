@@ -2,6 +2,7 @@
 namespace hrzg\filefly\components;
 
 use creocoder\flysystem\Filesystem;
+use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
 use hrzg\filefly\plugins\FindPermissions;
 use hrzg\filefly\plugins\RemovePermissions;
@@ -50,6 +51,12 @@ class FileManagerApi extends Component
 
         // init language handler
         $this->_translate = new Translate(\Yii::$app->language);
+
+        // disable find, beforeSave, beforeDelete for FileflyHashmap
+        FileflyHashmap::$activeAccessTrait = false;
+
+        // disable session flash messages in ActiveRecordAccessTrait
+        FileflyHashmap::$enableFlashMessages = false;
     }
 
     /**
