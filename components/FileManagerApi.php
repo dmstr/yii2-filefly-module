@@ -170,10 +170,15 @@ class FileManagerApi extends Component
 
             case 'edit':
                 $edited = $this->editAction($request['item'], $request['content']);
-                if ($edited !== false) {
-                    $response = $this->simpleSuccessResponse();
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->saving_failed);
+                switch (true) {
+                    case $edited === 'nopermission':
+                        $response = $this->simpleErrorResponse($this->_translate->permission_edit_denied);
+                        break;
+                    case $edited === true:
+                        $response = $this->simpleSuccessResponse();
+                        break;
+                    default:
+                        $response = $this->simpleErrorResponse($this->_translate->saving_failed);
                 }
                 break;
 
@@ -440,6 +445,10 @@ class FileManagerApi extends Component
     {
         foreach ($paths as $path) {
 
+            if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_DELETE, true)) {
+                return 'nopermission';
+            }
+
             // permission handling
             $removedPermission = $this->_filesystem->removePermission($path);
             if ($removedPermission === false) {
@@ -476,6 +485,10 @@ class FileManagerApi extends Component
      */
     private function editAction($path, $content)
     {
+        if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE, true)) {
+            return 'nopermission';
+        }
+
         if (!$this->_filesystem->get($path)->isFile()) {
             return false;
         }
@@ -504,7 +517,9 @@ class FileManagerApi extends Component
      */
     private function createFolderAction($path)
     {
-        // TODO check folder updated permissions
+        if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE, true)) {
+            return 'nopermission';
+        }
 
         if ($this->_filesystem->has($path)) {
             return 'exists';
