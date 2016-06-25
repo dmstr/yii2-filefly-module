@@ -309,6 +309,37 @@ class FileManagerApi extends Component
     }
 
     /**
+     * @param $file
+     *
+     * @return bool
+     */
+    private function downloadAction($file)
+    {
+        if (!$this->_filesystem->get($file)->isFile()) {
+            return false;
+        }
+
+        $quoted = sprintf('"%s"', addcslashes(basename($file), '"\\'));
+        $size   = $this->_filesystem->getSize($file);
+
+        header('Content-Description: File Transfer');
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename=' . $quoted);
+        header('Content-Transfer-Encoding: binary');
+        header('Connection: Keep-Alive');
+        header('Expires: 0');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Pragma: public');
+        header('Content-Length: ' . $size);
+
+
+        $stream = $this->_filesystem->readStream($file);
+        echo stream_get_contents($stream);
+        fclose($stream);
+        return true;
+    }
+
+    /**
      * @param $path
      *
      * @return array
@@ -403,10 +434,7 @@ class FileManagerApi extends Component
             $newPath = $newPath . '/' . basename($oldPath);
 
             // Update permissions
-            $updatePermission = $this->_filesystem->setPermission($oldPath, $newPath);
-            if ($updatePermission === false) {
-                return 'nopermission';
-            }
+            $this->_filesystem->setPermission($oldPath, $newPath);
 
             // Move file
             $moved = $this->_filesystem->get($oldPath)->rename($newPath);
@@ -543,21 +571,16 @@ class FileManagerApi extends Component
         }
 
         // set permissions
-        $setPermission = $this->_filesystem->setPermission($path);
-        if ($setPermission === false) {
-            return 'nopermission';
-        }
-
+        $this->_filesystem->setPermission($path);
         return true;
     }
 
     /**
-     * TODO WIP
-     *
-     * @param $paths
+     * TODO
+     * @param $path
      * @param $rights
      *
-     * @return bool|string
+     * @return bool
      */
     private function changePermissionsAction($path, $rights)
     {
@@ -590,64 +613,12 @@ class FileManagerApi extends Component
     }
 
     /**
-     * TODO implement
-     *
-     * @param $paths
-     * @param $destination
-     * @param $archiveName
-     *
-     * @return bool
-     */
-    private function compressAction($paths, $destination, $archiveName)
-    {
-        return true;
-        /*$archivePath = $this->_filesystem->getAdapter()->getPathPrefix() . ltrim($destination, '/') . $archiveName;
-
-        $zip = new ZipArchive();
-        if ($zip->open($archivePath, ZipArchive::CREATE) !== true) {
-            return false;
-        }
-
-        foreach ($paths as $path) {
-            $zip->addFile($this->_filesystem->getAdapter()->getPathPrefix() . $path, basename($path));
-        }
-
-        return $zip->close();*/
-    }
-
-    /**
-     * TODO implement
-     *
-     * @param $destination
-     * @param $archivePath
-     * @param $folderName
-     *
-     * @return bool|string
-     */
-    private function extractAction($destination, $archivePath, $folderName)
-    {
-        return true;
-        /*$archivePath = $this->_filesystem->getAdapter()->getPathPrefix() . $archivePath;
-        $folderPath  = $this->_filesystem->getAdapter()->getPathPrefix() . rtrim($destination, '/') . '/' . $folderName;
-
-        $zip = new ZipArchive;
-        if ($zip->open($archivePath) === false) {
-            return 'unsupported';
-        }
-
-        mkdir($folderPath);
-        $zip->extractTo($folderPath);
-        return $zip->close();*/
-    }
-
-    /**
      * @param $queries
      *
      * @return Response
      */
     public function getHandler($queries)
     {
-
         switch ($queries['action']) {
             case 'download':
                 $downloaded = $this->downloadAction($queries['path']);
@@ -665,36 +636,5 @@ class FileManagerApi extends Component
         }
 
         return $response;
-    }
-
-    /**
-     * @param $file
-     *
-     * @return bool
-     */
-    private function downloadAction($file)
-    {
-        if (!$this->_filesystem->get($file)->isFile()) {
-            return false;
-        }
-
-        $quoted = sprintf('"%s"', addcslashes(basename($file), '"\\'));
-        $size   = $this->_filesystem->getSize($file);
-
-        header('Content-Description: File Transfer');
-        header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename=' . $quoted);
-        header('Content-Transfer-Encoding: binary');
-        header('Connection: Keep-Alive');
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
-        header('Pragma: public');
-        header('Content-Length: ' . $size);
-
-
-        $stream = $this->_filesystem->readStream($file);
-        echo stream_get_contents($stream);
-        fclose($stream);
-        return true;
     }
 }
