@@ -25,7 +25,7 @@ class m160616_120810_add_filesystem_hash_table extends Migration
             ]
         );
 
-        $this->createIndex('component_path', $this->tableName, ['component', 'path'], true);
+        $this->createIndex('component_path_domain_owner', $this->tableName, ['component', 'path', 'access_domain', 'access_owner'], true);
     }
 
     public function safeDown()
