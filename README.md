@@ -101,4 +101,4 @@ Von unterschiedlichen Sprachen ist da noch nichtmal die Rede.
 Mögliche Lösungen:
 ---
 1. Ordner dürfen nur von einem Owner angelegt werden oder die Fehlermeldung weisst eben darauf hin,
-dass es an dieser Stelle schon ein Ordner mit selben Namen existiert?!
+dass es an dieser Stelle schon ein Ordner mit selben Namen gibt?!
