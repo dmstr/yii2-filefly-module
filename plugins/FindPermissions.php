@@ -90,23 +90,17 @@ class FindPermissions extends Component implements PluginInterface
                 $query->andWhere(['access_domain' => \Yii::$app->language]);
                 $hash = $query->one();
 
-
                 \Yii::error($permissionType, '$permissionType');
                 \Yii::error($subPath, '$subPath');
 
-
                 if ($hash === null) {
                     \Yii::error($hash, '$hash');
-                    continue;
+                    if ($permissionType === Module::ACCESS_UPDATE) {
+                        continue;
+                    }
+                    return false;
                 }
                 \Yii::error($hash->hasPermission($permissionType), '$perm');
-
-
-                /**
-                 * 1. access empty (is owner, true or continue)
-                 * 2. access set (permission granted, true)
-                 *    access set (is access owner, true, permission denied, false)
-                 */
 
                 if (empty($hash->{$permissionType})) {
                     \Yii::error('true', 'empty access');

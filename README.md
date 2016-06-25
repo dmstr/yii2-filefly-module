@@ -90,6 +90,7 @@ Remove permission
 ## TODOs
 
 - input validation of file and folder names ! Missing in native Angular-Filemanager
+- reverse permission set/update/delete in case of filesystem errors (i.e. exists, not found)
 
 Probs:
 ------
