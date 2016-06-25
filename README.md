@@ -25,7 +25,7 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 ],
 ```
 
-### RBAC
+## RBAC
 
 **Prosa**
 - Filefly Admins dürfen/können alles!
@@ -34,38 +34,9 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 - Sobald auf diesem Weg ein Recht vorhanden -> berechtigt
 - Sobald auf diesem Weg ein Recht verweigert -> untersagt
 
-**Plugin: findPermission**
-```
-How the plugin works if permission will be granted or denied
-
-1. access empty (is owner, true or continue)
-2. access set (permission granted, true)
-   access set (is access owner, true, permission denied, false)
-```
-
-**Plugin: setPermission**
-```
-List:
-...
-Upload:
-...
-Rename:
-...
-Copy:
-...
-Move:
-...
-Edit:
-...
-CreateFolder:
-...
-```
-
-**Plugin: removePermission**
-```
-Remove:
-- deletes the file or folder hash first, then do the file remove operation
-```
+**ActiveRecord: FileflyHashmap**
+- uses `dmstr\db\traits\ActiveRecordAccessTrait` with `$activeAccessTrait = false`
+- access checks will be done foreach permission type explicitly, `hasPermission($action)`
 
 #### Roles
 
@@ -78,17 +49,47 @@ Remove:
 - FileflyApi
 	- filefly_api_index
 	
-
 #### Permissions
 
 - filefly
 - filefly_default_index
 - filefly_api_index
 
+## RBAC Plugins
+
+Permission checks will ever come before file or older operation
+
+**GrantPermission**
+```
+Granted or deny permission 
+
+1. access field empty (is owner, true or continue)
+2. access field set (permission granted, true)
+   access field set (is access owner, true, permission denied, false)
+```
+
+**SetPermission**
+```
+Create or update permission
+
+1. Add new hash records
+2. Update hash records (recursive option)
+
+- Multi create option
+```
+
+**RemovePermission**
+```
+Remove permission
+
+1. Deletes file or folder records
+
+- Multi delete option
+```
 
 ## TODOs
 
-- input validation of file and folder names !
+- input validation of file and folder names ! Missing in native Angular-Filemanager
 
 Probs:
 ------
