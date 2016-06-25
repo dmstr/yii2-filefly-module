@@ -139,7 +139,7 @@ class FileManagerApi extends Component
                 break;
 
             case 'copy':
-                $copied = $this->copyAction($request['items'], $request['newPath']);
+                $copied = $this->copyAction($request['items'], $request['newPath'], $request['singleFilename']);
                 switch (true) {
                     case $copied === 'copyfailed':
                         $response = $this->simpleErrorResponse($this->_translate->copying_failed);
@@ -400,26 +400,25 @@ class FileManagerApi extends Component
     }
 
     /**
-     * TODO set new filename on copy doesn't works -> BUG
-     *
      * @param $oldPaths
      * @param $newPath
      *
      * @return bool
      */
-    private function copyAction($oldPaths, $newPath)
+    private function copyAction($oldPaths, $newPath, $newFilename)
     {
         $newPath = ltrim($newPath, '/');
         foreach ($oldPaths as $oldPath) {
+
             if (!$this->_filesystem->get($oldPath)->isFile()) {
                 return false;
             }
 
             // Build new path
-            $newPath = $newPath . '/' . basename($oldPath);
+            $newPath = $newPath . '/' . $newFilename;
 
             // Update permissions
-            $setPermission = $this->_filesystem->setPermission($newPath);
+            $setPermission = $this->_filesystem->setPermission('/' . $newPath);
             if ($setPermission === false) {
                 return 'nopermission';
             }
