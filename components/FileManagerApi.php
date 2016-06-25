@@ -130,7 +130,6 @@ class FileManagerApi extends Component
                 $moved = $this->moveAction($request['items'], $request['newPath']);
                 switch (true) {
                     case $moved === 'notfound':
-                        \Yii::error($moved, '$moved');
                         $response = $this->simpleErrorResponse($this->_translate->file_not_found);
                         break;
                     case $moved === 'nopermission':
@@ -146,7 +145,6 @@ class FileManagerApi extends Component
                 break;
 
             case 'copy':
-                \Yii::error($request, '$request.copy');
                 $copied = $this->copyAction($request['items'], $request['newPath'], $request['singleFilename']);
                 switch (true) {
                     case $copied === 'copyfailed':
@@ -390,6 +388,12 @@ class FileManagerApi extends Component
      */
     private function moveAction($oldPaths, $newPath)
     {
+        $newPath = substr($newPath, 1);
+        \Yii::error($newPath, '$newPath.move');
+        if (!$this->_filesystem->grantPermission([$newPath], Module::ACCESS_UPDATE)) {
+            return 'nopermission';
+        }
+
         foreach ($oldPaths as $oldPath) {
             if (!$this->_filesystem->get($oldPath)->isFile() && !$this->_filesystem->get($oldPath)->isDir()) {
                 return 'notfound';
