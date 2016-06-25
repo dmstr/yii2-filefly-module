@@ -16,6 +16,7 @@
 	"archive_opening_failed": "Could not open archive, it is either corrupted or unsupported",
 	"extraction_failed": "Extraction failed",
 	"upload_failed": "Upload filed",
+    "permission_edit_denied" : "You are not allowed to edit this file",
     "permission_upload_denied" : "You are not allowed to upload files to this directory",
     "permission_update_denied" : "You are not allowed to update this record",
     "permission_delete_denied" : "You are not allowed to delete this record",
