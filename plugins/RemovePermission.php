@@ -14,13 +14,12 @@ use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
 use yii\base\Component;
 
-
 /**
- * Class RemovePermissions
+ * Class RemovePermission
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class RemovePermissions extends Component implements PluginInterface
+class RemovePermission extends Component implements PluginInterface
 {
     /**
      * The yii component name of this filesystem
@@ -28,6 +27,9 @@ class RemovePermissions extends Component implements PluginInterface
      */
     public $component;
 
+    /**
+     * @var FilesystemInterface $filesystem
+     */
     protected $filesystem;
 
     /**
@@ -55,34 +57,22 @@ class RemovePermissions extends Component implements PluginInterface
      */
     public function handle($itemPath = null)
     {
-        $itemPath = ltrim($itemPath, '/');
+        \Yii::error($itemPath, '$removePermission.$itemPath');
 
-        return $this->removeRecursive($itemPath);
-    }
-
-    /**
-     * @param null $itemPath
-     *
-     * @return bool
-     */
-    private function removeRecursive($itemPath = null)
-    {
-        $items = FileflyHashmap::find()
+        $item = FileflyHashmap::find()
             ->andWhere(['component' => $this->component])
-            ->andWhere(['like', 'path', $itemPath . '%', false])
-            ->all();
+            ->andWhere(['path' => $itemPath])
+            ->andWhere(['access_domain' => \Yii::$app->language])
+            ->one();
 
-        if ($items === null) {
-            \Yii::error('Could not find items in [' . $itemPath . '] in hash table!', __METHOD__);
+        if ($item === null) {
+            \Yii::error('Could not find item [' . $itemPath . '] in hash table!', __METHOD__);
             return false;
         }
-
-        foreach ($items as $item) {
-
-            if (!$item->delete()) {
-                \Yii::error('Could not delete item [' . $itemPath . '] in hash table!', __METHOD__);
-                return false;
-            }
+        \Yii::error($item->attributes, '$remove.$item');
+        if (!$item->delete()) {
+            \Yii::error('Could not delete item [' . $itemPath . '] in hash table!', __METHOD__);
+            return false;
         }
 
         return true;

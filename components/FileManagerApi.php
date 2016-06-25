@@ -5,7 +5,7 @@ use creocoder\flysystem\Filesystem;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
 use hrzg\filefly\plugins\FindPermissions;
-use hrzg\filefly\plugins\RemovePermissions;
+use hrzg\filefly\plugins\RemovePermission;
 use hrzg\filefly\plugins\SetPermission;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\Util;
@@ -47,7 +47,7 @@ class FileManagerApi extends Component
         $component = ['component' => $fsComponent];
         $this->_filesystem->addPlugin(new FindPermissions($component));
         $this->_filesystem->addPlugin(new SetPermission($component));
-        $this->_filesystem->addPlugin(new RemovePermissions($component));
+        $this->_filesystem->addPlugin(new RemovePermission($component));
 
         // init language handler
         $this->_translate = new Translate(\Yii::$app->language);
@@ -161,6 +161,9 @@ class FileManagerApi extends Component
                 switch (true) {
                     case $removed === 'notempty':
                         $response = $this->simpleErrorResponse($this->_translate->removing_failed_directory_not_empty);
+                        break;
+                    case $removed === 'errorpermission':
+                        $response = $this->simpleErrorResponse($this->_translate->permission_delete_error);
                         break;
                     case $removed === 'nopermission':
                         $response = $this->simpleErrorResponse($this->_translate->permission_delete_denied);
@@ -487,14 +490,20 @@ class FileManagerApi extends Component
      */
     private function removeAction($paths)
     {
+        $anyNoPerm = false;
+
         foreach ($paths as $path) {
 
             if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_DELETE)) {
-                return 'nopermission';
+                $anyNoPerm = true;
+                continue;
             }
 
             // remove permission
-            $this->_filesystem->removePermission($path);
+            $removedPermission = $this->_filesystem->removePermission($path);
+            if ($removedPermission === false) {
+                return 'errorpermission';
+            }
 
             if ($this->_filesystem->get($path)->isDir()) {
 
@@ -513,6 +522,9 @@ class FileManagerApi extends Component
             if ($removed === false) {
                 return 'removefailed';
             }
+        }
+        if ($anyNoPerm) {
+            return 'nopermission';
         }
 
         return true;
@@ -577,6 +589,7 @@ class FileManagerApi extends Component
 
     /**
      * TODO
+     *
      * @param $path
      * @param $rights
      *

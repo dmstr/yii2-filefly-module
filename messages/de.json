@@ -19,6 +19,7 @@
     "permission_edit_denied" : "You are not allowed to edit this file",
     "permission_upload_denied" : "You are not allowed to upload files to this directory",
     "permission_update_denied" : "You are not allowed to update this record",
-    "permission_delete_denied" : "You are not allowed to delete this record",
+    "permission_delete_denied" : "You are not allowed to delete some records"
+    "permission_delete_error" : "An permission error occurred on delete this record",
     "permission_folder_creation_failed" : "You are not allowed to create this record"
 }
