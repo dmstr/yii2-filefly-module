@@ -27,13 +27,45 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 
 ### RBAC
 
+**Prosa**
 - Filefly Admins dürfen/können alles!
 - Solange keine Berechtigungen gesetzt sind, wird down up geschaut ob irgendwo das geforderte Recht gegeben ist.
 - Besitzer Berechtigungen gehen über die gesetzten Rechte in `access_read`, `access_update`, `access_delete`
 - Sobald auf diesem Weg ein Recht vorhanden -> berechtigt
 - Sobald auf diesem Weg ein Recht verweigert -> untersagt
 
+**Plugin: findPermission**
+```
+How the plugin works if permission will be granted or denied
 
+1. access empty (is owner, true or continue next upper path)
+2. access set (permission denied, false -> is access owner, true)
+3. access set (permission granted, true)
+```
+
+**Plugin: setPermission**
+```
+List:
+...
+Upload:
+...
+Rename:
+...
+Copy:
+...
+Move:
+...
+Edit:
+...
+CreateFolder:
+...
+```
+
+**Plugin: removePermission**
+```
+Remove:
+- deletes the file or folder hash first, then do the file remove operation
+```
 
 #### Roles
 
