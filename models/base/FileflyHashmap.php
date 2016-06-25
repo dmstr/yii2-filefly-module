@@ -42,7 +42,12 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
             [['component'], 'string', 'max' => 45],
             [['path'], 'string', 'max' => 745],
             [['access_domain', 'access_read', 'access_update', 'access_delete'], 'string', 'max' => 255],
-            [['component', 'path'], 'unique', 'targetAttribute' => ['component', 'path'], 'message' => 'The combination of Component and Path has already been taken.']
+            [
+                ['component', 'path', 'access_domain', 'access_owner'],
+                'unique',
+                'targetAttribute' => ['component', 'path', 'access_domain', 'access_owner'],
+                'message'         => 'The combination of Component, Path, Domain and Owner has already been taken.'
+            ]
         ];
     }
 
@@ -52,16 +57,16 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
     public function attributeLabels()
     {
         return [
-            'id' => Yii::t('app', 'ID'),
-            'component' => Yii::t('app', 'Component'),
-            'path' => Yii::t('app', 'Path'),
+            'id'            => Yii::t('app', 'ID'),
+            'component'     => Yii::t('app', 'Component'),
+            'path'          => Yii::t('app', 'Path'),
             'access_domain' => Yii::t('app', 'Access Domain'),
-            'access_owner' => Yii::t('app', 'Access Owner'),
-            'access_read' => Yii::t('app', 'Access Read'),
+            'access_owner'  => Yii::t('app', 'Access Owner'),
+            'access_read'   => Yii::t('app', 'Access Read'),
             'access_update' => Yii::t('app', 'Access Update'),
             'access_delete' => Yii::t('app', 'Access Delete'),
-            'created_at' => Yii::t('app', 'Created At'),
-            'updated_at' => Yii::t('app', 'Updated At'),
+            'created_at'    => Yii::t('app', 'Created At'),
+            'updated_at'    => Yii::t('app', 'Updated At'),
         ];
     }
 }
