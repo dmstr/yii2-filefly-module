@@ -63,11 +63,10 @@ class FindPermissions extends Component implements PluginInterface
      *
      * @param array $contents
      * @param string $permissionType
-     * @param bool $findRaw
      *
      * @return array|\yii\db\ActiveRecord[]
      */
-    public function handle(array $contents, $permissionType = 'access_read', $findRaw = false)
+    public function handle(array $contents, $permissionType = 'access_read')
     {
         $this->_iterator = [];
 
@@ -80,36 +79,54 @@ class FindPermissions extends Component implements PluginInterface
 
             // built path iterations
             $this->buildPathIterator($path);
+            \Yii::error($path, '$path');
 
             foreach ($this->_iterator as $subPath) {
                 /** @var $hash \hrzg\filefly\models\FileflyHashmap */
-                $query = FileflyHashmap::find($findRaw);
+                $query = FileflyHashmap::find();
                 $query->andWhere(['component' => $this->component]);
                 $query->andWhere(['path' => $subPath]);
                 $query->andWhere(['access_domain' => \Yii::$app->language]);
                 $hash = $query->one();
 
+
+                \Yii::error($permissionType, '$permissionType');
+                \Yii::error($subPath, '$subPath');
+
+
                 if ($hash === null) {
-                    if ($permissionType === Module::ACCESS_READ) {
-                        break;
-                    } else {
-                        continue;
+                    \Yii::error($hash, '$hash');
+                    break;
                 }
+                \Yii::error($hash->hasPermission($permissionType), '$perm');
 
-                // if permissions for type are set
-                if (!empty($hash->{$permissionType})) {
 
-                    // on permission deny break else grant
-                    if (!$hash->hasPermission($permissionType)) {
-                        return false;
-                    } else {
+                /**
+                 * 1. access empty (is owner, true or continue)
+                 * 2. access set (permission granted, true)
+                 *    access set (is access owner, true, permission denied, false)
+                 */
+
+                if (empty($hash->{$permissionType})) {
+                    \Yii::error('true', 'empty access');
+
+                    // match if owner right can be granted
+                    if ($hash->hasPermission($permissionType)) {
                         return true;
+                    } else {
+                        \Yii::error('continue', 'empty access and no perm');
+                        continue;
                     }
                 }
 
-                // to match if full owner rights can be granted
-                if ($hash->hasPermission($permissionType)) {
-                    return true;
+                if (!empty($hash->{$permissionType})) {
+
+                    // direct or owner permission granted
+                    if ($hash->hasPermission($permissionType)) {
+                        return true;
+                    } else {
+                        return false;
+                    }
                 }
             }
         }

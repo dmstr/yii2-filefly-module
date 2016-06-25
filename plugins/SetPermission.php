@@ -59,43 +59,56 @@ class SetPermission extends Component implements PluginInterface
      */
     public function handle($oldItemPath = null, $newItemPath = null)
     {
+        \Yii::error($oldItemPath, '$oldItemPath.setPerm');
         // find has for item
         $oldHash = FileflyHashmap::find()
             ->where(
                 [
-                    'component' => $this->component,
-                    'path'      => $oldItemPath,
+                    'component'     => $this->component,
+                    'path'          => $oldItemPath,
+                    'access_domain' => \Yii::$app->language
                 ]
             )
             ->one();
 
         // upload / create
         if (empty($oldHash)) {
-            $newHash = new FileflyHashmap(['component' => $this->component, 'path' => $oldItemPath]);
+            $newHash = new FileflyHashmap(
+                [
+                    'component'    => $this->component,
+                    'path'         => $oldItemPath,
+                    'access_owner' => \Yii::$app->user->id
+                ]
+            );
             if (!$newHash->save()) {
                 \Yii::error($newHash->getErrors(), __METHOD__);
                 \Yii::error('Could not save new item [' . $oldItemPath . '] to hash table!', __METHOD__);
                 return false;
             }
         } else {
-            return $this->updateRecursive($oldItemPath, $newItemPath);
+            \Yii::error($oldHash->attributes, '$oldHash.setPerm');
+            \Yii::error($newItemPath, '$newItemPath.setPerm');
+            return $this->updateRecursive($oldHash->path, $newItemPath);
         }
 
         return true;
     }
 
-
     /**
-     * @param $oldItemPath
-     * @param null $newItemPath
+     * @param string $oldItemPath
+     * @param string $newItemPath
      *
      * @return bool
      */
-    private function updateRecursive($oldItemPath, $newItemPath = null)
+    private function updateRecursive($oldItemPath, $newItemPath)
     {
+        $find = $oldItemPath . '%';
+        \Yii::error($find, '$find.recursive.setPerm');
+
         $items = FileflyHashmap::find()
             ->andWhere(['component' => $this->component])
-            ->andWhere(['like', 'path', $oldItemPath . '%', false])
+            ->andWhere(['like', 'path', $find, false])
+            ->andWhere(['access_domain' => \Yii::$app->language])
             ->all();
 
         if ($items === null) {
@@ -103,11 +116,16 @@ class SetPermission extends Component implements PluginInterface
         }
 
         foreach ($items as $item) {
+            \Yii::error($item->path, '$item->path.setperm');
+            \Yii::error($newItemPath, '$newItemPath.setperm');
 
-            // TODO replace only this folder, not subfolders with same name
-            $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
+            $item->path = $newItemPath;
+
+            // TODO use for move ?
+            //            $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
 
             if (!$item->save()) {
+                \Yii::error($item->getErrors(), 'ERRORS.setPerm');
                 \Yii::error('Could not update item [' . $oldItemPath . '] to hash table!', __METHOD__);
                 return false;
             }

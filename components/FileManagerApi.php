@@ -146,6 +146,7 @@ class FileManagerApi extends Component
                 break;
 
             case 'copy':
+                \Yii::error($request, '$request.copy');
                 $copied = $this->copyAction($request['items'], $request['newPath'], $request['singleFilename']);
                 switch (true) {
                     case $copied === 'copyfailed':
@@ -286,7 +287,7 @@ class FileManagerApi extends Component
      */
     private function uploadAction($path, $files)
     {
-        if ($this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE, true)) {
+        if ($this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE)) {
             foreach ($files as $file) {
                 $stream   = fopen($file['tmp_name'], 'r+');
                 $fullPath = $path . '/' . $file['name'];
@@ -324,7 +325,7 @@ class FileManagerApi extends Component
         foreach ($contents AS $item) {
 
             $path = '/' . $item['path'];
-            if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_READ, true)) {
+            if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_READ)) {
                 continue;
             }
 
@@ -361,15 +362,16 @@ class FileManagerApi extends Component
      */
     private function renameAction($oldPath, $newPath)
     {
+        if (!$this->_filesystem->grantPermission([$oldPath], Module::ACCESS_UPDATE)) {
+            return 'nopermission';
+        }
+
         if (!$this->_filesystem->get($oldPath)->isFile() && !$this->_filesystem->get($oldPath)->isDir()) {
             return 'notfound';
         }
 
         // Update permissions
-        $updatePermission = $this->_filesystem->setPermission($oldPath, $newPath);
-        if ($updatePermission === false) {
-            return 'nopermission';
-        }
+        $this->_filesystem->setPermission($oldPath, $newPath);
 
         // rename
         $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
@@ -412,14 +414,19 @@ class FileManagerApi extends Component
     }
 
     /**
-     * @param $oldPaths
-     * @param $newPath
+     * @param string $oldPaths
+     * @param string $newPath
+     * @param string $newFilename
      *
      * @return bool
      */
     private function copyAction($oldPaths, $newPath, $newFilename)
     {
-        $newPath = ltrim($newPath, '/');
+        $newPath = substr($newPath, 1);
+        if (!$this->_filesystem->grantPermission([$newPath], Module::ACCESS_UPDATE)) {
+            return 'nopermission';
+        }
+
         foreach ($oldPaths as $oldPath) {
 
             if (!$this->_filesystem->get($oldPath)->isFile()) {
@@ -429,12 +436,10 @@ class FileManagerApi extends Component
             // Build new path
             $newPath = $newPath . '/' . $newFilename;
 
-            // Update permissions
-            $setPermission = $this->_filesystem->setPermission('/' . $newPath);
-            if ($setPermission === false) {
-                return 'nopermission';
-            }
+            // Set new permission
+            $this->_filesystem->setPermission($newPath);
 
+            // copy file
             $copied = $this->_filesystem->get($oldPath)->copy($newPath);
             if ($copied === false) {
                 return 'copyfailed';
@@ -452,15 +457,12 @@ class FileManagerApi extends Component
     {
         foreach ($paths as $path) {
 
-            if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_DELETE, true)) {
+            if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_DELETE)) {
                 return 'nopermission';
             }
 
-            // permission handling
-            $removedPermission = $this->_filesystem->removePermission($path);
-            if ($removedPermission === false) {
-                return 'nopermission';
-            }
+            // remove permission
+            $this->_filesystem->removePermission($path);
 
             if ($this->_filesystem->get($path)->isDir()) {
 
@@ -492,7 +494,7 @@ class FileManagerApi extends Component
      */
     private function editAction($path, $content)
     {
-        if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE, true)) {
+        if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -524,7 +526,7 @@ class FileManagerApi extends Component
      */
     private function createFolderAction($path)
     {
-        if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE, true)) {
+        if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
