@@ -87,7 +87,6 @@ class SetPermission extends Component implements PluginInterface
             }
         } else {
             \Yii::error($oldHash->attributes, '$oldHash.setPerm');
-            \Yii::error($newItemPath, '$newItemPath.setPerm');
             return $this->updateRecursive($oldHash->path, $newItemPath);
         }
 
@@ -118,9 +117,9 @@ class SetPermission extends Component implements PluginInterface
         foreach ($items as $item) {
             \Yii::error($item->path, '$item->path.setperm');
             \Yii::error($oldItemPath, '$oldItemPath.setperm');
-            \Yii::error($newItemPath, '$newItemPath.setperm');
+            \Yii::error(substr($newItemPath, 1), '$newItemPath.setperm');
 
-            $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
+            $item->path = str_replace($oldItemPath, substr($newItemPath, 1), $item->path);
 
             if (!$item->save()) {
                 \Yii::error($item->getErrors(), 'ERRORS.setPerm');

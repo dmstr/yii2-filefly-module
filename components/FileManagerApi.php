@@ -434,7 +434,7 @@ class FileManagerApi extends Component
             }
 
             // Build new path
-            $newPath = $newPath . '/' . basename($oldPath);
+            $newPath = '/' .  $newPath . '/' . basename($oldPath);
 
             // Update permissions
             $this->_filesystem->setPermission($oldPath, $newPath);
