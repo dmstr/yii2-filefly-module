@@ -91,6 +91,8 @@ Remove permission
 
 - input validation of file and folder names ! Missing in native Angular-Filemanager
 - reverse permission set/update/delete in case of filesystem errors (i.e. exists, not found)
+- update move modal like delete modal, refresh location on cancel modal dialog
+	- error on partial move in case of some permission denies in subdirectories
 
 Probs:
 ------
