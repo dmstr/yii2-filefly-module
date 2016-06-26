@@ -119,6 +119,10 @@ class SetPermission extends Component implements PluginInterface
             \Yii::error($oldItemPath, '$oldItemPath.setperm');
             \Yii::error(substr($newItemPath, 1), '$newItemPath.setperm');
 
+            if ($newItemPath[0] !== '/') {
+//TODO ADD a path validator
+            }
+
             $item->path = str_replace($oldItemPath, substr($newItemPath, 1), $item->path);
 
             if (!$item->save()) {
