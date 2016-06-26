@@ -75,7 +75,7 @@ Create or update permission
 1. Add new hash records
 2. Update hash records (recursive option)
 
-- Multi create option
+- Multi create and update option
 ```
 
 **RemovePermission**
