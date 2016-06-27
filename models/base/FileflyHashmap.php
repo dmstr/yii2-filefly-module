@@ -12,7 +12,6 @@ use Yii;
  * @property integer $id
  * @property string $component
  * @property string $path
- * @property string $access_domain
  * @property integer $access_owner
  * @property string $access_read
  * @property string $access_update
@@ -41,12 +40,12 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
             [['created_at', 'updated_at'], 'safe'],
             [['component'], 'string', 'max' => 45],
             [['path'], 'string', 'max' => 745],
-            [['access_domain', 'access_read', 'access_update', 'access_delete'], 'string', 'max' => 255],
+            [['access_read', 'access_update', 'access_delete'], 'string', 'max' => 255],
             [
-                ['component', 'path', 'access_domain', 'access_owner'],
+                ['component', 'path', 'access_owner'],
                 'unique',
-                'targetAttribute' => ['component', 'path', 'access_domain', 'access_owner'],
-                'message'         => 'The combination of Component, Path, Domain and Owner has already been taken.'
+                'targetAttribute' => ['component', 'path'],
+                'message'         => 'The combination of Component, Path has already been taken.'
             ]
         ];
     }
@@ -60,7 +59,6 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
             'id'            => Yii::t('app', 'ID'),
             'component'     => Yii::t('app', 'Component'),
             'path'          => Yii::t('app', 'Path'),
-            'access_domain' => Yii::t('app', 'Access Domain'),
             'access_owner'  => Yii::t('app', 'Access Owner'),
             'access_read'   => Yii::t('app', 'Access Read'),
             'access_update' => Yii::t('app', 'Access Update'),

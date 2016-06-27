@@ -4,6 +4,7 @@ namespace hrzg\filefly\components;
 use creocoder\flysystem\Filesystem;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
+use hrzg\filefly\plugins\GetPermission;
 use hrzg\filefly\plugins\GrantPermission;
 use hrzg\filefly\plugins\RemovePermission;
 use hrzg\filefly\plugins\SetPermission;
@@ -48,6 +49,7 @@ class FileManagerApi extends Component
         $this->_filesystem->addPlugin(new GrantPermission($component));
         $this->_filesystem->addPlugin(new SetPermission($component));
         $this->_filesystem->addPlugin(new RemovePermission($component));
+        $this->_filesystem->addPlugin(new GetPermission($component));
 
         // init language handler
         $this->_translate = new Translate(\Yii::$app->language);
@@ -229,6 +231,9 @@ class FileManagerApi extends Component
 
                 break;
 
+            case 'getPermissions':
+                $response = $this->getPermissions($request['path']);
+                break;
             case 'changePermissions':
                 $changed = $this->changePermissionsAction($request['itemPath'], $request['rights']);
                 if ($changed === true) {
@@ -590,6 +595,18 @@ class FileManagerApi extends Component
         // set permissions
         $this->_filesystem->setPermission($path);
         return true;
+    }
+
+    private function getPermissions($path)
+    {
+        \Yii::error($this->_filesystem->getPermission($path), 'getPermissions.by.path');
+        $response = new Response();
+        $response->setData(
+            [
+                'auth' => $this->_filesystem->getPermission($path)
+            ]
+        );
+        return $response;
     }
 
     /**

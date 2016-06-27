@@ -30,7 +30,7 @@ class m160619_070000_module_access extends Migration
         $auth = \Yii::$app->authManager;
 
         /**
-         * create permisions for each controller action
+         * create permissions for each controller action
          */
         foreach ($this->permisions as $action => $permission) {
             $permisions[$action] = $auth->createPermission($permission['name']);
