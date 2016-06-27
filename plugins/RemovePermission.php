@@ -62,7 +62,6 @@ class RemovePermission extends Component implements PluginInterface
         $item = FileflyHashmap::find()
             ->andWhere(['component' => $this->component])
             ->andWhere(['path' => $itemPath])
-            ->andWhere(['access_domain' => \Yii::$app->language])
             ->one();
 
         if ($item === null) {

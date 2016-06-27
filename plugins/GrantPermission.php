@@ -85,7 +85,6 @@ class GrantPermission extends Component implements PluginInterface
             $query = FileflyHashmap::find();
             $query->andWhere(['component' => $this->component]);
             $query->andWhere(['path' => $subPath]);
-            $query->andWhere(['access_domain' => \Yii::$app->language]);
             $hash = $query->one();
 
             \Yii::error($permissionType, '$permissionType');

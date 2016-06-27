@@ -92,8 +92,6 @@ Remove permission
 
 Probs:
 ------
-1. Spalte `access_domain` wird eigentlich nicht gebraucht, da ein Dateisystem keine Sprachunterscheidung hat
 
 Mögliche Lösungen:
 ---
-1. Spalte löschen

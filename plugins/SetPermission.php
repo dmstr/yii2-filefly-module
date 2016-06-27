@@ -66,7 +66,6 @@ class SetPermission extends Component implements PluginInterface
                 [
                     'component'     => $this->component,
                     'path'          => $oldItemPath,
-                    'access_domain' => \Yii::$app->language
                 ]
             )
             ->one();
@@ -77,7 +76,6 @@ class SetPermission extends Component implements PluginInterface
                 [
                     'component'     => $this->component,
                     'path'          => $oldItemPath,
-                    'access_domain' => \Yii::$app->language,
                     'access_owner'  => \Yii::$app->user->id
                 ]
             );
@@ -108,7 +106,6 @@ class SetPermission extends Component implements PluginInterface
         $items = FileflyHashmap::find()
             ->andWhere(['component' => $this->component])
             ->andWhere(['like', 'path', $find, false])
-            ->andWhere(['access_domain' => \Yii::$app->language])
             ->all();
 
         if ($items === null) {

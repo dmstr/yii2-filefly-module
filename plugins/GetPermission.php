@@ -17,11 +17,11 @@ use yii\base\Component;
 
 
 /**
- * Class GrantPermission
+ * Class GetPermission
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class GrantPermission extends Component implements PluginInterface
+class GetPermission extends Component implements PluginInterface
 {
     /**
      * The yii component name of this filesystem
@@ -33,12 +33,6 @@ class GrantPermission extends Component implements PluginInterface
      * @var FilesystemInterface $filesystem
      */
     protected $filesystem;
-
-    /**
-     * List of tree parents to be checked
-     * @var array
-     */
-    private $_iterator = [];
 
     /**
      * @param FilesystemInterface $filesystem
@@ -53,97 +47,48 @@ class GrantPermission extends Component implements PluginInterface
      */
     public function getMethod()
     {
-        return 'grantPermission';
+        return 'getPermission';
     }
 
     /**
-     * TODO $contents array param can be a single input!
-     * Find permissions for paths by permission type
-     *
-     * - Parent permission support if no direct permission can be granted
-     *
-     * @param string $path
-     * @param string $permissionType
-     *
-     * @return array|\yii\db\ActiveRecord[]
-     */
-    public function handle($path, $permissionType = 'access_read')
-    {
-        $this->_iterator = [];
-
-        // Grand ALL access for admins
-        if (in_array(Module::ADMIN_ACCESS_ALL, array_keys(FileflyHashmap::getUsersAuthItems()))) {
-            return true;
-        }
-
-        // built path iterations
-        $this->buildPathIterator($path);
-        \Yii::error($path, '$path');
-
-        foreach ($this->_iterator as $subPath) {
-            /** @var $hash \hrzg\filefly\models\FileflyHashmap */
-            $query = FileflyHashmap::find();
-            $query->andWhere(['component' => $this->component]);
-            $query->andWhere(['path' => $subPath]);
-            $hash = $query->one();
-
-            \Yii::error($permissionType, '$permissionType');
-            \Yii::error($subPath, '$subPath');
-
-            if ($hash === null) {
-                \Yii::error($hash, '$hash');
-                if ($permissionType === Module::ACCESS_UPDATE) {
-                    continue;
-                }
-                return false;
-            }
-            \Yii::error($hash->hasPermission($permissionType), '$perm');
-
-            if (empty($hash->{$permissionType})) {
-                \Yii::error('true', 'empty access');
-
-                // match if owner right can be granted
-                if ($hash->hasPermission($permissionType)) {
-                    return true;
-                } else {
-                    \Yii::error('continue', 'empty access and no perm');
-                    continue;
-                }
-            }
-
-            if (!empty($hash->{$permissionType})) {
-
-                // direct or owner permission granted
-                if ($hash->hasPermission($permissionType)) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * built the the path iterations down -> up
-     *
      * @param $path
+     *
+     * @return bool
      */
-    private function buildPathIterator($path)
+    public function handle($path)
     {
-        $path           = ltrim($path, '/');
-        $parts          = explode('/', $path);
-        $countPathParts = count($parts);
-        $subCounter     = $countPathParts;
+        /** @var $hash \hrzg\filefly\models\FileflyHashmap */
+        $query = FileflyHashmap::find();
+        $query->andWhere(['component' => $this->component]);
+        $query->andWhere(['path' => $path]);
+        $hash = $query->one();
 
-        for ($i = 0; $i < $countPathParts; $i++) {
-            $tmp = '';
-            for ($j = 0; $j < $subCounter; $j++) {
-                $tmp .= '/' . $parts[$j];
+        if ($hash === null) {
+            return false;
+        } else {
+            \Yii::error($hash->attributes, '$hash');
 
+            // TODO return all auth items for use and set seleted properties from DB
+            // ->  FileflyHashmap::getUsersAuthItems();
+
+            $selectedRoles = [];
+
+            // read access
+            foreach ($hash->authItemStringToArray(Module::ACCESS_READ) as $readItem) {
+                $selectedRoles['read'][] = ['role' => '<i class="glyphicon glyphicon-lock"></i> ' . $readItem, 'selected' => true];
             }
-            $subCounter--;
-            $this->_iterator[] = $tmp;
+
+            // read update
+            foreach ($hash->authItemStringToArray(Module::ACCESS_UPDATE) as $updateItem) {
+                $selectedRoles['update'][] = ['role' => '<i class="glyphicon glyphicon-lock"></i> ' . $updateItem, 'selected' => true];
+            }
+
+            // read delete
+            foreach ($hash->authItemStringToArray(Module::ACCESS_DELETE) as $deleteItem) {
+                $selectedRoles['delete'][] = ['role' => '<i class="glyphicon glyphicon-lock"></i> ' . $deleteItem, 'selected' => true];
+            }
+
+            return $selectedRoles;
         }
     }
 }
