@@ -62,12 +62,12 @@ class FindPermissions extends Component implements PluginInterface
      *
      * - Parent permission support if no direct permission can be granted
      *
-     * @param array $contents
+     * @param string $path
      * @param string $permissionType
      *
      * @return array|\yii\db\ActiveRecord[]
      */
-    public function handle(array $contents, $permissionType = 'access_read')
+    public function handle($path, $permissionType = 'access_read')
     {
         $this->_iterator = [];
 
@@ -76,52 +76,49 @@ class FindPermissions extends Component implements PluginInterface
             return true;
         }
 
-        foreach ($contents as $path) {
+        // built path iterations
+        $this->buildPathIterator($path);
+        \Yii::error($path, '$path');
 
-            // built path iterations
-            $this->buildPathIterator($path);
-            \Yii::error($path, '$path');
+        foreach ($this->_iterator as $subPath) {
+            /** @var $hash \hrzg\filefly\models\FileflyHashmap */
+            $query = FileflyHashmap::find();
+            $query->andWhere(['component' => $this->component]);
+            $query->andWhere(['path' => $subPath]);
+            $query->andWhere(['access_domain' => \Yii::$app->language]);
+            $hash = $query->one();
 
-            foreach ($this->_iterator as $subPath) {
-                /** @var $hash \hrzg\filefly\models\FileflyHashmap */
-                $query = FileflyHashmap::find();
-                $query->andWhere(['component' => $this->component]);
-                $query->andWhere(['path' => $subPath]);
-                $query->andWhere(['access_domain' => \Yii::$app->language]);
-                $hash = $query->one();
+            \Yii::error($permissionType, '$permissionType');
+            \Yii::error($subPath, '$subPath');
 
-                \Yii::error($permissionType, '$permissionType');
-                \Yii::error($subPath, '$subPath');
+            if ($hash === null) {
+                \Yii::error($hash, '$hash');
+                if ($permissionType === Module::ACCESS_UPDATE) {
+                    continue;
+                }
+                return false;
+            }
+            \Yii::error($hash->hasPermission($permissionType), '$perm');
 
-                if ($hash === null) {
-                    \Yii::error($hash, '$hash');
-                    if ($permissionType === Module::ACCESS_UPDATE) {
-                        continue;
-                    }
+            if (empty($hash->{$permissionType})) {
+                \Yii::error('true', 'empty access');
+
+                // match if owner right can be granted
+                if ($hash->hasPermission($permissionType)) {
+                    return true;
+                } else {
+                    \Yii::error('continue', 'empty access and no perm');
+                    continue;
+                }
+            }
+
+            if (!empty($hash->{$permissionType})) {
+
+                // direct or owner permission granted
+                if ($hash->hasPermission($permissionType)) {
+                    return true;
+                } else {
                     return false;
-                }
-                \Yii::error($hash->hasPermission($permissionType), '$perm');
-
-                if (empty($hash->{$permissionType})) {
-                    \Yii::error('true', 'empty access');
-
-                    // match if owner right can be granted
-                    if ($hash->hasPermission($permissionType)) {
-                        return true;
-                    } else {
-                        \Yii::error('continue', 'empty access and no perm');
-                        continue;
-                    }
-                }
-
-                if (!empty($hash->{$permissionType})) {
-
-                    // direct or owner permission granted
-                    if ($hash->hasPermission($permissionType)) {
-                        return true;
-                    } else {
-                        return false;
-                    }
                 }
             }
         }

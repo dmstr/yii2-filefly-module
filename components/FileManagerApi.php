@@ -294,7 +294,7 @@ class FileManagerApi extends Component
      */
     private function uploadAction($path, $files)
     {
-        if ($this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE)) {
+        if ($this->_filesystem->grantPermission($path, Module::ACCESS_UPDATE)) {
             foreach ($files as $file) {
                 $stream   = fopen($file['tmp_name'], 'r+');
                 $fullPath = $path . '/' . $file['name'];
@@ -363,7 +363,7 @@ class FileManagerApi extends Component
         foreach ($contents AS $item) {
 
             $path = '/' . $item['path'];
-            if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_READ)) {
+            if (!$this->_filesystem->grantPermission($path, Module::ACCESS_READ)) {
                 continue;
             }
 
@@ -400,7 +400,7 @@ class FileManagerApi extends Component
      */
     private function renameAction($oldPath, $newPath)
     {
-        if (!$this->_filesystem->grantPermission([$oldPath], Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantPermission($oldPath, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -427,7 +427,7 @@ class FileManagerApi extends Component
      */
     private function moveAction($oldPaths, $newPath)
     {
-        if (!$this->_filesystem->grantPermission([$newPath], Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantPermission($newPath, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -460,7 +460,7 @@ class FileManagerApi extends Component
      */
     private function copyAction($oldPaths, $newPath, $newFilename)
     {
-        if (!$this->_filesystem->grantPermission([$newPath], Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantPermission($newPath, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -499,7 +499,7 @@ class FileManagerApi extends Component
         $anyNoPerm = false;
         foreach ($paths as $path) {
 
-            if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_DELETE)) {
+            if (!$this->_filesystem->grantPermission($path, Module::ACCESS_DELETE)) {
                 $anyNoPerm = true;
                 continue;
             }
@@ -543,7 +543,7 @@ class FileManagerApi extends Component
      */
     private function editAction($path, $content)
     {
-        if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantPermission($path, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -575,7 +575,7 @@ class FileManagerApi extends Component
      */
     private function createFolderAction($path)
     {
-        if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantPermission($path, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
