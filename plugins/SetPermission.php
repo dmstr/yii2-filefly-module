@@ -75,9 +75,10 @@ class SetPermission extends Component implements PluginInterface
         if (empty($oldHash)) {
             $newHash = new FileflyHashmap(
                 [
-                    'component'    => $this->component,
-                    'path'         => $oldItemPath,
-                    'access_owner' => \Yii::$app->user->id
+                    'component'     => $this->component,
+                    'path'          => $oldItemPath,
+                    'access_domain' => \Yii::$app->language,
+                    'access_owner'  => \Yii::$app->user->id
                 ]
             );
             if (!$newHash->save()) {
@@ -117,13 +118,9 @@ class SetPermission extends Component implements PluginInterface
         foreach ($items as $item) {
             \Yii::error($item->path, '$item->path.setperm');
             \Yii::error($oldItemPath, '$oldItemPath.setperm');
-            \Yii::error(substr($newItemPath, 1), '$newItemPath.setperm');
+            \Yii::error($newItemPath, '$newItemPath.setperm');
 
-            if ($newItemPath[0] !== '/') {
-//TODO ADD a path validator
-            }
-
-            $item->path = str_replace($oldItemPath, substr($newItemPath, 1), $item->path);
+            $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
 
             if (!$item->save()) {
                 \Yii::error($item->getErrors(), 'ERRORS.setPerm');

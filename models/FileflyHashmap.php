@@ -33,4 +33,29 @@ class FileflyHashmap extends BaseFileflyHashmap
             ]
         );
     }
+
+    /**
+     * @inheritdoc
+     */
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                [['path'], 'pathValidator'],
+            ]
+        );
+    }
+
+    /**
+     * Ensure exact one directory separator at the beginning of the path name
+     *
+     * @param $attribute
+     * @param $params
+     */
+    public function pathValidator($attribute, $params)
+    {
+        $val              = ltrim($this->$attribute, DIRECTORY_SEPARATOR);
+        $this->$attribute = DIRECTORY_SEPARATOR . $val;
+    }
 }

@@ -408,14 +408,13 @@ class FileManagerApi extends Component
             return 'notfound';
         }
 
-        // Update permissions
-        $this->_filesystem->setPermission($oldPath, $newPath);
-
         // rename
         $renamed = $this->_filesystem->get($oldPath)->rename($newPath);
         if ($renamed === false) {
             return 'renamefailed';
         }
+        // Update permissions
+        $this->_filesystem->setPermission($oldPath, $newPath);
 
         return true;
     }
@@ -428,8 +427,6 @@ class FileManagerApi extends Component
      */
     private function moveAction($oldPaths, $newPath)
     {
-        $newPath = substr($newPath, 1);
-        \Yii::error($newPath, '$newPath.move');
         if (!$this->_filesystem->grantPermission([$newPath], Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
@@ -440,16 +437,16 @@ class FileManagerApi extends Component
             }
 
             // Build new path
-            $newPath = '/' .  $newPath . '/' . basename($oldPath);
-
-            // Update permissions
-            $this->_filesystem->setPermission($oldPath, $newPath);
+            $newPath = $newPath . '/' . basename($oldPath);
 
             // Move file
             $moved = $this->_filesystem->get($oldPath)->rename($newPath);
             if ($moved === false) {
                 return 'movefailed';
             }
+
+            // Update permissions
+            $this->_filesystem->setPermission($oldPath, $newPath);
         }
         return true;
     }
@@ -463,7 +460,6 @@ class FileManagerApi extends Component
      */
     private function copyAction($oldPaths, $newPath, $newFilename)
     {
-        $newPath = substr($newPath, 1);
         if (!$this->_filesystem->grantPermission([$newPath], Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
@@ -501,18 +497,11 @@ class FileManagerApi extends Component
     private function removeAction($paths)
     {
         $anyNoPerm = false;
-
         foreach ($paths as $path) {
 
             if (!$this->_filesystem->grantPermission([$path], Module::ACCESS_DELETE)) {
                 $anyNoPerm = true;
                 continue;
-            }
-
-            // remove permission
-            $removedPermission = $this->_filesystem->removePermission($path);
-            if ($removedPermission === false) {
-                return 'errorpermission';
             }
 
             if ($this->_filesystem->get($path)->isDir()) {
@@ -531,6 +520,12 @@ class FileManagerApi extends Component
 
             if ($removed === false) {
                 return 'removefailed';
+            }
+
+            // remove permission
+            $removedPermission = $this->_filesystem->removePermission($path);
+            if ($removedPermission === false) {
+                return 'errorpermission';
             }
         }
         if ($anyNoPerm) {
