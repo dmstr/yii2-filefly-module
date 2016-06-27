@@ -145,7 +145,13 @@ class FileManagerApi extends Component
                 break;
 
             case 'copy':
-                $copied = $this->copyAction($request['items'], $request['newPath'], $request['singleFilename']);
+                // copy single file with new file name
+                $newFilename = null;
+                if (array_key_exists('singleFilename', $request)) {
+                    $newFilename = $request['singleFilename'];
+                }
+
+                $copied = $this->copyAction($request['items'], $request['newPath'], $newFilename);
                 switch (true) {
                     case $copied === 'copyfailed':
                         $response = $this->simpleErrorResponse($this->_translate->copying_failed);
@@ -469,16 +475,20 @@ class FileManagerApi extends Component
             }
 
             // Build new path
-            $newPath = '/' . $newPath . '/' . $newFilename;
-
-            // Set new permission
-            $this->_filesystem->setPermission($newPath);
+            if ($newFilename === null) {
+                $filename = $newPath . '/' . basename($oldPath);
+            } else {
+                $filename = $newPath . '/' . $newFilename;
+            }
 
             // copy file
-            $copied = $this->_filesystem->get($oldPath)->copy($newPath);
+            $copied = $this->_filesystem->get($oldPath)->copy($filename);
             if ($copied === false) {
                 return 'copyfailed';
             }
+
+            // Set new permission
+            $this->_filesystem->setPermission($filename);
         }
         return true;
     }
