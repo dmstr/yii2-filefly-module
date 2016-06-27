@@ -31,12 +31,11 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 - Filefly Admins dürfen/können alles!
 - Solange keine Berechtigungen gesetzt sind, wird down up geschaut ob irgendwo das geforderte Recht gegeben ist.
 - Besitzer Berechtigungen gehen über die gesetzten Rechte in `access_read`, `access_update`, `access_delete`
-- Sobald auf diesem Weg ein Recht vorhanden -> berechtigt
-- Sobald auf diesem Weg ein Recht verweigert -> untersagt
 
 **ActiveRecord: FileflyHashmap**
 - uses `dmstr\db\traits\ActiveRecordAccessTrait` with `$activeAccessTrait = false`
 - access checks will be done foreach permission type explicitly, `hasPermission($action)`
+- uses a `pathValidator` rule to ensure the `path` syntax
 
 #### Roles
 
@@ -57,7 +56,7 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 
 ## RBAC Plugins
 
-Permission checks will ever come before file or older operation
+Permission checks will ever come after file or older operation
 
 **GrantPermission**
 ```
@@ -90,18 +89,11 @@ Remove permission
 ## TODOs
 
 - input validation of file and folder names ! Missing in native Angular-Filemanager
-- reverse permission set/update/delete in case of filesystem errors (i.e. exists, not found)
-- update move modal like delete modal, refresh location on cancel modal dialog
-	- error on partial move in case of some permission denies in subdirectories
 
 Probs:
 ------
-1. Die DB hat ein Index über (Filesystem / Path / Owner / Domain)
-Jetzt kommt ein 2. Benutzer und will einen Ordner mit selben Namen auf der selben Ebene anlegen.
-Die DB kanns aufgrund des 4er Index verarbeiten, das Filesystem aber nicht !! 
-Von unterschiedlichen Sprachen ist da noch nichtmal die Rede.
+1. Spalte `access_domain` wird eigentlich nicht gebraucht, da ein Dateisystem keine Sprachunterscheidung hat
 
 Mögliche Lösungen:
 ---
-1. Ordner dürfen nur von einem Owner angelegt werden oder die Fehlermeldung weisst eben darauf hin,
-dass es an dieser Stelle schon ein Ordner mit selben Namen gibt?!
+1. Spalte löschen

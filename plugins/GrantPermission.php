@@ -17,11 +17,11 @@ use yii\base\Component;
 
 
 /**
- * Class FindPermissions
+ * Class GrantPermission
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class FindPermissions extends Component implements PluginInterface
+class GrantPermission extends Component implements PluginInterface
 {
     /**
      * The yii component name of this filesystem

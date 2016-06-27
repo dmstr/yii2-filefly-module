@@ -4,7 +4,7 @@ namespace hrzg\filefly\components;
 use creocoder\flysystem\Filesystem;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
-use hrzg\filefly\plugins\FindPermissions;
+use hrzg\filefly\plugins\GrantPermission;
 use hrzg\filefly\plugins\RemovePermission;
 use hrzg\filefly\plugins\SetPermission;
 use League\Flysystem\FileExistsException;
@@ -45,7 +45,7 @@ class FileManagerApi extends Component
 
         // add plugins
         $component = ['component' => $fsComponent];
-        $this->_filesystem->addPlugin(new FindPermissions($component));
+        $this->_filesystem->addPlugin(new GrantPermission($component));
         $this->_filesystem->addPlugin(new SetPermission($component));
         $this->_filesystem->addPlugin(new RemovePermission($component));
 
