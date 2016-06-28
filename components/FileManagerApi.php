@@ -8,6 +8,7 @@ use hrzg\filefly\plugins\GetPermission;
 use hrzg\filefly\plugins\GrantPermission;
 use hrzg\filefly\plugins\RemovePermission;
 use hrzg\filefly\plugins\SetPermission;
+use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\Util;
 use yii\base\Component;
@@ -50,6 +51,7 @@ class FileManagerApi extends Component
         $this->_filesystem->addPlugin(new SetPermission($component));
         $this->_filesystem->addPlugin(new RemovePermission($component));
         $this->_filesystem->addPlugin(new GetPermission($component));
+        $this->_filesystem->addPlugin(new UpdatePermission($component));
 
         // init language handler
         $this->_translate = new Translate(\Yii::$app->language);
@@ -235,11 +237,9 @@ class FileManagerApi extends Component
                 $response = $this->getPermissions($request['path']);
                 break;
             case 'changePermissions':
-                $changed = $this->changePermissionsAction($request['itemPath'], $request['rights']);
+                $changed = $this->changePermissionsAction($request['path'], $request['item']);
                 if ($changed === true) {
                     $response = $this->simpleSuccessResponse();
-                } elseif ($changed === 'missing') {
-                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
                 } else {
                     $response = $this->simpleErrorResponse($this->_translate->permissions_change_failed);
                 }
@@ -597,6 +597,11 @@ class FileManagerApi extends Component
         return true;
     }
 
+    /**
+     * @param $path
+     *
+     * @return Response
+     */
     private function getPermissions($path)
     {
         \Yii::error($this->_filesystem->getPermission($path), 'getPermissions.by.path');
@@ -610,41 +615,19 @@ class FileManagerApi extends Component
     }
 
     /**
-     * TODO
-     *
-     * @param $path
-     * @param $rights
+     * @param null $path
+     * @param null $item
      *
      * @return bool
      */
-    private function changePermissionsAction($path, $rights)
+    private function changePermissionsAction($path = null, $item = null)
     {
-        \Yii::error($path, 'changePermissions.$path');
-        \Yii::error($rights, 'changePermissions.$rights');
+        $updateItemAuth = $this->_filesystem->updatePermission($item, $path);
+
+        if ($updateItemAuth === false) {
+            return false;
+        }
         return true;
-
-        /*foreach ($paths as $path) {
-            if (!file_exists($$path)) {
-                return 'missing';
-            }
-
-            if (is_dir($path) && $recursive === true) {
-                $iterator = new RecursiveIteratorIterator(
-                    new RecursiveDirectoryIterator($path),
-                    RecursiveIteratorIterator::SELF_FIRST
-                );
-
-                foreach ($iterator as $item) {
-                    $changed = chmod($item, octdec($permissions));
-
-                    if ($changed === false) {
-                        return false;
-                    }
-                }
-            }
-
-            return chmod($path, octdec($permissions));
-        }*/
     }
 
     /**
