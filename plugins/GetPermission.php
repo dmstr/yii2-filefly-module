@@ -56,6 +56,9 @@ class GetPermission extends Component implements PluginInterface
     }
 
     /**
+     * Build permissions array for multi selects in permission modal
+     * // TODO optimize iterations!?
+     *
      * @param $path
      *
      * @return bool
@@ -76,21 +79,13 @@ class GetPermission extends Component implements PluginInterface
         if ($hash === null) {
             return false;
         } else {
-            \Yii::error($hash->attributes, '$hash->attributes');
-
-            // TODO itera
             $userAuthItems = FileflyHashmap::getUsersAuthItems();
-            $readItems     = $hash->authItemStringToArray(Module::ACCESS_READ);
-            $updateItems   = $hash->authItemStringToArray(Module::ACCESS_UPDATE);
-            $deleteItems   = $hash->authItemStringToArray(Module::ACCESS_DELETE);
-
-            \Yii::error($userAuthItems, '$userAuthItems');
 
             // READ ACCESS
             $posRead = 0;
             foreach (array_keys($userAuthItems) as $authItem) {
                 $selected = false;
-                foreach ($readItems as $readItem) {
+                foreach ($hash->authItemStringToArray(Module::ACCESS_READ) as $readItem) {
                     if ($authItem === $readItem) {
                         $selected = true;
                     }
@@ -103,7 +98,7 @@ class GetPermission extends Component implements PluginInterface
             $posUpdate = 0;
             foreach (array_keys($userAuthItems) as $authItem) {
                 $selected = false;
-                foreach ($updateItems as $updateItem) {
+                foreach ($hash->authItemStringToArray(Module::ACCESS_UPDATE) as $updateItem) {
                     if ($authItem === $updateItem) {
                         $selected = true;
                     }
@@ -116,7 +111,7 @@ class GetPermission extends Component implements PluginInterface
             $posDelete = 0;
             foreach (array_keys($userAuthItems) as $authItem) {
                 $selected = false;
-                foreach ($deleteItems as $deleteItem) {
+                foreach ($hash->authItemStringToArray(Module::ACCESS_DELETE) as $deleteItem) {
                     if ($authItem === $deleteItem) {
                         $selected = true;
                     }
@@ -125,7 +120,6 @@ class GetPermission extends Component implements PluginInterface
                 $posDelete++;
             }
         }
-        \Yii::error($this->permissions, '$this->permissions');
         return $this->permissions;
     }
 }
