@@ -75,17 +75,17 @@ class GetPermission extends Component implements PluginInterface
 
             // read access
             foreach ($hash->authItemStringToArray(Module::ACCESS_READ) as $readItem) {
-                $selectedRoles['read'][] = ['role' => '<i class="glyphicon glyphicon-lock"></i> ' . $readItem, 'selected' => true];
+                $selectedRoles['read'][] = ['role' => $readItem, 'selected' => true];
             }
 
             // read update
             foreach ($hash->authItemStringToArray(Module::ACCESS_UPDATE) as $updateItem) {
-                $selectedRoles['update'][] = ['role' => '<i class="glyphicon glyphicon-lock"></i> ' . $updateItem, 'selected' => true];
+                $selectedRoles['update'][] = ['role' => $updateItem, 'selected' => true];
             }
 
             // read delete
             foreach ($hash->authItemStringToArray(Module::ACCESS_DELETE) as $deleteItem) {
-                $selectedRoles['delete'][] = ['role' => '<i class="glyphicon glyphicon-lock"></i> ' . $deleteItem, 'selected' => true];
+                $selectedRoles['delete'][] = ['role' => $deleteItem, 'selected' => true];
             }
 
             return $selectedRoles;
