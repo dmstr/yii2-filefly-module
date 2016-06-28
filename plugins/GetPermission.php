@@ -35,6 +35,11 @@ class GetPermission extends Component implements PluginInterface
     protected $filesystem;
 
     /**
+     * @var array
+     */
+    protected $permissions = [];
+
+    /**
      * @param FilesystemInterface $filesystem
      */
     public function setFilesystem(FilesystemInterface $filesystem)
@@ -57,6 +62,11 @@ class GetPermission extends Component implements PluginInterface
      */
     public function handle($path)
     {
+        $this->permissions           = [];
+        $this->permissions['read']   = null;
+        $this->permissions['update'] = null;
+        $this->permissions['delete'] = null;
+
         /** @var $hash \hrzg\filefly\models\FileflyHashmap */
         $query = FileflyHashmap::find();
         $query->andWhere(['component' => $this->component]);
@@ -66,29 +76,56 @@ class GetPermission extends Component implements PluginInterface
         if ($hash === null) {
             return false;
         } else {
-            \Yii::error($hash->attributes, '$hash');
+            \Yii::error($hash->attributes, '$hash->attributes');
 
-            // TODO return all auth items for use and set seleted properties from DB
-            // ->  FileflyHashmap::getUsersAuthItems();
+            // TODO itera
+            $userAuthItems = FileflyHashmap::getUsersAuthItems();
+            $readItems     = $hash->authItemStringToArray(Module::ACCESS_READ);
+            $updateItems   = $hash->authItemStringToArray(Module::ACCESS_UPDATE);
+            $deleteItems   = $hash->authItemStringToArray(Module::ACCESS_DELETE);
 
-            $selectedRoles = [];
+            \Yii::error($userAuthItems, '$userAuthItems');
 
-            // read access
-            foreach ($hash->authItemStringToArray(Module::ACCESS_READ) as $readItem) {
-                $selectedRoles['read'][] = ['role' => $readItem, 'selected' => true];
+            // READ ACCESS
+            $posRead = 0;
+            foreach (array_keys($userAuthItems) as $authItem) {
+                $selected = false;
+                foreach ($readItems as $readItem) {
+                    if ($authItem === $readItem) {
+                        $selected = true;
+                    }
+                    $this->permissions['read'][$posRead] = ['role' => $authItem, 'selected' => $selected];
+                }
+                $posRead++;
             }
 
-            // read update
-            foreach ($hash->authItemStringToArray(Module::ACCESS_UPDATE) as $updateItem) {
-                $selectedRoles['update'][] = ['role' => $updateItem, 'selected' => true];
+            // UPDATE ACCESS
+            $posUpdate = 0;
+            foreach (array_keys($userAuthItems) as $authItem) {
+                $selected = false;
+                foreach ($updateItems as $updateItem) {
+                    if ($authItem === $updateItem) {
+                        $selected = true;
+                    }
+                    $this->permissions['update'][$posUpdate] = ['role' => $authItem, 'selected' => $selected];
+                }
+                $posUpdate++;
             }
 
-            // read delete
-            foreach ($hash->authItemStringToArray(Module::ACCESS_DELETE) as $deleteItem) {
-                $selectedRoles['delete'][] = ['role' => $deleteItem, 'selected' => true];
+            // DELETE ACCESS
+            $posDelete = 0;
+            foreach (array_keys($userAuthItems) as $authItem) {
+                $selected = false;
+                foreach ($deleteItems as $deleteItem) {
+                    if ($authItem === $deleteItem) {
+                        $selected = true;
+                    }
+                    $this->permissions['delete'][$posDelete] = ['role' => $authItem, 'selected' => $selected];
+                }
+                $posDelete++;
             }
-
-            return $selectedRoles;
         }
+        \Yii::error($this->permissions, '$this->permissions');
+        return $this->permissions;
     }
 }
