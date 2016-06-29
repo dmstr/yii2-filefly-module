@@ -28,7 +28,8 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 ## RBAC
 
 **Prosa**
-- Filefly Admins dürfen/können alles!
+- `FileflyAdmin` dürfen/können alles!
+- `FileflyPermissions` berechtigte können Berechtigungen in Rahmen ihnen zugewiesenen RBAC Berechtigungen setzen und ändern.
 - Solange keine Berechtigungen gesetzt sind, wird down up geschaut ob irgendwo das geforderte Recht gegeben ist.
 - Besitzer Berechtigungen gehen über die gesetzten Rechte in `access_read`, `access_update`, `access_delete`
 
@@ -47,6 +48,8 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 	
 - FileflyApi
 	- filefly_api_index
+	
+- FileflyPermissions
 	
 #### Permissions
 

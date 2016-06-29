@@ -88,7 +88,7 @@ class GrantAccess extends Component implements PluginInterface
             }
 
             // Grand ALL access for admins
-            if (in_array(Module::ADMIN_ACCESS_ALL, array_keys(FileflyHashmap::getUsersAuthItems()))) {
+            if (in_array(Module::ACCESS_ROLE_ADMIN, array_keys(FileflyHashmap::getUsersAuthItems()))) {
                 return true;
             }
 

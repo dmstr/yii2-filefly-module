@@ -10,7 +10,9 @@ use yii\web\HttpException;
 
 class ApiController extends \yii\rest\Controller
 {
-
+    /**
+     * @inheritdoc
+     */
     public function behaviors()
     {
         $behaviors               = parent::behaviors();
@@ -27,6 +29,9 @@ class ApiController extends \yii\rest\Controller
         return $behaviors;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function actionIndex()
     {
         // set the yii component name of the filesystem
