@@ -4,10 +4,10 @@ namespace hrzg\filefly\components;
 use creocoder\flysystem\Filesystem;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
-use hrzg\filefly\plugins\GetPermission;
-use hrzg\filefly\plugins\GrantPermission;
-use hrzg\filefly\plugins\RemovePermission;
-use hrzg\filefly\plugins\SetPermission;
+use hrzg\filefly\plugins\GetPermissions;
+use hrzg\filefly\plugins\GrantAccess;
+use hrzg\filefly\plugins\RemoveAccess;
+use hrzg\filefly\plugins\SetAccess;
 use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\Util;
@@ -47,10 +47,10 @@ class FileManagerApi extends Component
 
         // add plugins
         $component = ['component' => $fsComponent];
-        $this->_filesystem->addPlugin(new GrantPermission($component));
-        $this->_filesystem->addPlugin(new SetPermission($component));
-        $this->_filesystem->addPlugin(new RemovePermission($component));
-        $this->_filesystem->addPlugin(new GetPermission($component));
+        $this->_filesystem->addPlugin(new GrantAccess($component));
+        $this->_filesystem->addPlugin(new SetAccess($component));
+        $this->_filesystem->addPlugin(new RemoveAccess($component));
+        $this->_filesystem->addPlugin(new GetPermissions($component));
         $this->_filesystem->addPlugin(new UpdatePermission($component));
 
         // init language handler
@@ -97,9 +97,7 @@ class FileManagerApi extends Component
 
         switch ($request['action']) {
             case 'list':
-
                 $list = $this->listAction($request['path']);
-
                 if (!is_array($list)) {
                     $response = $this->simpleErrorResponse($this->_translate->listing_filed);
                 } else {
@@ -233,8 +231,8 @@ class FileManagerApi extends Component
 
                 break;
 
-            case 'getPermissions':
-                $response = $this->getPermissions($request['path']);
+            case 'resolvePermissions':
+                $response = $this->resolvePermissions($request['path']);
                 break;
             case 'changePermissions':
                 $changed = $this->changePermissionsAction($request['path'], $request['item']);
@@ -299,7 +297,7 @@ class FileManagerApi extends Component
      */
     private function uploadAction($path, $files)
     {
-        if ($this->_filesystem->grantPermission($path, Module::ACCESS_UPDATE)) {
+        if ($this->_filesystem->grantAccess($path, Module::ACCESS_UPDATE)) {
             foreach ($files as $file) {
                 $stream   = fopen($file['tmp_name'], 'r+');
                 $fullPath = $path . '/' . $file['name'];
@@ -315,7 +313,7 @@ class FileManagerApi extends Component
                 }
 
                 // set permission
-                $this->_filesystem->setPermission($fullPath);
+                $this->_filesystem->setAccess($fullPath);
             }
             return true;
         }
@@ -363,12 +361,8 @@ class FileManagerApi extends Component
         $files = [];
 
         // get all filesystem path contents
-        $contents = $this->_filesystem->listContents($path);
-
-        foreach ($contents AS $item) {
-
-            $path = '/' . $item['path'];
-            if (!$this->_filesystem->grantPermission($path, Module::ACCESS_READ)) {
+        foreach ($this->_filesystem->listContents($path) AS $item) {
+            if (!$this->_filesystem->grantAccess($item['path'], Module::ACCESS_READ)) {
                 continue;
             }
 
@@ -405,7 +399,7 @@ class FileManagerApi extends Component
      */
     private function renameAction($oldPath, $newPath)
     {
-        if (!$this->_filesystem->grantPermission($oldPath, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($oldPath, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -419,7 +413,7 @@ class FileManagerApi extends Component
             return 'renamefailed';
         }
         // Update permissions
-        $this->_filesystem->setPermission($oldPath, $newPath);
+        $this->_filesystem->setAccess($oldPath, $newPath);
 
         return true;
     }
@@ -432,7 +426,7 @@ class FileManagerApi extends Component
      */
     private function moveAction($oldPaths, $newPath)
     {
-        if (!$this->_filesystem->grantPermission($newPath, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($newPath, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -451,7 +445,7 @@ class FileManagerApi extends Component
             }
 
             // Update permissions
-            $this->_filesystem->setPermission($oldPath, $newPath);
+            $this->_filesystem->setAccess($oldPath, $newPath);
         }
         return true;
     }
@@ -465,7 +459,7 @@ class FileManagerApi extends Component
      */
     private function copyAction($oldPaths, $newPath, $newFilename)
     {
-        if (!$this->_filesystem->grantPermission($newPath, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($newPath, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -489,7 +483,7 @@ class FileManagerApi extends Component
             }
 
             // Set new permission
-            $this->_filesystem->setPermission($filename);
+            $this->_filesystem->setAccess($filename);
         }
         return true;
     }
@@ -504,7 +498,7 @@ class FileManagerApi extends Component
         $anyNoPerm = false;
         foreach ($paths as $path) {
 
-            if (!$this->_filesystem->grantPermission($path, Module::ACCESS_DELETE)) {
+            if (!$this->_filesystem->grantAccess($path, Module::ACCESS_DELETE)) {
                 $anyNoPerm = true;
                 continue;
             }
@@ -528,7 +522,7 @@ class FileManagerApi extends Component
             }
 
             // remove permission
-            $removedPermission = $this->_filesystem->removePermission($path);
+            $removedPermission = $this->_filesystem->removeAccess($path);
             if ($removedPermission === false) {
                 return 'errorpermission';
             }
@@ -548,7 +542,7 @@ class FileManagerApi extends Component
      */
     private function editAction($path, $content)
     {
-        if (!$this->_filesystem->grantPermission($path, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($path, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -580,7 +574,7 @@ class FileManagerApi extends Component
      */
     private function createFolderAction($path)
     {
-        if (!$this->_filesystem->grantPermission($path, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($path, Module::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -593,7 +587,7 @@ class FileManagerApi extends Component
         }
 
         // set permissions
-        $this->_filesystem->setPermission($path);
+        $this->_filesystem->setAccess($path);
         return true;
     }
 
@@ -602,13 +596,13 @@ class FileManagerApi extends Component
      *
      * @return Response
      */
-    private function getPermissions($path)
+    private function resolvePermissions($path)
     {
-        \Yii::error($this->_filesystem->getPermission($path), 'getPermissions.by.path');
+        \Yii::error($this->_filesystem->getPermissions($path), 'getPermissions.by.path');
         $response = new Response();
         $response->setData(
             [
-                'auth' => $this->_filesystem->getPermission($path)
+                'auth' => $this->_filesystem->getPermissions($path)
             ]
         );
         return $response;

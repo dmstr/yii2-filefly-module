@@ -15,11 +15,11 @@ use League\Flysystem\PluginInterface;
 use yii\base\Component;
 
 /**
- * Class RemovePermission
+ * Class RemoveAccess
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class RemovePermission extends Component implements PluginInterface
+class RemoveAccess extends Component implements PluginInterface
 {
     /**
      * The yii component name of this filesystem
@@ -45,7 +45,7 @@ class RemovePermission extends Component implements PluginInterface
      */
     public function getMethod()
     {
-        return 'removePermission';
+        return 'removeAccess';
     }
 
     /**
@@ -57,7 +57,6 @@ class RemovePermission extends Component implements PluginInterface
      */
     public function handle($itemPath = null)
     {
-        \Yii::error($itemPath, '$removePermission.$itemPath');
 
         $item = FileflyHashmap::find()
             ->andWhere(['component' => $this->component])
@@ -68,7 +67,6 @@ class RemovePermission extends Component implements PluginInterface
             \Yii::error('Could not find item [' . $itemPath . '] in hash table!', __METHOD__);
             return false;
         }
-        \Yii::error($item->attributes, '$remove.$item');
         if (!$item->delete()) {
             \Yii::error('Could not delete item [' . $itemPath . '] in hash table!', __METHOD__);
             return false;

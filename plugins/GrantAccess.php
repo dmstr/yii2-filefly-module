@@ -17,11 +17,11 @@ use yii\base\Component;
 
 
 /**
- * Class GrantPermission
+ * Class GrantAccess
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class GrantPermission extends Component implements PluginInterface
+class GrantAccess extends Component implements PluginInterface
 {
     /**
      * The yii component name of this filesystem
@@ -53,7 +53,7 @@ class GrantPermission extends Component implements PluginInterface
      */
     public function getMethod()
     {
-        return 'grantPermission';
+        return 'grantAccess';
     }
 
     /**

@@ -16,11 +16,11 @@ use yii\base\Component;
 
 
 /**
- * Class SetPermission
+ * Class SetAccess
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class SetPermission extends Component implements PluginInterface
+class SetAccess extends Component implements PluginInterface
 {
     /**
      * The yii component name of this filesystem
@@ -46,7 +46,7 @@ class SetPermission extends Component implements PluginInterface
      */
     public function getMethod()
     {
-        return 'setPermission';
+        return 'setAccess';
     }
 
     /**

@@ -17,11 +17,11 @@ use yii\base\Component;
 
 
 /**
- * Class GetPermission
+ * Class GetPermissions
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class GetPermission extends Component implements PluginInterface
+class GetPermissions extends Component implements PluginInterface
 {
     /**
      * The yii component name of this filesystem
@@ -52,7 +52,7 @@ class GetPermission extends Component implements PluginInterface
      */
     public function getMethod()
     {
-        return 'getPermission';
+        return 'getPermissions';
     }
 
     /**
