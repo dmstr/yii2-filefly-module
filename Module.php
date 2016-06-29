@@ -3,6 +3,7 @@
 namespace hrzg\filefly;
 
 use dmstr\web\traits\AccessBehaviorTrait;
+use yii\base\Exception;
 use yii\web\HttpException;
 
 class Module extends \yii\base\Module
@@ -62,13 +63,15 @@ class Module extends \yii\base\Module
      *
      * @throws HttpException
      */
-    public function init()
+    public function beforeAction($action)
     {
-        parent::init();
+        parent::beforeAction($action);
 
         if (empty($this->filesystem)) {
-            \Yii::error('Please configure a filesystem', __METHOD__);
-            throw new HttpException(406);
+            \Yii::$app->session->addFlash('warning', 'No filesystem configured for <code>filefly</code> module');
+            \Yii::warning('Filesystem not configured.', __METHOD__);
         }
+
+        return true;
     }
 }
