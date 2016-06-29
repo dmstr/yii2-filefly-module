@@ -232,8 +232,15 @@ class FileManagerApi extends Component
                 break;
 
             case 'resolvePermissions':
-                $response = $this->resolvePermissions($request['path']);
+                $response = new Response();
+                $response->setData(
+                    [
+                        'auth' => $this->_filesystem->getPermissions($request['path'])
+                    ]
+                );
+
                 break;
+
             case 'changePermissions':
                 $changed = $this->changePermissionsAction($request['path'], $request['item']);
                 if ($changed === true) {
@@ -589,23 +596,6 @@ class FileManagerApi extends Component
         // set permissions
         $this->_filesystem->setAccess($path);
         return true;
-    }
-
-    /**
-     * @param $path
-     *
-     * @return Response
-     */
-    private function resolvePermissions($path)
-    {
-        \Yii::error($this->_filesystem->getPermissions($path), 'getPermissions.by.path');
-        $response = new Response();
-        $response->setData(
-            [
-                'auth' => $this->_filesystem->getPermissions($path)
-            ]
-        );
-        return $response;
     }
 
     /**
