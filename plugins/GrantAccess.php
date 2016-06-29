@@ -57,7 +57,6 @@ class GrantAccess extends Component implements PluginInterface
     }
 
     /**
-     * TODO $contents array param can be a single input!
      * Find permissions for paths by permission type
      *
      * - Parent permission support if no direct permission can be granted

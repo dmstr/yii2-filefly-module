@@ -79,11 +79,11 @@ class GetPermissions extends Component implements PluginInterface
         if ($hash === null) {
             return false;
         } else {
-            $userAuthItems = FileflyHashmap::getUsersAuthItems();
+            $userAuthItems = array_keys(FileflyHashmap::getUsersAuthItems());
 
             // READ ACCESS
             $posRead = 0;
-            foreach (array_keys($userAuthItems) as $authItem) {
+            foreach ($userAuthItems as $authItem) {
                 $selected = false;
                 foreach ($hash->authItemStringToArray(Module::ACCESS_READ) as $readItem) {
                     if ($authItem === $readItem) {
@@ -96,7 +96,7 @@ class GetPermissions extends Component implements PluginInterface
 
             // UPDATE ACCESS
             $posUpdate = 0;
-            foreach (array_keys($userAuthItems) as $authItem) {
+            foreach ($userAuthItems as $authItem) {
                 $selected = false;
                 foreach ($hash->authItemStringToArray(Module::ACCESS_UPDATE) as $updateItem) {
                     if ($authItem === $updateItem) {
@@ -109,7 +109,7 @@ class GetPermissions extends Component implements PluginInterface
 
             // DELETE ACCESS
             $posDelete = 0;
-            foreach (array_keys($userAuthItems) as $authItem) {
+            foreach ($userAuthItems as $authItem) {
                 $selected = false;
                 foreach ($hash->authItemStringToArray(Module::ACCESS_DELETE) as $deleteItem) {
                     if ($authItem === $deleteItem) {
