@@ -69,13 +69,6 @@ class GrantAccess extends Component implements PluginInterface
      */
     public function handle($path, $permissionType = 'access_read')
     {
-        $this->_iterator = [];
-
-        // Grand ALL access for admins
-        if (in_array(Module::ADMIN_ACCESS_ALL, array_keys(FileflyHashmap::getUsersAuthItems()))) {
-            return true;
-        }
-
         // built path iterations
         $this->buildPathIterator($path);
 
@@ -87,10 +80,17 @@ class GrantAccess extends Component implements PluginInterface
             $hash = $query->one();
 
             if ($hash === null) {
+
                 if ($permissionType === Module::ACCESS_UPDATE) {
                     continue;
                 }
+
                 return false;
+            }
+
+            // Grand ALL access for admins
+            if (in_array(Module::ADMIN_ACCESS_ALL, array_keys(FileflyHashmap::getUsersAuthItems()))) {
+                return true;
             }
 
             if (empty($hash->{$permissionType})) {
@@ -123,6 +123,8 @@ class GrantAccess extends Component implements PluginInterface
      */
     private function buildPathIterator($path)
     {
+        $this->_iterator = [];
+
         $path           = ltrim($path, '/');
         $parts          = explode('/', $path);
         $countPathParts = count($parts);
