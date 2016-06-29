@@ -78,7 +78,6 @@ class GrantAccess extends Component implements PluginInterface
 
         // built path iterations
         $this->buildPathIterator($path);
-        \Yii::error($path, '$path');
 
         foreach ($this->_iterator as $subPath) {
             /** @var $hash \hrzg\filefly\models\FileflyHashmap */
@@ -87,21 +86,14 @@ class GrantAccess extends Component implements PluginInterface
             $query->andWhere(['path' => $subPath]);
             $hash = $query->one();
 
-            \Yii::error($permissionType, '$permissionType');
-            \Yii::error($subPath, '$subPath');
-
             if ($hash === null) {
-                \Yii::error($hash, '$hash');
                 if ($permissionType === Module::ACCESS_UPDATE) {
                     continue;
                 }
                 return false;
             }
-            \Yii::error($hash->hasPermission($permissionType), '$perm');
 
             if (empty($hash->{$permissionType})) {
-                \Yii::error('true', 'empty access');
-
                 // match if owner right can be granted
                 if ($hash->hasPermission($permissionType)) {
                     return true;

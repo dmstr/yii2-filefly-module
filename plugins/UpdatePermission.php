@@ -35,11 +35,6 @@ class UpdatePermission extends Component implements PluginInterface
     protected $filesystem;
 
     /**
-     * @var array
-     */
-    //    protected $permissions = [];
-
-    /**
      * @param FilesystemInterface $filesystem
      */
     public function setFilesystem(FilesystemInterface $filesystem)
@@ -57,7 +52,6 @@ class UpdatePermission extends Component implements PluginInterface
 
     /**
      * Build permissions array for multi selects in permission modal
-     * // TODO optimize iterations!?
      *
      * @param array $item
      * @param string $path
@@ -91,6 +85,7 @@ class UpdatePermission extends Component implements PluginInterface
                 $deleteItems[$deleteItem['role']] = $deleteItem['role'];
             }
 
+            // set access permissions
             $hash->authItemArrayToString(Module::ACCESS_READ, $readItems);
             $hash->authItemArrayToString(Module::ACCESS_UPDATE, $updateItems);
             $hash->authItemArrayToString(Module::ACCESS_DELETE, $deleteItems);

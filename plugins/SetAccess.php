@@ -59,13 +59,11 @@ class SetAccess extends Component implements PluginInterface
      */
     public function handle($oldItemPath = null, $newItemPath = null)
     {
-        \Yii::error($oldItemPath, '$oldItemPath.setPerm');
-
         $oldHash = FileflyHashmap::find()
             ->where(
                 [
-                    'component'     => $this->component,
-                    'path'          => $oldItemPath,
+                    'component' => $this->component,
+                    'path'      => $oldItemPath,
                 ]
             )
             ->one();
@@ -74,18 +72,16 @@ class SetAccess extends Component implements PluginInterface
         if (empty($oldHash)) {
             $newHash = new FileflyHashmap(
                 [
-                    'component'     => $this->component,
-                    'path'          => $oldItemPath,
-                    'access_owner'  => \Yii::$app->user->id
+                    'component'    => $this->component,
+                    'path'         => $oldItemPath,
+                    'access_owner' => \Yii::$app->user->id
                 ]
             );
             if (!$newHash->save()) {
-                \Yii::error($newHash->getErrors(), __METHOD__);
                 \Yii::error('Could not save new item [' . $oldItemPath . '] to hash table!', __METHOD__);
                 return false;
             }
         } else {
-            \Yii::error($oldHash->attributes, '$oldHash.setPerm');
             return $this->updateRecursive($oldHash->path, $newItemPath);
         }
 
@@ -101,7 +97,6 @@ class SetAccess extends Component implements PluginInterface
     private function updateRecursive($oldItemPath, $newItemPath)
     {
         $find = $oldItemPath . '%';
-        \Yii::error($find, '$find.recursive.setPerm');
 
         $items = FileflyHashmap::find()
             ->andWhere(['component' => $this->component])
@@ -113,14 +108,9 @@ class SetAccess extends Component implements PluginInterface
         }
 
         foreach ($items as $item) {
-            \Yii::error($item->path, '$item->path.setperm');
-            \Yii::error($oldItemPath, '$oldItemPath.setperm');
-            \Yii::error($newItemPath, '$newItemPath.setperm');
-
             $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
 
             if (!$item->save()) {
-                \Yii::error($item->getErrors(), 'ERRORS.setPerm');
                 \Yii::error('Could not update item [' . $oldItemPath . '] to hash table!', __METHOD__);
                 return false;
             }
