@@ -89,12 +89,8 @@ Remove permission
 - Multi delete option
 ```
 
-## TODOs
-
-- input validation of file and folder names ! Missing in native Angular-Filemanager
-
-Probs:
+Known Issues:
 ------
 
-Mögliche Lösungen:
----
+- input validation of file and folder names (special chars like /)! Missing in native Angular-Filemanager
+- camel cases, is actually case insensitive
