@@ -623,6 +623,15 @@ class FileManagerApi extends Component
     {
         switch ($queries['action']) {
             case 'download':
+
+                // check access first, and redirect to login if false
+                if (!$this->_filesystem->grantAccess($queries['path'], Module::ACCESS_READ)) {
+                    $response = new Response();
+                    $response->setStatus(403, 'Unauthorized!');
+                    return $response;
+                }
+
+                // try to download file
                 $downloaded = $this->downloadAction($queries['path']);
                 if ($downloaded === true) {
                     exit;
