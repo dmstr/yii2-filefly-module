@@ -2,7 +2,9 @@
 
 namespace hrzg\filefly;
 
+use creocoder\flysystem\Filesystem;
 use dmstr\web\traits\AccessBehaviorTrait;
+use yii\base\Component;
 use yii\base\Exception;
 use yii\web\HttpException;
 
@@ -54,7 +56,12 @@ class Module extends \yii\base\Module
     public $filesystem;
 
     /**
-     * @var string
+     * @var object creocoder\flysystem\Filesystem
+     */
+    public $filesystemComponent;
+
+    /**
+     * @inheritdoc
      */
     public $controllerNamespace = 'hrzg\filefly\controllers';
 
@@ -70,6 +77,17 @@ class Module extends \yii\base\Module
         if (empty($this->filesystem)) {
             \Yii::$app->session->addFlash('warning', 'No filesystem configured for <code>filefly</code> module');
             \Yii::warning('Filesystem not configured.', __METHOD__);
+        }
+
+        // set the yii component name of the filesystem
+        $fsComponentName = $this->filesystem;
+
+        // get the component object
+        $this->filesystemComponent = \Yii::$app->{$fsComponentName};
+
+        if (!$this->filesystemComponent instanceof Filesystem) {
+            \Yii::$app->session->addFlash('error', 'Filesystem component is no instance of creocoder\flysystem\Filesystem');
+            \Yii::warning('Invalid filesystem component.', __METHOD__);
         }
 
         return true;

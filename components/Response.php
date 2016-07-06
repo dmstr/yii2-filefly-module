@@ -17,11 +17,6 @@ class Response
 	 */
 	private $statusCode = 200;
 
-    /**
-     * @var integer
-     */
-    private $statusCodeUnauthorized = 403;
-
 	/**
 	 * @var string
 	 */
@@ -51,13 +46,6 @@ class Response
 	 */
 	public function setStatus ($statusCode, $status)
 	{
-        // unauthorized requests (403) redirect to login
-        if ($statusCode == $this->statusCodeUnauthorized) {
-            Url::remember(\Yii::$app->homeUrl);
-            \Yii::$app->response->redirect(\Yii::$app->user->loginUrl);
-            return false;
-        }
-
 		$this->statusCode = $statusCode;
 		$this->status = $status;
 
@@ -78,6 +66,7 @@ class Response
 
 	/**
 	 * @param mixed $body used instead of data if set
+     * @return 	object 			this
 	 */
 	public function setBody ($body)
 	{
@@ -88,6 +77,7 @@ class Response
 
 	/**
 	 * @param mixed $data any data which should be later encoded to body
+     * @return 	object 			this
 	 */
 	public function setData ($data)
 	{

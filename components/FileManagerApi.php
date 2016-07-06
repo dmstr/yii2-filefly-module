@@ -258,6 +258,56 @@ class FileManagerApi extends Component
     }
 
     /**
+     * @param $queries
+     *
+     * @return Response
+     */
+    public function getHandler($queries)
+    {
+        switch ($queries['action']) {
+            case 'download':
+
+                // check access first, and redirect to login if false
+                if (!$this->_filesystem->grantAccess($queries['path'], Module::ACCESS_READ)) {
+                    return $this->unauthorizedResponse($queries['action']);
+                }
+
+                // try to download file
+                $downloaded = $this->downloadAction($queries['path']);
+                if ($downloaded === true) {
+                    exit;
+                } else {
+                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
+                }
+
+                break;
+
+            default:
+                $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
+                break;
+        }
+
+        return $response;
+    }
+
+    /**
+     * @param $action
+     *
+     * @return Response
+     */
+    private function unauthorizedResponse($action)
+    {
+        $bodyHtml  = <<<Html
+You are not allowed to <strong>$action</strong> this file!
+Html;
+
+        $response = new Response();
+        $response->setStatus(401, 'Unauthorized');
+        $response->setBody($bodyHtml);
+        return $response;
+    }
+
+    /**
      * @return Response
      */
     private function simpleSuccessResponse()
@@ -350,7 +400,6 @@ class FileManagerApi extends Component
         header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
         header('Pragma: public');
         header('Content-Length: ' . $size);
-
 
         $stream = $this->_filesystem->readStream($file);
         echo stream_get_contents($stream);
@@ -612,40 +661,5 @@ class FileManagerApi extends Component
             return false;
         }
         return true;
-    }
-
-    /**
-     * @param $queries
-     *
-     * @return Response
-     */
-    public function getHandler($queries)
-    {
-        switch ($queries['action']) {
-            case 'download':
-
-                // check access first, and redirect to login if false
-                if (!$this->_filesystem->grantAccess($queries['path'], Module::ACCESS_READ)) {
-                    $response = new Response();
-                    $response->setStatus(403, 'Unauthorized!');
-                    return $response;
-                }
-
-                // try to download file
-                $downloaded = $this->downloadAction($queries['path']);
-                if ($downloaded === true) {
-                    exit;
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
-                }
-
-                break;
-
-            default:
-                $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
-                break;
-        }
-
-        return $response;
     }
 }
