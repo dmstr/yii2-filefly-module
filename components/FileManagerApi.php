@@ -494,16 +494,16 @@ Html;
             }
 
             // Build new path
-            $newPath = $newPath . '/' . basename($oldPath);
+            $destPath = $newPath . '/' . basename($oldPath);
 
             // Move file
-            $moved = $this->_filesystem->get($oldPath)->rename($newPath);
+            $moved = $this->_filesystem->get($oldPath)->rename($destPath);
             if ($moved === false) {
                 return 'movefailed';
             }
 
             // Update permissions
-            $this->_filesystem->setAccess($oldPath, $newPath);
+            $this->_filesystem->setAccess($oldPath, $destPath);
         }
         return true;
     }
