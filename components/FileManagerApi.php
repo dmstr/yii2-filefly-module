@@ -553,19 +553,17 @@ Html;
      */
     private function removeAction($paths)
     {
-        $anyNoPerm = false;
+        $anyDeniedPerm = false;
         foreach ($paths as $path) {
 
             if (!$this->_filesystem->grantAccess($path, Module::ACCESS_DELETE)) {
-                $anyNoPerm = true;
+                $anyDeniedPerm = true;
                 continue;
             }
 
             if ($this->_filesystem->get($path)->isDir()) {
 
-                $iterator = $this->_filesystem->isEmpty($path);
-
-                if ($iterator === false) {
+                if ($this->_filesystem->isEmpty($path) === false) {
                     return 'notempty';
                 }
 
@@ -584,7 +582,7 @@ Html;
                 return 'errorpermission';
             }
         }
-        if ($anyNoPerm) {
+        if ($anyDeniedPerm) {
             return 'nopermission';
         }
 
