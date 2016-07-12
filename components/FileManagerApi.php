@@ -6,6 +6,7 @@ use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
 use hrzg\filefly\plugins\GetPermissions;
 use hrzg\filefly\plugins\GrantAccess;
+use hrzg\filefly\plugins\RecursiveIterator;
 use hrzg\filefly\plugins\RemoveAccess;
 use hrzg\filefly\plugins\SetAccess;
 use hrzg\filefly\plugins\UpdatePermission;
@@ -52,6 +53,7 @@ class FileManagerApi extends Component
         $this->_filesystem->addPlugin(new RemoveAccess($component));
         $this->_filesystem->addPlugin(new GetPermissions($component));
         $this->_filesystem->addPlugin(new UpdatePermission($component));
+        $this->_filesystem->addPlugin(new RecursiveIterator($component));
 
         // init language handler
         $this->_translate = new Translate(\Yii::$app->language);
@@ -561,10 +563,9 @@ Html;
 
             if ($this->_filesystem->get($path)->isDir()) {
 
-                $dirEmpty = (new \FilesystemIterator($this->_filesystem->getAdapter()->getPathPrefix() . $path))
-                    ->valid();
+                $iterator = $this->_filesystem->isEmpty($path);
 
-                if ($dirEmpty) {
+                if ($iterator === false) {
                     return 'notempty';
                 }
 
