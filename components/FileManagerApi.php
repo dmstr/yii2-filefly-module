@@ -590,6 +590,7 @@ Html;
     }
 
     /**
+     * TODO option globally tmp disabled in hrzg/yii2-filemanager-widgets
      * @param $path
      * @param $content
      *
@@ -609,6 +610,7 @@ Html;
     }
 
     /**
+     * TODO option globally tmp disabled in hrzg/yii2-filemanager-widgets
      * @param $path
      *
      * @return bool|string
