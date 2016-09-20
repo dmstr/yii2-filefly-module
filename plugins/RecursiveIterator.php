@@ -62,7 +62,7 @@ class RecursiveIterator extends Component implements PluginInterface
         $find = $itemPath . '%';
 
         $items = FileflyHashmap::find()
-            ->andWhere(['component' => 'fsFtp'])
+            ->andWhere(['component' => $this->component])
             ->andWhere(['like', 'path', $find, false])
             ->all();
 
