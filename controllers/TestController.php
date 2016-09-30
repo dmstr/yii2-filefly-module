@@ -10,10 +10,13 @@
 namespace hrzg\filefly\controllers;
 
 
+use dmstr\web\traits\AccessBehaviorTrait;
 use yii\web\Controller;
 
 class TestController extends Controller
 {
+    use AccessBehaviorTrait;
+    
     public function actionIndex(){
         return $this->render('index');
     }
