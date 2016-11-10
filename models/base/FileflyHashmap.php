@@ -56,15 +56,15 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
     public function attributeLabels()
     {
         return [
-            'id'            => Yii::t('app', 'ID'),
-            'component'     => Yii::t('app', 'Component'),
-            'path'          => Yii::t('app', 'Path'),
-            'access_owner'  => Yii::t('app', 'Access Owner'),
-            'access_read'   => Yii::t('app', 'Access Read'),
-            'access_update' => Yii::t('app', 'Access Update'),
-            'access_delete' => Yii::t('app', 'Access Delete'),
-            'created_at'    => Yii::t('app', 'Created At'),
-            'updated_at'    => Yii::t('app', 'Updated At'),
+            'id'            => Yii::t('filefly', 'ID'),
+            'component'     => Yii::t('filefly', 'Component'),
+            'path'          => Yii::t('filefly', 'Path'),
+            'access_owner'  => Yii::t('filefly', 'Access Owner'),
+            'access_read'   => Yii::t('filefly', 'Access Read'),
+            'access_update' => Yii::t('filefly', 'Access Update'),
+            'access_delete' => Yii::t('filefly', 'Access Delete'),
+            'created_at'    => Yii::t('filefly', 'Created At'),
+            'updated_at'    => Yii::t('filefly', 'Updated At'),
         ];
     }
 }

@@ -10,7 +10,7 @@ use yii\helpers\Inflector;
 <div class="row">
     <div class="col-xs-12 col-md-4">
         <h4>
-            <?= \Yii::t('app', 'Current Filesystem') ?>
+            <?= \Yii::t('filefly', 'Current Filesystem') ?>
         </h4>
         <ul>
             <li><?= Inflector::titleize($this->context->module->filesystem) ?></li>
