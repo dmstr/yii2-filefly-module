@@ -13,6 +13,7 @@ use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\Util;
 use yii\base\Component;
+use yii\helpers\ArrayHelper;
 
 /**
  * Class FileManagerApi
@@ -282,6 +283,15 @@ class FileManagerApi extends Component
                     $response = $this->simpleErrorResponse($this->_translate->file_not_found);
                 }
 
+                break;
+            case 'search':
+                $all = FileflyHashmap::find()->all();
+                $response = new Response();
+                $response->setData(
+                    [
+                        'result' => ArrayHelper::toArray($all)
+                    ]
+                );
                 break;
 
             default:
