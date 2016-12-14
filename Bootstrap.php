@@ -25,7 +25,7 @@ class Bootstrap implements BootstrapInterface
      */
     public function bootstrap($app)
     {
-        $app->params['yii.migrations'][] = '@vendor/hrzg/yii2-filefly-module/migrations';
+        $app->params['yii.migrations'][] = '@hrzg/filefly/migrations';
 
         if (!\Yii::$app->hasModule('filefly')) {
             $app->setModule(
