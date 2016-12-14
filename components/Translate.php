@@ -13,7 +13,7 @@ class Translate
 
     public function __construct($lang)
     {
-        $langFile = \Yii::getAlias('@vendor/hrzg/yii2-filefly-module') . '/messages/' . $lang . '.json';
+        $langFile = \Yii::getAlias('@hrzg/filefly') . '/messages/' . $lang . '.json';
         if (!file_exists($langFile)) {
             throw new \Exception('No language file for chosen language');
             return;
