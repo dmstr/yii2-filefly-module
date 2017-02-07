@@ -284,6 +284,22 @@ class FileManagerApi extends Component
                 }
 
                 break;
+            case 'stream':
+
+                // check access first, and redirect to login if false
+                if (!$this->_filesystem->grantAccess($queries['path'], Module::ACCESS_READ)) {
+                    return $this->unauthorizedResponse($queries['action']);
+                }
+
+                // try to download file
+                $downloaded = $this->streamAction($queries['path']);
+                if ($downloaded === true) {
+                    exit;
+                } else {
+                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
+                }
+
+                break;
             case 'search':
                 $all = FileflyHashmap::find()->all();
                 $response = new Response();
@@ -410,6 +426,37 @@ Html;
         header('Connection: Keep-Alive');
         header('Expires: 0');
         header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Pragma: public');
+        header('Content-Length: ' . $size);
+
+        $stream = $this->_filesystem->readStream($file);
+        echo stream_get_contents($stream);
+        fclose($stream);
+        return true;
+    }
+
+    /**
+     * @param $file
+     *
+     * @return bool
+     */
+    private function streamAction($file)
+    {
+        if (!$this->_filesystem->get($file)->isFile()) {
+            return false;
+        }
+
+        $quoted = sprintf('"%s"', addcslashes(basename($file), '"\\'));
+        $size   = $this->_filesystem->getSize($file);
+
+        header('Content-Type: '.$this->_filesystem->getMimetype($file));
+        header('Content-Transfer-Encoding: binary');
+        header('Connection: Keep-Alive');
+        $offset = 604800; # 1 week
+        if ($expiringDate = gmdate("D, d M Y H:i:s", time() + $offset)) {
+            header("Expires: $expiringDate GMT");
+        }
+        header('Cache-Control: public');
         header('Pragma: public');
         header('Content-Length: ' . $size);
 
