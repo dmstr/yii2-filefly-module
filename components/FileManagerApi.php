@@ -388,7 +388,12 @@ Html;
                 $fullPath = $path . '/' . $file['name'];
 
                 try {
-                    $uploaded = $this->_filesystem->writeStream($fullPath, $stream);
+                    $uploaded = $this->_filesystem->writeStream(
+                        $fullPath,
+                        $stream,
+                        [
+                            'mimetype' => mime_content_type($file['tmp_name']),
+                        ]);
                 } catch (FileExistsException $e) {
                     return 'fileexists';
 
