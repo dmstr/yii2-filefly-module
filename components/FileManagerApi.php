@@ -232,7 +232,7 @@ class FileManagerApi extends Component
                 // slug new folder name
                 if ($this->_module->slugNames) {
                     $pathInfo = pathinfo($request['newPath']);
-                    $newPath = $pathInfo['dirname'].'/'.$pathInfo['basename'];
+                    $newPath = $pathInfo['dirname'].'/'.Inflector::slug($pathInfo['basename']);
                 }
                 $created = $this->createFolderAction($newPath);
                 switch (true) {
@@ -288,7 +288,7 @@ class FileManagerApi extends Component
             case 'download':
 
                 // check access first, and redirect to login if false
-                if (!$this->_filesystem->grantAccess($queries['path'], Module::ACCESS_READ)) {
+                if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
 
@@ -308,7 +308,7 @@ class FileManagerApi extends Component
                 }
 
                 // check access first, and redirect to login if false
-                if (!$this->_filesystem->grantAccess($queries['path'], Module::ACCESS_READ)) {
+                if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
 
@@ -403,7 +403,7 @@ Html;
      */
     private function uploadAction($path, $files)
     {
-        if ($this->_filesystem->grantAccess($path, Module::ACCESS_UPDATE)) {
+        if ($this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             foreach ($files as $file) {
                 $stream   = fopen($file['tmp_name'], 'r+');
 
@@ -510,7 +510,7 @@ Html;
 
         // get all filesystem path contents
         foreach ($this->_filesystem->listContents($path) AS $item) {
-            if (!$this->_filesystem->grantAccess($item['path'], Module::ACCESS_READ)) {
+            if (!$this->_filesystem->grantAccess($item['path'], Filefly::ACCESS_READ)) {
                 continue;
             }
 
@@ -547,7 +547,7 @@ Html;
      */
     private function renameAction($oldPath, $newPath)
     {
-        if (!$this->_filesystem->grantAccess($oldPath, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($oldPath, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -574,7 +574,7 @@ Html;
      */
     private function moveAction($oldPaths, $newPath)
     {
-        if (!$this->_filesystem->grantAccess($newPath, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($newPath, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -607,7 +607,7 @@ Html;
      */
     private function copyAction($oldPaths, $newPath, $newFilename)
     {
-        if (!$this->_filesystem->grantAccess($newPath, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($newPath, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -646,7 +646,7 @@ Html;
         $anyDeniedPerm = false;
         foreach ($paths as $path) {
 
-            if (!$this->_filesystem->grantAccess($path, Module::ACCESS_DELETE)) {
+            if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_DELETE)) {
                 $anyDeniedPerm = true;
                 continue;
             }
@@ -688,7 +688,7 @@ Html;
      */
     private function editAction($path, $content)
     {
-        if (!$this->_filesystem->grantAccess($path, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
@@ -721,7 +721,7 @@ Html;
      */
     private function createFolderAction($path)
     {
-        if (!$this->_filesystem->grantAccess($path, Module::ACCESS_UPDATE)) {
+        if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
