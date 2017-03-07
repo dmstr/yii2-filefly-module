@@ -322,7 +322,10 @@ class FileManagerApi extends Component
 
                 break;
             case 'search':
-                $all = FileflyHashmap::find()->all();
+                $all = FileflyHashmap::find()
+                    ->where(['LIKE', 'path', ArrayHelper::getValue($queries,'q')])
+                    ->limit(ArrayHelper::getValue($queries,'page_limit',10))
+                    ->all();
                 $response = new Response();
                 $response->setData(
                     [
