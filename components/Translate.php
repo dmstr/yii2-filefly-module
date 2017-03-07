@@ -6,6 +6,7 @@ namespace hrzg\filefly\components;
  *
  * For simple translation to alternative languages
  * @author      Jakub Ďuraš <jakub@duras.me>
+ * @author      Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
 class Translate
 {
@@ -14,9 +15,10 @@ class Translate
     public function __construct($lang)
     {
         $langFile = \Yii::getAlias('@hrzg/filefly') . '/messages/' . $lang . '.json';
+
+        // use fallback en language file
         if (!file_exists($langFile)) {
-            throw new \Exception('No language file for chosen language');
-            return;
+            $langFile = \Yii::getAlias('@hrzg/filefly') . '/messages/en.json';
         }
 
         $json = file_get_contents($langFile);
