@@ -3,7 +3,7 @@ namespace hrzg\filefly\components;
 
 use creocoder\flysystem\Filesystem;
 use hrzg\filefly\models\FileflyHashmap;
-use hrzg\filefly\Module;
+use hrzg\filefly\Module as Filefly;
 use hrzg\filefly\plugins\GetPermissions;
 use hrzg\filefly\plugins\GrantAccess;
 use hrzg\filefly\plugins\RecursiveIterator;
@@ -14,6 +14,7 @@ use League\Flysystem\FileExistsException;
 use League\Flysystem\Util;
 use yii\base\Component;
 use yii\helpers\ArrayHelper;
+use yii\helpers\Inflector;
 
 /**
  * Class FileManagerApi
@@ -28,6 +29,12 @@ class FileManagerApi extends Component
     private $_filesystem = null;
 
     /**
+     * the filefly module instance
+     * @var null
+     */
+    private $_module = null;
+
+    /**
      * @var null
      */
     private $_translate;
@@ -36,13 +43,16 @@ class FileManagerApi extends Component
      * @param Filesystem $fs
      * @param bool|true $muteErrors
      */
-    public function __construct(Filesystem $fs, $fsComponent = null, $muteErrors = false)
+    public function __construct(Filesystem $fs, $fsComponent = null, $muteErrors = false, Filefly $module)
     {
         parent::__construct();
 
         if (!$muteErrors) {
             ini_set('display_errors', 1);
         }
+
+        // set module
+        $this->_module = $module;
 
         // set filesystem
         $this->_filesystem = $fs;
@@ -217,7 +227,14 @@ class FileManagerApi extends Component
                 break;
 
             case 'createFolder':
-                $created = $this->createFolderAction($request['newPath']);
+                $newPath = $request['newPath'];
+
+                // slug new folder name
+                if ($this->_module->slugNames) {
+                    $pathInfo = pathinfo($request['newPath']);
+                    $newPath = $pathInfo['dirname'].'/'.$pathInfo['basename'];
+                }
+                $created = $this->createFolderAction($newPath);
                 switch (true) {
                     case $created === 'exists':
                         $response = $this->simpleErrorResponse($this->_translate->folder_already_exists);
@@ -286,14 +303,18 @@ class FileManagerApi extends Component
                 break;
             case 'stream':
 
+                if (!array_key_exists('path', $queries)) {
+                    return $this->simpleErrorResponse($this->_translate->streaming_failed);
+                }
+
                 // check access first, and redirect to login if false
                 if (!$this->_filesystem->grantAccess($queries['path'], Module::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
 
-                // try to download file
-                $downloaded = $this->streamAction($queries['path']);
-                if ($downloaded === true) {
+                // try to stream file
+                $streamed = $this->streamAction($queries['path']);
+                if ($streamed === true) {
                     exit;
                 } else {
                     $response = $this->simpleErrorResponse($this->_translate->file_not_found);
@@ -385,7 +406,14 @@ Html;
         if ($this->_filesystem->grantAccess($path, Module::ACCESS_UPDATE)) {
             foreach ($files as $file) {
                 $stream   = fopen($file['tmp_name'], 'r+');
-                $fullPath = $path . '/' . $file['name'];
+
+                // parse $file['name'] for slugging, im enabled
+                if ($this->_module->slugNames) {
+                    $pathInfo = pathinfo($file['name']);
+                    $fullPath = $path . '/' . Inflector::slug($pathInfo['filename']).'.'.$pathInfo['extension'];
+                } else {
+                    $fullPath = $path . '/' . $file['name'];
+                }
 
                 try {
                     $uploaded = $this->_filesystem->writeStream(
@@ -394,6 +422,7 @@ Html;
                         [
                             'mimetype' => mime_content_type($file['tmp_name']),
                         ]);
+
                 } catch (FileExistsException $e) {
                     return 'fileexists';
 
@@ -451,7 +480,6 @@ Html;
             return false;
         }
 
-        $quoted = sprintf('"%s"', addcslashes(basename($file), '"\\'));
         $size   = $this->_filesystem->getSize($file);
 
         header('Content-Type: '.$this->_filesystem->getMimetype($file));
@@ -700,6 +728,7 @@ Html;
         if ($this->_filesystem->has($path)) {
             return 'exists';
         }
+
         $newDir = $this->_filesystem->createDir($path);
         if ($newDir === false) {
             return false;

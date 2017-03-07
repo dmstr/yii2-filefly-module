@@ -64,6 +64,12 @@ class Module extends \yii\base\Module
     public $controllerNamespace = 'hrzg\filefly\controllers';
 
     /**
+     * use \yii\helpers\Inflector::slug() for file names on create/upload
+     * @var bool
+     */
+    public $slugNames = true;
+
+    /**
      * @inheritdoc
      *
      * @throws HttpException
@@ -85,7 +91,7 @@ class Module extends \yii\base\Module
             // get the component object
             $this->filesystemComponent = \Yii::$app->{$fsComponentName};
 
-            if (!$this->filesystemComponent instanceof Filesystem) {
+            if ( ! $this->filesystemComponent instanceof Filesystem) {
                 \Yii::$app->session->addFlash(
                     'error',
                     'Filesystem component is no instance of creocoder\flysystem\Filesystem'

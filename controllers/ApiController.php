@@ -59,7 +59,7 @@ class ApiController extends \yii\rest\Controller
     public function actionIndex()
     {
         // Manager API
-        $fileManagerApi = new FileManagerApi($this->module->filesystemComponent, $this->module->filesystem);
+        $fileManagerApi = new FileManagerApi($this->module->filesystemComponent, $this->module->filesystem, false, $this->module);
 
         $rest = new Rest();
         $rest->post([$fileManagerApi, 'postHandler'])

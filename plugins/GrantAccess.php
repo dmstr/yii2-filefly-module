@@ -21,32 +21,13 @@ use yii\base\Component;
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class GrantAccess extends Component implements PluginInterface
+class GrantAccess extends FilesystemHash implements PluginInterface
 {
-    /**
-     * The yii component name of this filesystem
-     * @var string
-     */
-    public $component;
-
-    /**
-     * @var FilesystemInterface $filesystem
-     */
-    protected $filesystem;
-
     /**
      * List of tree parents to be checked
      * @var array
      */
     private $_iterator = [];
-
-    /**
-     * @param FilesystemInterface $filesystem
-     */
-    public function setFilesystem(FilesystemInterface $filesystem)
-    {
-        $this->filesystem = $filesystem;
-    }
 
     /**
      * @return string
