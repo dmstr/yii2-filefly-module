@@ -128,7 +128,7 @@ class GrantAccess extends AccessPlugin
             $tmp = '';
             for ($j = 0; $j < $subCounter; $j++) {
                 $tmp .= '/' . $parts[$j];
-
+                $tmp = $this->normalize($tmp);
             }
             $subCounter--;
             $this->_iterator[] = $tmp;

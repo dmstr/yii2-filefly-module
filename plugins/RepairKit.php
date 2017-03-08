@@ -38,11 +38,6 @@ class RepairKit extends AccessPlugin
      */
     public function handle($path)
     {
-        // root path do not have the need to check permission
-        if ($path === '/') {
-            return true;
-        }
-
         // TODO make this configurable, repair true | false
         if (1) {
             $path = $this->normalize($path);
