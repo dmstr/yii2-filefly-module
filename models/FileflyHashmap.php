@@ -4,6 +4,7 @@ namespace hrzg\filefly\models;
 
 use dmstr\db\traits\ActiveRecordAccessTrait;
 use hrzg\filefly\models\base\FileflyHashmap as BaseFileflyHashmap;
+use hrzg\filefly\Module;
 use Yii;
 use yii\behaviors\TimestampBehavior;
 use yii\db\Expression;
@@ -32,6 +33,28 @@ class FileflyHashmap extends BaseFileflyHashmap
                 ]
             ]
         );
+    }
+
+    /**
+     * @return array with access field names
+     */
+    public static function accessColumnAttributes()
+    {
+        return [
+            'owner'  => 'access_owner',
+            'read'   => 'access_read',
+            'update' => 'access_update',
+            'delete' => 'access_delete',
+            'domain' => false,
+        ];
+    }
+
+    /**
+     * @return array
+     */
+    public static function accessDefaults()
+    {
+        return \Yii::$app->getModule(Module::NAME)->defaultPermissions;
     }
 
     /**

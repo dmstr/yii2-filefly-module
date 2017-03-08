@@ -11,9 +11,7 @@ namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
-use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
-use yii\base\Component;
 
 
 /**
@@ -21,7 +19,7 @@ use yii\base\Component;
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class UpdatePermission extends FilesystemHash implements PluginInterface
+class UpdatePermission extends AccessPlugin
 {
     /**
      * @return string

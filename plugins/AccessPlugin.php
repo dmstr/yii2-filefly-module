@@ -9,19 +9,17 @@
 
 namespace hrzg\filefly\plugins;
 
-use hrzg\filefly\models\FileflyHashmap;
-use hrzg\filefly\Module;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
 use yii\base\Component;
 
 
 /**
- * Class FilesystemHash
+ * Class AccessPlugin
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-abstract class FilesystemHash extends Component implements PluginInterface
+abstract class AccessPlugin extends Component implements PluginInterface
 {
     /**
      * The yii component name of this filesystem
@@ -35,6 +33,24 @@ abstract class FilesystemHash extends Component implements PluginInterface
     protected $filesystem;
 
     /**
+     * @var array
+     */
+    protected $permissions = [];
+
+    /**
+     * List of tree parents to be checked
+     * @var array
+     */
+    protected $_iterator = [];
+
+    /**
+     * Get the method name.
+     *
+     * @return string
+     */
+    abstract public function getMethod();
+
+    /**
      * @param FilesystemInterface $filesystem
      */
     public function setFilesystem(FilesystemInterface $filesystem)
@@ -43,9 +59,14 @@ abstract class FilesystemHash extends Component implements PluginInterface
     }
 
     /**
-     * Get the method name.
+     * ensure one beginning forward slash
      *
-     * @return string
+     * @param string $path
+     *
+     * @return string normalized path string
      */
-    abstract public function getMethod();
+    protected function normalize($path)
+    {
+        return '/' . ltrim($path, '/');
+    }
 }

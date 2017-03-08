@@ -10,16 +10,14 @@
 namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
-use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
-use yii\base\Component;
 
 /**
  * Class RecursiveIterator
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class RecursiveIterator extends FilesystemHash implements PluginInterface
+class RecursiveIterator extends AccessPlugin
 {
     /**
      * @return string
@@ -40,6 +38,7 @@ class RecursiveIterator extends FilesystemHash implements PluginInterface
      */
     public function handle($itemPath = null)
     {
+        // TODO will find folders /test1 and /test11, denies deleting folder /test1, but both are empty!!!
         $find = $itemPath . '%';
 
         $items = FileflyHashmap::find()
@@ -51,7 +50,7 @@ class RecursiveIterator extends FilesystemHash implements PluginInterface
             return true;
         }
 
-        \Yii::error('Path [' . $itemPath . '] is not empty!', __METHOD__);
+        \Yii::info('Path [' . $itemPath . '] is not empty!', __METHOD__);
         return false;
     }
 }

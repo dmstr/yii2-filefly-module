@@ -10,9 +10,12 @@ class Module extends \yii\base\Module
 {
     use AccessBehaviorTrait;
 
+    const NAME = 'filefly';
+
     /**
      * Access fields
      */
+    const ACCESS_OWNER = 'access_owner';
     const ACCESS_READ = 'access_read';
     const ACCESS_UPDATE = 'access_update';
     const ACCESS_DELETE = 'access_delete';
@@ -70,6 +73,17 @@ class Module extends \yii\base\Module
     public $slugNames = true;
 
     /**
+     * Used as default permissions on \hrzg\filefly\plugins\AccessPlugin->filesystemHashEnsurance()
+     * @var array
+     */
+    public $defaultPermissions = [
+        self::ACCESS_OWNER  => 1,
+        self::ACCESS_READ   => null,
+        self::ACCESS_UPDATE => null,
+        self::ACCESS_DELETE => null,
+    ];
+
+    /**
      * @inheritdoc
      *
      * @throws HttpException
@@ -99,7 +113,6 @@ class Module extends \yii\base\Module
                 \Yii::error('Invalid filesystem component.', __METHOD__);
             }
         }
-
         return true;
     }
 }

@@ -10,16 +10,14 @@
 namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
-use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
-use yii\base\Component;
 
 /**
  * Class RemoveAccess
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class RemoveAccess extends FilesystemHash implements PluginInterface
+class RemoveAccess extends AccessPlugin
 {
     /**
      * @return string

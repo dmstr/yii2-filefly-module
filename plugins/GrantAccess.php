@@ -11,9 +11,6 @@ namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
-use League\Flysystem\FilesystemInterface;
-use League\Flysystem\PluginInterface;
-use yii\base\Component;
 
 
 /**
@@ -21,14 +18,8 @@ use yii\base\Component;
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class GrantAccess extends FilesystemHash implements PluginInterface
+class GrantAccess extends AccessPlugin
 {
-    /**
-     * List of tree parents to be checked
-     * @var array
-     */
-    private $_iterator = [];
-
     /**
      * @return string
      */
@@ -44,20 +35,51 @@ class GrantAccess extends FilesystemHash implements PluginInterface
      *
      * @param string $path
      * @param string $permissionType
+     * @param bool $checkParent
      *
      * @return array|\yii\db\ActiveRecord[]
      */
-    public function handle($path, $permissionType = 'access_read')
+    public function handle($path, $permissionType = 'access_read', $checkParent = true)
     {
+        $path = $this->normalize($path);
+
+        // in root path allow access to all
+        if ($path === '/') {
+            return true;
+        }
+
         // Grand ALL access for admins
         if (in_array(Module::ACCESS_ROLE_ADMIN, array_keys(FileflyHashmap::getUsersAuthItems()))) {
             return true;
         }
 
-        // built path iterations
-        $this->buildPathIterator($path);
+        // do direct permission check for item
+        if ($checkParent === false) {
+
+            /** @var $hash \hrzg\filefly\models\FileflyHashmap */
+            $query = FileflyHashmap::find();
+            $query->andWhere(['component' => $this->component]);
+            $query->andWhere(['path' => $path]);
+            $hash = $query->one();
+
+            // return null for empty permission field, will check if any parent access can be granted
+            if (empty($hash->{$permissionType})) {
+                return null;
+            }
+
+            if ($hash !== null) {
+                return $hash->hasPermission($permissionType);
+            }
+            return false;
+        }
+
+        // build path iterator list
+        $this->buildIterator($path);
 
         foreach ($this->_iterator as $subPath) {
+
+            $subPath = $this->normalize($subPath);
+
             /** @var $hash \hrzg\filefly\models\FileflyHashmap */
             $query = FileflyHashmap::find();
             $query->andWhere(['component' => $this->component]);
@@ -69,7 +91,6 @@ class GrantAccess extends FilesystemHash implements PluginInterface
                 if ($permissionType === Module::ACCESS_UPDATE) {
                     continue;
                 }
-
                 return false;
             }
 
@@ -84,13 +105,8 @@ class GrantAccess extends FilesystemHash implements PluginInterface
             }
 
             if (!empty($hash->{$permissionType})) {
-
                 // direct or owner permission granted
-                if ($hash->hasPermission($permissionType)) {
-                    return true;
-                } else {
-                    return false;
-                }
+                return $hash->hasPermission($permissionType);
             }
         }
         return false;
@@ -101,11 +117,9 @@ class GrantAccess extends FilesystemHash implements PluginInterface
      *
      * @param $path
      */
-    private function buildPathIterator($path)
+    private function buildIterator($path)
     {
-        $this->_iterator = [];
-
-        $path           = ltrim($path, '/');
+        $path           = $this->normalize($path);
         $parts          = explode('/', $path);
         $countPathParts = count($parts);
         $subCounter     = $countPathParts;

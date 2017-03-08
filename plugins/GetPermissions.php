@@ -11,9 +11,7 @@ namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
-use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
-use yii\base\Component;
 
 
 /**
@@ -21,13 +19,8 @@ use yii\base\Component;
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class GetPermissions extends FilesystemHash implements PluginInterface
+class GetPermissions extends AccessPlugin
 {
-    /**
-     * @var array
-     */
-    protected $permissions = [];
-
     /**
      * @return string
      */
@@ -46,7 +39,6 @@ class GetPermissions extends FilesystemHash implements PluginInterface
      */
     public function handle($path)
     {
-        $this->permissions           = [];
         $this->permissions['read']   = null;
         $this->permissions['update'] = null;
         $this->permissions['delete'] = null;

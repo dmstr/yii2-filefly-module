@@ -10,9 +10,6 @@
 namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
-use League\Flysystem\FilesystemInterface;
-use League\Flysystem\PluginInterface;
-use yii\base\Component;
 
 
 /**
@@ -20,7 +17,7 @@ use yii\base\Component;
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
-class SetAccess extends FilesystemHash implements PluginInterface
+class SetAccess extends AccessPlugin
 {
     /**
      * @return string
@@ -40,6 +37,10 @@ class SetAccess extends FilesystemHash implements PluginInterface
      */
     public function handle($oldItemPath = null, $newItemPath = null)
     {
+        $oldItemPath = $this->normalize($oldItemPath);
+        $newItemPath = $this->normalize($newItemPath);
+
+        \Yii::error($oldItemPath, 'setAccess for');
         $oldHash = FileflyHashmap::find()
             ->where(
                 [

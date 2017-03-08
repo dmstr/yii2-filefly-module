@@ -8,6 +8,7 @@ use hrzg\filefly\plugins\GetPermissions;
 use hrzg\filefly\plugins\GrantAccess;
 use hrzg\filefly\plugins\RecursiveIterator;
 use hrzg\filefly\plugins\RemoveAccess;
+use hrzg\filefly\plugins\RepairKit;
 use hrzg\filefly\plugins\SetAccess;
 use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
@@ -59,6 +60,7 @@ class FileManagerApi extends Component
 
         // add plugins
         $component = ['component' => $fsComponent];
+        $this->_filesystem->addPlugin(new RepairKit($component));
         $this->_filesystem->addPlugin(new GrantAccess($component));
         $this->_filesystem->addPlugin(new SetAccess($component));
         $this->_filesystem->addPlugin(new RemoveAccess($component));
@@ -287,7 +289,12 @@ class FileManagerApi extends Component
         switch ($queries['action']) {
             case 'download':
 
+                if (!array_key_exists('path', $queries)) {
+                    return $this->simpleErrorResponse($this->_translate->download_failed);
+                }
+
                 // check access first, and redirect to login if false
+                $this->_filesystem->check($queries['path']);
                 if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
@@ -308,6 +315,7 @@ class FileManagerApi extends Component
                 }
 
                 // check access first, and redirect to login if false
+                $this->_filesystem->check($queries['path']);
                 if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
@@ -413,9 +421,9 @@ Html;
                 // parse $file['name'] for slugging, im enabled
                 if ($this->_module->slugNames) {
                     $pathInfo = pathinfo($file['name']);
-                    $fullPath = $path . '/' . Inflector::slug($pathInfo['filename']).'.'.$pathInfo['extension'];
+                    $fullPath = $path.'/'.Inflector::slug($pathInfo['filename']).'.'.strtolower($pathInfo['extension']);
                 } else {
-                    $fullPath = $path . '/' . $file['name'];
+                    $fullPath = $path.'/'.$file['name'];
                 }
 
                 try {
@@ -511,9 +519,24 @@ Html;
     {
         $files = [];
 
+        // check only folder and folder parent access
+        $this->_filesystem->check($path);
+        $parentFolderAccess = $this->_filesystem->grantAccess($path, Filefly::ACCESS_READ);
+
         // get all filesystem path contents
         foreach ($this->_filesystem->listContents($path) AS $item) {
-            if (!$this->_filesystem->grantAccess($item['path'], Filefly::ACCESS_READ)) {
+
+            // check direct access
+            $this->_filesystem->check($item['path']);
+            $access = $this->_filesystem->grantAccess($item['path'], Filefly::ACCESS_READ, false);
+
+            // direct access denied
+            if ($access === false) {
+                continue;
+            }
+
+            // empty direct access and no parent access
+            if ($access === null && !$parentFolderAccess) {
                 continue;
             }
 
@@ -533,7 +556,6 @@ Html;
 
             $files[] = [
                 'name' => $item['basename'],
-                // 'rights' => $this->_filesystem->getMetadata($item['path']),
                 'size' => $size,
                 'date' => $date->format('Y-m-d H:i:s'),
                 'type' => $item['type'],
@@ -655,7 +677,6 @@ Html;
             }
 
             if ($this->_filesystem->get($path)->isDir()) {
-
                 if ($this->_filesystem->isEmpty($path) === false) {
                     return 'notempty';
                 }
