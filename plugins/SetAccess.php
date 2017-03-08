@@ -40,7 +40,6 @@ class SetAccess extends AccessPlugin
         $oldItemPath = $this->normalize($oldItemPath);
         $newItemPath = $this->normalize($newItemPath);
 
-        \Yii::error($oldItemPath, 'setAccess for');
         $oldHash = FileflyHashmap::find()
             ->where(
                 [
