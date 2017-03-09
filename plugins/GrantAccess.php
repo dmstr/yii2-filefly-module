@@ -119,10 +119,11 @@ class GrantAccess extends AccessPlugin
      */
     private function buildIterator($path)
     {
-        $path           = $this->normalize($path);
-        $parts          = explode('/', $path);
-        $countPathParts = count($parts);
-        $subCounter     = $countPathParts;
+        $this->_iterator = [];
+        $path            = $this->normalize($path);
+        $parts           = explode('/', $path);
+        $countPathParts  = count($parts);
+        $subCounter      = $countPathParts;
 
         for ($i = 0; $i < $countPathParts; $i++) {
             $tmp = '';
