@@ -7,9 +7,11 @@ Installation
 
 #### ENV variables
 
-Variable | Value
-------------- | -------------
-AFM_FILESYSTEM | 'yii component name'
+Variable | Value | Required
+------------- | ------------- | -------------
+AFM_FILESYSTEM | yii component name | yes
+AFM_REPAIR | default: true | no
+AFM_SLUG_NAMES | default: true | no
 
 i.e. `AFM_FILESYSTEM=fsLocal`
 
@@ -19,9 +21,17 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 
 ```
 'filefly' => [
-    'class' => 'hrzg\filefly\Module',
-    'layout' => '@backend/views/layouts/main',
-    'filesystem' => getenv('FILEFLY_FILESYSTEM')
+    'class'              => 'hrzg\filefly\Module',
+    'layout'             => '@backend/views/layouts/main',
+    'filesystem'         => getenv('AFM_FILESYSTEM'),
+    'slugNames'			 => (getenv('AFM_SLUG_NAMES')) ? getenv('AFM_SLUG_NAMES') : true,
+    'repair'             => (getenv('AFM_REPAIR')) ? getenv('AFM_REPAIR') : true,
+    'defaultPermissions' => [
+        \hrzg\filefly\Module::ACCESS_OWNER  => 1,
+        \hrzg\filefly\Module::ACCESS_READ   => \hrzg\filefly\models\FileflyHashmap::$_all,
+        \hrzg\filefly\Module::ACCESS_UPDATE => \hrzg\filefly\models\FileflyHashmap::$_all,
+        \hrzg\filefly\Module::ACCESS_DELETE => \hrzg\filefly\models\FileflyHashmap::$_all,
+    ]
 ],
 ```
 
@@ -88,9 +98,3 @@ Remove permission
 
 - Multi delete option
 ```
-
-Known Issues:
-------
-
-- input validation of file and folder names (special chars like /)! Missing in native Angular-Filemanager
-- camel cases, is actually case insensitive
