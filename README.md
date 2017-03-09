@@ -15,7 +15,7 @@ AFM_SLUG_NAMES | default: true | no
 
 i.e. `AFM_FILESYSTEM=fsLocal`
 
-:info: How to configure a filesystem component [Filesystem docs](https://github.com/creocoder/yii2-flysystem/blob/master/README.md)
+:question: How to configure a filesystem component [Filesystem docs](https://github.com/creocoder/yii2-flysystem/blob/master/README.md)
 
 #### Yii config
 
@@ -38,15 +38,18 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 ## RBAC
 
 **Prosa**
-- `FileflyAdmin` dürfen/können alles!
-- `FileflyPermissions` berechtigte können Berechtigungen in Rahmen ihnen zugewiesenen RBAC Berechtigungen setzen und ändern.
-- Solange keine Berechtigungen gesetzt sind, wird down up geschaut ob irgendwo das geforderte Recht gegeben ist.
+- `FileflyAdmin` have all access!
+- `FileflyPermissions` berechtigte können Berechtigungen in Rahmen ihnen zugewiesenen RBAC Berechtigungen setzen und ändern
+- `FileflyPermissions` assigned users can set or unset roles or permissions which the user himself has assigned
+
+- If no permission is set, it will check if any inherited permission can be granted
 - Besitzer Berechtigungen gehen über die gesetzten Rechte in `access_read`, `access_update`, `access_delete`
+- `access_owner` permission before `access_read`, `access_update`, `access_delete`
 
 **ActiveRecord: FileflyHashmap**
 - uses `dmstr\db\traits\ActiveRecordAccessTrait` with `$activeAccessTrait = false`
 - access checks will be done foreach permission type explicitly, `hasPermission($action)`
-- uses a `pathValidator` rule to ensure the `path` syntax
+- uses a `pathValidator` rule to ensure the `path` syntax on active record operations
 
 #### Roles
 

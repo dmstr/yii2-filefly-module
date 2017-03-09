@@ -38,7 +38,6 @@ class RepairKit extends AccessPlugin
      */
     public function handle($path, $repair)
     {
-        // TODO make this configurable, repair true | false
         if ($repair) {
             $path = $this->normalize($path);
 
