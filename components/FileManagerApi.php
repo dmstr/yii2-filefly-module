@@ -87,12 +87,16 @@ class FileManagerApi extends Component
      */
     public function postHandler($query, $request, $files)
     {
+        // default response
+        $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
+
         // Probably file upload
         if (!isset($request['action'])
             && (isset($_SERVER["CONTENT_TYPE"])
                 && strpos($_SERVER["CONTENT_TYPE"], 'multipart/form-data') !== false)
         ) {
             $uploaded = $this->uploadAction($request['destination'], $files);
+
             switch (true) {
                 case $uploaded === 'fileexists':
                     $response = $this->simpleErrorResponse($this->_translate->file_already_exists);
