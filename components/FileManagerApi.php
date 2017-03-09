@@ -8,7 +8,7 @@ use hrzg\filefly\plugins\GetPermissions;
 use hrzg\filefly\plugins\GrantAccess;
 use hrzg\filefly\plugins\RecursiveIterator;
 use hrzg\filefly\plugins\RemoveAccess;
-use hrzg\filefly\plugins\RepairKit;
+use hrzg\filefly\plugins\SelfHealKit;
 use hrzg\filefly\plugins\SetAccess;
 use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
@@ -60,7 +60,7 @@ class FileManagerApi extends Component
 
         // add plugins
         $component = ['component' => $fsComponent];
-        $this->_filesystem->addPlugin(new RepairKit($component));
+        $this->_filesystem->addPlugin(new SelfHealKit($component));
         $this->_filesystem->addPlugin(new GrantAccess($component));
         $this->_filesystem->addPlugin(new SetAccess($component));
         $this->_filesystem->addPlugin(new RemoveAccess($component));
@@ -115,7 +115,15 @@ class FileManagerApi extends Component
         }
 
         switch ($request['action']) {
+
             case 'list':
+                if (array_key_exists('recycle', $request) && $request['recycle'] === true) {
+                    $recycle = $this->_filesystem->check(null, $this->_module->repair, true);
+                    if ($recycle === false) {
+                        return $this->simpleErrorResponse($this->_translate->recycling_failed);
+                    }
+                }
+
                 $list = $this->listAction($request['path']);
                 if (!is_array($list)) {
                     $response = $this->simpleErrorResponse($this->_translate->listing_filed);
@@ -234,10 +242,14 @@ class FileManagerApi extends Component
 
             case 'createFolder':
                 $newPath = $request['newPath'];
+                $pathInfo = pathinfo($request['newPath']);
+
+                // ensure hashmap entry
+                $this->_filesystem->check($pathInfo['dirname'], $this->_module->repair);
 
                 // slug new folder name
                 if ($this->_module->slugNames) {
-                    $pathInfo = pathinfo($request['newPath']);
+
                     $newPath = $pathInfo['dirname'].'/'.Inflector::slug($pathInfo['basename']);
                 }
                 $created = $this->createFolderAction($newPath);
@@ -662,7 +674,7 @@ Html;
         foreach ($oldPaths as $oldPath) {
 
             // ensure hashmap entry
-            $this->_filesystem->check($path, $this->_module->repair);
+            $this->_filesystem->check($oldPath, $this->_module->repair);
             if (!$this->_filesystem->get($oldPath)->isFile()) {
                 return false;
             }
@@ -783,9 +795,6 @@ Html;
      */
     private function createFolderAction($path)
     {
-        // ensure hashmap entry
-        $this->_filesystem->check($path, $this->_module->repair);
-
         if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
