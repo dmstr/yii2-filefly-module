@@ -32,25 +32,37 @@ class RecursiveIterator extends AccessPlugin
      *
      * Query result 1 means no sub items found
      *
-     * @param string $itemPath
+     * @param string $path
      *
      * @return bool
      */
-    public function handle($itemPath = null)
+    public function handle($path)
     {
-        // TODO will find folders /test1 and /test11, denies deleting folder /test1, but both are empty!!!
-        $find = $itemPath . '%';
+        /** @var FileflyHashmap $item */
+        $item = FileflyHashmap::find()
+            ->andWhere(['component' => $this->component])
+            ->andWhere(['path' => $path])
+            ->one();
+
+        if (empty($item)) {
+            \Yii::info('Path [' . $path . '] not found!', __METHOD__);
+            return false;
+        }
+
+        // find hashmap items beneath this path
+        $find = $item->path . '/%';
 
         $items = FileflyHashmap::find()
             ->andWhere(['component' => $this->component])
             ->andWhere(['like', 'path', $find, false])
             ->all();
 
-        if (count($items) < 2) {
+        // if no items found => dir is empty
+        if (empty($items)) {
             return true;
         }
 
-        \Yii::info('Path [' . $itemPath . '] is not empty!', __METHOD__);
+        \Yii::info('Path [' . $path . '] is not empty!', __METHOD__);
         return false;
     }
 }
