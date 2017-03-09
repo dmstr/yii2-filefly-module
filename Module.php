@@ -73,7 +73,15 @@ class Module extends \yii\base\Module
     public $slugNames = true;
 
     /**
-     * Used as default permissions on \hrzg\filefly\plugins\AccessPlugin->filesystemHashEnsurance()
+     * Active / deactivate the filesystem and hashmap self healing plugins
+     * @var bool
+     */
+    public $repair = true;
+
+    /**
+     * Used as default permissions on active \hrzg\filefly\plugins\RepairKit
+     * if $this->repair = true
+     *
      * @var array
      */
     public $defaultPermissions = [
@@ -82,12 +90,6 @@ class Module extends \yii\base\Module
         self::ACCESS_UPDATE => '*',
         self::ACCESS_DELETE => '*',
     ];
-
-    /**
-     * Active / deactivate the filesystem and hashmap self healing plugins
-     * @var bool
-     */
-    public $repair = true;
 
     /**
      * @inheritdoc
