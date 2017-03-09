@@ -43,7 +43,6 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 - `FileflyPermissions` assigned users can set or unset roles or permissions which the user himself has assigned
 
 - If no permission is set, it will check if any inherited permission can be granted
-- Besitzer Berechtigungen gehen über die gesetzten Rechte in `access_read`, `access_update`, `access_delete`
 - `access_owner` permission before `access_read`, `access_update`, `access_delete`
 
 **ActiveRecord: FileflyHashmap**
