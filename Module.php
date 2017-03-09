@@ -84,6 +84,12 @@ class Module extends \yii\base\Module
     ];
 
     /**
+     * Active / deactivate the filesystem and hashmap self healing plugins
+     * @var bool
+     */
+    public $repair = true;
+
+    /**
      * @inheritdoc
      *
      * @throws HttpException

@@ -11,7 +11,6 @@ namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
-use League\Flysystem\PluginInterface;
 
 
 /**
@@ -32,14 +31,15 @@ class RepairKit extends AccessPlugin
     /**
      * Check if path has hash and repair with default permissions if not set
      *
-     * @param $path
+     * @param string $path
+     * @param bool $repair
      *
      * @return bool
      */
-    public function handle($path)
+    public function handle($path, $repair)
     {
         // TODO make this configurable, repair true | false
-        if (1) {
+        if ($repair) {
             $path = $this->normalize($path);
 
             /** @var $hash \hrzg\filefly\models\FileflyHashmap */

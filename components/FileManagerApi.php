@@ -294,7 +294,7 @@ class FileManagerApi extends Component
                 }
 
                 // check access first, and redirect to login if false
-                $this->_filesystem->check($queries['path']);
+                $this->_filesystem->check($queries['path'], $this->_module->repair);
                 if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
@@ -315,7 +315,7 @@ class FileManagerApi extends Component
                 }
 
                 // check access first, and redirect to login if false
-                $this->_filesystem->check($queries['path']);
+                $this->_filesystem->check($queries['path'], $this->_module->repair);
                 if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
@@ -414,6 +414,8 @@ Html;
      */
     private function uploadAction($path, $files)
     {
+        // ensure hashmap entry
+        $this->_filesystem->check($path, $this->_module->repair);
         if ($this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             foreach ($files as $file) {
                 $stream   = fopen($file['tmp_name'], 'r+');
@@ -519,15 +521,19 @@ Html;
     {
         $files = [];
 
+        // ensure hashmap entry
+        $this->_filesystem->check($path, $this->_module->repair);
+
         // check only folder and folder parent access
-        $this->_filesystem->check($path);
         $parentFolderAccess = $this->_filesystem->grantAccess($path, Filefly::ACCESS_READ);
 
         // get all filesystem path contents
         foreach ($this->_filesystem->listContents($path) AS $item) {
 
+            // ensure hashmap entry
+            $this->_filesystem->check($item['path'], $this->_module->repair);
+
             // check direct access
-            $this->_filesystem->check($item['path']);
             $access = $this->_filesystem->grantAccess($item['path'], Filefly::ACCESS_READ, false);
 
             // direct access denied
@@ -565,13 +571,16 @@ Html;
     }
 
     /**
-     * @param $oldPath
-     * @param $newPath
+     * @param string $oldPath
+     * @param string $newPath
      *
      * @return string
      */
     private function renameAction($oldPath, $newPath)
     {
+        // ensure hashmap entry
+        $this->_filesystem->check($oldPath, $this->_module->repair);
+
         if (!$this->_filesystem->grantAccess($oldPath, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
@@ -592,18 +601,25 @@ Html;
     }
 
     /**
-     * @param $oldPaths
-     * @param $newPath
+     * @param array $oldPaths
+     * @param string $newPath
      *
      * @return bool
      */
     private function moveAction($oldPaths, $newPath)
     {
+        // ensure hashmap entry
+        $this->_filesystem->check($newPath, $this->_module->repair);
+
         if (!$this->_filesystem->grantAccess($newPath, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
         foreach ($oldPaths as $oldPath) {
+
+            // ensure hashmap entry
+            $this->_filesystem->check($oldPath, $this->_module->repair);
+
             if (!$this->_filesystem->get($oldPath)->isFile() && !$this->_filesystem->get($oldPath)->isDir()) {
                 return 'notfound';
             }
@@ -624,7 +640,7 @@ Html;
     }
 
     /**
-     * @param string $oldPaths
+     * @param array $oldPaths
      * @param string $newPath
      * @param string $newFilename
      *
@@ -632,12 +648,17 @@ Html;
      */
     private function copyAction($oldPaths, $newPath, $newFilename)
     {
+        // ensure hashmap entry
+        $this->_filesystem->check($newPath, $this->_module->repair);
+
         if (!$this->_filesystem->grantAccess($newPath, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
 
         foreach ($oldPaths as $oldPath) {
 
+            // ensure hashmap entry
+            $this->_filesystem->check($path, $this->_module->repair);
             if (!$this->_filesystem->get($oldPath)->isFile()) {
                 return false;
             }
@@ -670,6 +691,9 @@ Html;
     {
         $anyDeniedPerm = false;
         foreach ($paths as $path) {
+
+            // ensure hashmap entry
+            $this->_filesystem->check($path, $this->_module->repair);
 
             if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_DELETE)) {
                 $anyDeniedPerm = true;
@@ -705,13 +729,16 @@ Html;
 
     /**
      * TODO option globally tmp disabled in hrzg/yii2-filemanager-widgets
-     * @param $path
-     * @param $content
+     * @param string $path
+     * @param string $content
      *
      * @return int
      */
     private function editAction($path, $content)
     {
+        // ensure hashmap entry
+        $this->_filesystem->check($path, $this->_module->repair);
+
         if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
@@ -725,12 +752,19 @@ Html;
 
     /**
      * TODO option globally tmp disabled in hrzg/yii2-filemanager-widgets
-     * @param $path
+     * @param string $path
      *
      * @return bool|string
      */
     private function getContentAction($path)
     {
+        // ensure hashmap entry
+        $this->_filesystem->check($path, $this->_module->repair);
+
+        if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
+            return 'nopermission';
+        }
+
         if (!$this->_filesystem->get($path)->isFile()) {
             return false;
         }
@@ -745,6 +779,9 @@ Html;
      */
     private function createFolderAction($path)
     {
+        // ensure hashmap entry
+        $this->_filesystem->check($path, $this->_module->repair);
+
         if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             return 'nopermission';
         }
@@ -771,6 +808,9 @@ Html;
      */
     private function changePermissionsAction($path = null, $item = null)
     {
+        // ensure hashmap entry
+        $this->_filesystem->check($path, $this->_module->repair);
+
         $updateItemAuth = $this->_filesystem->updatePermission($item, $path);
 
         if ($updateItemAuth === false) {
