@@ -1,6 +1,6 @@
 FileFly
 =======
-FlySystem API for Filemanager
+FlySystem API for [dmstr/yii2-filemanager-widgets](https://github.com/dmstr/yii2-filemanager-widgets)
 
 Installation
 ------------
