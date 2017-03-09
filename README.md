@@ -39,7 +39,6 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 
 **Prosa**
 - `FileflyAdmin` have all access!
-- `FileflyPermissions` berechtigte können Berechtigungen in Rahmen ihnen zugewiesenen RBAC Berechtigungen setzen und ändern
 - `FileflyPermissions` assigned users can set or unset roles or permissions which the user himself has assigned
 
 - If no permission is set, it will check if any inherited permission can be granted
