@@ -354,7 +354,7 @@ class FileManagerApi extends Component
 
                 $query = FileflyHashmap::find()
                     ->select(['component', 'path'])
-                    ->andWhere(['LIKE', 'path', ArrayHelper::getValue($queries, 'q', '%')])
+                    ->andWhere(['LIKE', 'path', strtolower(ArrayHelper::getValue($queries, 'q', '%'))])
                     ->limit(ArrayHelper::getValue($queries, 'page_limit', 10))
                     ->orderBy(['updated_at' => SORT_DESC])
                     ->asArray();
