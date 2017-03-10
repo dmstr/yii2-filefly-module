@@ -348,6 +348,10 @@ class FileManagerApi extends Component
                 break;
             case 'search':
 
+                if (\Yii::$app->user->isGuest) {
+                    return $this->unauthorizedResponse($queries['action']);
+                }
+
                 $query = FileflyHashmap::find()
                     ->select(['component', 'path'])
                     ->andWhere(['LIKE', 'path', ArrayHelper::getValue($queries, 'q', '%')])
