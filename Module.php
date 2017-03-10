@@ -38,7 +38,7 @@ class Module extends \yii\base\Module
     /**
      * @var array
      */
-    public $accessFields = [self::ACCESS_READ, self::ACCESS_UPDATE, self::ACCESS_DELETE];
+    public $accessFields = [self::ACCESS_OWNER, self::ACCESS_READ, self::ACCESS_UPDATE, self::ACCESS_DELETE];
 
     /**
      * @var array
