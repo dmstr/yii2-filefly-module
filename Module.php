@@ -121,6 +121,10 @@ class Module extends \yii\base\Module
                 \Yii::error('Invalid filesystem component.', __METHOD__);
             }
         }
+
+        // breadcrumbs
+        \Yii::$app->controller->view->params['breadcrumbs'][] = ['label' => 'Filefly module', 'url' => ['/filefly']];
+
         return true;
     }
 }
