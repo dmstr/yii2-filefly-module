@@ -12,6 +12,7 @@ use hrzg\filefly\plugins\SelfHealKit;
 use hrzg\filefly\plugins\SetAccess;
 use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
+use League\Flysystem\FileNotFoundException;
 use League\Flysystem\Util;
 use yii\base\Component;
 use yii\helpers\ArrayHelper;
@@ -346,16 +347,35 @@ class FileManagerApi extends Component
 
                 break;
             case 'search':
-                $all = FileflyHashmap::find()
-                    ->where(['LIKE', 'path', ArrayHelper::getValue($queries,'q')])
-                    ->limit(ArrayHelper::getValue($queries,'page_limit',10))
-                    ->all();
-                $response = new Response();
-                $response->setData(
-                    [
-                        'result' => ArrayHelper::toArray($all)
-                    ]
-                );
+
+                $query = FileflyHashmap::find()
+                    ->select(['component', 'path'])
+                    ->andWhere(['LIKE', 'path', ArrayHelper::getValue($queries, 'q', '%')])
+                    ->limit(ArrayHelper::getValue($queries, 'page_limit', 10))
+                    ->orderBy(['updated_at' => SORT_DESC])
+                    ->asArray();
+
+                // filter results, only files
+                $files = [];
+                foreach ($query->all() as $item) {
+
+                    // check read permissions
+                    if ( ! $this->_filesystem->grantAccess($item['path'], Filefly::ACCESS_READ)) {
+                        continue;
+                    }
+
+                    // add files
+                    try {
+                        if ($this->_filesystem->get($item['path'])->isFile()) {
+                            $files[] = $item;
+                        }
+                    } catch (FileNotFoundException $e) {
+                        continue;
+                    }
+                }
+
+                // return files
+                $response = (new Response())->setData(['result' => $files]);
                 break;
 
             default:
