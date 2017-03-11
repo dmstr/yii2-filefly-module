@@ -352,34 +352,11 @@ class FileManagerApi extends Component
                     return $this->unauthorizedResponse($queries['action']);
                 }
 
-                $query = FileflyHashmap::find()
-                    ->select(['component', 'path'])
-                    ->andWhere(['LIKE', 'path', strtolower(ArrayHelper::getValue($queries, 'q', '%'))])
-                    ->limit(ArrayHelper::getValue($queries, 'page_limit', 10))
-                    ->orderBy(['updated_at' => SORT_DESC])
-                    ->asArray();
+                $path = strtolower(ArrayHelper::getValue($queries, 'q', '%'));
+                $type = strtolower(ArrayHelper::getValue($queries, 'type', 'file'));
+                $limit = ArrayHelper::getValue($queries, 'limit', 10);
 
-                // filter results, only files
-                $files = [];
-                foreach ($query->all() as $item) {
-
-                    // check read permissions
-                    if ( ! $this->_filesystem->grantAccess($item['path'], Filefly::ACCESS_READ)) {
-                        continue;
-                    }
-
-                    // add files
-                    try {
-                        if ($this->_filesystem->get($item['path'])->isFile()) {
-                            $files[] = $item;
-                        }
-                    } catch (FileNotFoundException $e) {
-                        continue;
-                    }
-                }
-
-                // return files
-                $response = (new Response())->setData(['result' => $files]);
+                $response = $this->searchAction($path, $type, $limit);
                 break;
 
             default:
@@ -444,6 +421,55 @@ Html;
             );
 
         return $response;
+    }
+
+    /**
+     * @param string $path
+     * @param string $type
+     * @param integer $limit
+     *
+     * @return string
+     */
+    private function searchAction($path, $type, $limit)
+    {
+        $query = FileflyHashmap::find()
+            ->select(['path'])
+            ->andWhere(['LIKE', 'path', $path])
+            ->limit($limit)
+            ->orderBy(['updated_at' => SORT_DESC])
+            ->asArray();
+
+        // filter results, only files
+        $result = [];
+        foreach ($query->all() as $item) {
+
+            // check read permissions
+            if ( ! $this->_filesystem->grantAccess($item['path'], Filefly::ACCESS_READ)) {
+                continue;
+            }
+
+            // add directory
+            try {
+                $element = $this->_filesystem->get($item['path']);
+                $item['mime'] = $this->_filesystem->getMimetype($item['path']);
+                $item['type'] = $element->getType();
+
+                if ($type === 'file' && $element->isFile()) {
+                    $result[] = $item;
+                }
+
+                if ($type === 'dir' && $element->isDir()) {
+                    $result[] = $item;
+                }
+
+            } catch (FileNotFoundException $e) {
+                continue;
+            }
+        }
+        \Yii::error($result, '$result');
+
+        // return elements
+        return $result;
     }
 
     /**
