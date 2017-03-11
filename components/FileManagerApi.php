@@ -332,7 +332,6 @@ class FileManagerApi extends Component
                 }
 
                 // check access first, and redirect to login if false
-                $this->_filesystem->check($queries['path'], $this->_module->repair);
                 if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
