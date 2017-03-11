@@ -356,7 +356,7 @@ class FileManagerApi extends Component
                 $type = strtolower(ArrayHelper::getValue($queries, 'type', 'file'));
                 $limit = ArrayHelper::getValue($queries, 'limit', 10);
 
-                $response = $this->searchAction($path, $type, $limit);
+                $response = (new Response())->setData(['result' => $this->searchAction($path, $type, $limit)]);
                 break;
 
             default:
