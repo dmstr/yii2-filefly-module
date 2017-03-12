@@ -355,7 +355,7 @@ class FileManagerApi extends Component
                 $type = strtolower(ArrayHelper::getValue($queries, 'type', 'file'));
                 $limit = ArrayHelper::getValue($queries, 'limit', 10);
 
-                $response = (new Response())->setData(['result' => $this->searchAction($path, $type, $limit)]);
+                $response = (new Response())->setData($this->searchAction($path, $type, $limit));
                 break;
 
             default:
@@ -450,6 +450,7 @@ Html;
             // add directory
             try {
                 $element = $this->_filesystem->get($item['path']);
+                $item['id'] = $item['path'];
                 $item['mime'] = $this->_filesystem->getMimetype($item['path']);
                 $item['type'] = $element->getType();
 
