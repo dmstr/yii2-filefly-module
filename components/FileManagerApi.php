@@ -311,7 +311,6 @@ class FileManagerApi extends Component
                 }
 
                 // check access first, and redirect to login if false
-                $this->_filesystem->check($queries['path'], $this->_module->repair);
                 if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
@@ -447,7 +446,6 @@ Html;
                 continue;
             }
 
-            // add directory
             try {
                 $element = $this->_filesystem->get($item['path']);
                 $item['id'] = $item['path'];
@@ -466,9 +464,8 @@ Html;
                 continue;
             }
         }
-        \Yii::error($result, '$result');
 
-        // return elements
+        // return found elements
         return $result;
     }
 
@@ -519,63 +516,86 @@ Html;
     }
 
     /**
-     * @param $file
+     * @param string $path
      *
      * @return bool
+     * @throws \yii\base\ExitException
      */
-    private function downloadAction($file)
+    private function downloadAction($path)
     {
-        if (!$this->_filesystem->get($file)->isFile()) {
+        try {
+            $element = $this->_filesystem->get($path);
+
+            if (!$element->isFile()) {
+                return false;
+            }
+
+            // get meta info
+            $fileName = sprintf('"%s"', addcslashes(basename($path), '"\\'));
+            $mimeType = $this->_filesystem->getMimetype($path);
+            $size   = $this->_filesystem->getSize($path);
+
+            // set headers
+            header('Content-Description: File Transfer');
+            header('Content-Type: ' . $mimeType);
+            header('Content-Disposition: attachment; filename=' . $fileName);
+            header('Content-Length: ' . $size);
+            header('Content-Transfer-Encoding: binary');
+            header('Connection: Keep-Alive');
+            header('Expires: 0');
+            header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+            header('Pragma: public');
+
+            $stream = $this->_filesystem->readStream($path);
+            echo stream_get_contents($stream);
+            fclose($stream);
+
+
+        } catch (FileNotFoundException $e) {
             return false;
         }
-
-        $quoted = sprintf('"%s"', addcslashes(basename($file), '"\\'));
-        $size   = $this->_filesystem->getSize($file);
-
-        header('Content-Description: File Transfer');
-        header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename=' . $quoted);
-        header('Content-Transfer-Encoding: binary');
-        header('Connection: Keep-Alive');
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
-        header('Pragma: public');
-        header('Content-Length: ' . $size);
-
-        $stream = $this->_filesystem->readStream($file);
-        echo stream_get_contents($stream);
-        fclose($stream);
-        return true;
+        \Yii::$app->end();
     }
 
     /**
-     * @param $file
+     * Stream a file
+     * @param $path
      *
      * @return bool
+     * @throws \yii\base\ExitException
      */
-    private function streamAction($file)
+    private function streamAction($path)
     {
-        if (!$this->_filesystem->get($file)->isFile()) {
+        try {
+            $element = $this->_filesystem->get($path);
+
+            if (!$element->isFile()) {
+                return false;
+            }
+
+            $mimeType = $this->_filesystem->getMimetype($path);
+            $size   = $this->_filesystem->getSize($path);
+
+            // set headers
+            header('Content-Type: ' . $mimeType);
+            header('Content-Length: ' . $size);
+            header('Content-Transfer-Encoding: binary');
+            header('Connection: Keep-Alive');
+            $offset = 604800; # 1 week
+            if ($expiringDate = gmdate("D, d M Y H:i:s", time() + $offset)) {
+                header("Expires: $expiringDate GMT");
+            }
+            header('Cache-Control: public');
+            header('Pragma: public');
+
+            $stream = $this->_filesystem->readStream($path);
+            echo stream_get_contents($stream);
+            fclose($stream);
+
+        } catch (FileNotFoundException $e) {
             return false;
         }
-
-        $size   = $this->_filesystem->getSize($file);
-
-        header('Content-Type: '.$this->_filesystem->getMimetype($file));
-        header('Content-Transfer-Encoding: binary');
-        header('Connection: Keep-Alive');
-        $offset = 604800; # 1 week
-        if ($expiringDate = gmdate("D, d M Y H:i:s", time() + $offset)) {
-            header("Expires: $expiringDate GMT");
-        }
-        header('Cache-Control: public');
-        header('Pragma: public');
-        header('Content-Length: ' . $size);
-
-        $stream = $this->_filesystem->readStream($file);
-        echo stream_get_contents($stream);
-        fclose($stream);
-        return true;
+        \Yii::$app->end();
     }
 
     /**
