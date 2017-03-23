@@ -91,6 +91,10 @@ class FileflyHashmap extends BaseFileflyHashmap
     {
         $totalBytes = self::find()->sum('size');
 
+        if ($totalBytes === null) {
+            $totalBytes = 0;
+        }
+
         if ($raw) {
             return $totalBytes;
         } else {
