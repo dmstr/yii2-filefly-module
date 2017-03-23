@@ -13,7 +13,7 @@ use Yii;
  * @property string $component
  * @property string $type
  * @property string $path
- * @property string $size
+ * @property integer $size
  * @property integer $access_owner
  * @property string $access_read
  * @property string $access_update
