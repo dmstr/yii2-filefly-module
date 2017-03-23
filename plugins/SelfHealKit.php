@@ -91,10 +91,28 @@ class SelfHealKit extends AccessPlugin
 
         if ($hash === null) {
             $defaultPermissions = FileflyHashmap::accessDefaults();
+
+            // get meta information
+            try {
+                $meta = $this->filesystem->getMetadata($path);
+                $type = (isset($meta['type'])) ? $meta['type'] : null;
+                $size = (isset($meta['size'])) ? $meta['size'] : null;
+            } catch (FileNotFoundException $e) {
+                \Yii::error($e->getMessage(), __METHOD__);
+                $type = null;
+                $size = null;
+            }
+
+            if ($path === '/') {
+                $type = 'root';
+            }
+
             $repairHash         = new FileflyHashmap(
                 [
                     'component'           => $this->component,
+                    'type'                => $type,
                     'path'                => $path,
+                    'size'                => $size,
                     Module::ACCESS_OWNER  => $defaultPermissions[Module::ACCESS_OWNER],
                     Module::ACCESS_READ   => $defaultPermissions[Module::ACCESS_READ],
                     Module::ACCESS_UPDATE => $defaultPermissions[Module::ACCESS_UPDATE],
@@ -106,5 +124,6 @@ class SelfHealKit extends AccessPlugin
                 return false;
             }
         }
+        return true;
     }
 }

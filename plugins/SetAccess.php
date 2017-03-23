@@ -10,6 +10,7 @@
 namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
+use League\Flysystem\FileNotFoundException;
 
 
 /**
@@ -51,10 +52,24 @@ class SetAccess extends AccessPlugin
 
         // upload / create
         if (empty($oldHash)) {
+
+            // get meta information
+            try {
+                $meta = $this->filesystem->getMetadata($oldItemPath);
+                $type = (isset($meta['type'])) ? $meta['type'] : null;
+                $size = (isset($meta['size'])) ? $meta['size'] : null;
+            } catch (FileNotFoundException $e) {
+                \Yii::error($e->getMessage(), __METHOD__);
+                $type = null;
+                $size = null;
+            }
+
             $newHash = new FileflyHashmap(
                 [
                     'component'    => $this->component,
+                    'type'         => $type,
                     'path'         => $oldItemPath,
+                    'size'         => $size,
                     'access_owner' => \Yii::$app->user->id
                 ]
             );

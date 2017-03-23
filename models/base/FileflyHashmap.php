@@ -11,7 +11,9 @@ use Yii;
  *
  * @property integer $id
  * @property string $component
+ * @property string $type
  * @property string $path
+ * @property string $size
  * @property integer $access_owner
  * @property string $access_read
  * @property string $access_update
@@ -36,9 +38,10 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
     {
         return [
             [['component', 'path'], 'required'],
-            [['access_owner'], 'integer'],
+            [['access_owner', 'size'], 'integer'],
             [['created_at', 'updated_at'], 'safe'],
             [['component'], 'string', 'max' => 45],
+            [['type'], 'string', 'max' => 32],
             [['path'], 'string', 'max' => 745],
             [['access_read', 'access_update', 'access_delete'], 'string', 'max' => 255],
             [
@@ -58,7 +61,9 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
         return [
             'id'            => Yii::t('filefly', 'ID'),
             'component'     => Yii::t('filefly', 'Component'),
+            'type'          => Yii::t('filefly', 'Type'),
             'path'          => Yii::t('filefly', 'Path'),
+            'size'          => Yii::t('filefly', 'Size'),
             'access_owner'  => Yii::t('filefly', 'Access Owner'),
             'access_read'   => Yii::t('filefly', 'Access Read'),
             'access_update' => Yii::t('filefly', 'Access Update'),

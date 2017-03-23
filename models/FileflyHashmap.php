@@ -81,4 +81,20 @@ class FileflyHashmap extends BaseFileflyHashmap
         $val              = ltrim($this->$attribute, DIRECTORY_SEPARATOR);
         $this->$attribute = DIRECTORY_SEPARATOR . $val;
     }
+
+    /**
+     * @param bool|false $raw
+     *
+     * @return mixed|string
+     */
+    public static function getTotalSize($raw = false)
+    {
+        $totalBytes = self::find()->sum('size');
+
+        if ($raw) {
+            return $totalBytes;
+        } else {
+            return \Yii::$app->formatter->asShortSize($totalBytes, 2);
+        }
+    }
 }
