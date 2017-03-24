@@ -1,4 +1,4 @@
-FileFly
+Yii2 FileFly Module
 =======
 
 [![Latest Stable Version](https://poser.pugx.org/dmstr/yii2-filefly-module/v/stable.svg)](https://packagist.org/packages/dmstr/yii2-filefly-module) 
