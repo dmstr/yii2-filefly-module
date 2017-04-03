@@ -24,7 +24,7 @@ class m160616_120810_add_filesystem_hash_table extends Migration
             ]
         );
 
-        $this->execute("ALTER TABLE `filefly_hashmap` ADD UNIQUE (`component` (45), `path` (200))");
+        $this->createIndex('unique_filefly_hashmap_component_path', 'filefly_hashmap', ['component','path'], true);
     }
 
     public function safeDown()
