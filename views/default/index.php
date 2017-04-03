@@ -1,9 +1,9 @@
 <?php
-use yii\helpers\Inflector;
-
 /*
  * @var yii\web\View $this
  */
+use yii\helpers\Inflector;
+
 $this->title = 'Filefly';
 ?>
 <h1><?= Inflector::titleize($this->context->module->id) ?></h1>

@@ -1,5 +1,10 @@
-FileFly
+Yii2 FileFly Module
 =======
+
+[![Latest Stable Version](https://poser.pugx.org/dmstr/yii2-filefly-module/v/stable.svg)](https://packagist.org/packages/dmstr/yii2-filefly-module) 
+[![Total Downloads](https://poser.pugx.org/dmstr/yii2-filefly-module/downloads.svg)](https://packagist.org/packages/dmstr/yii2-filefly-module)
+[![License](https://poser.pugx.org/dmstr/yii2-filefly-module/license.svg)](https://packagist.org/packages/dmstr/yii2-filefly-module)
+
 FlySystem API for [dmstr/yii2-filemanager-widgets](https://github.com/dmstr/yii2-filemanager-widgets)
 
 Installation

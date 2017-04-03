@@ -1,4 +1,11 @@
 <?php
+/**
+ * @link http://www.herzogkommunikation.de/
+ * @copyright Copyright (c) 2017 herzog kommunikation GmbH, Stuttgart
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
 namespace hrzg\filefly\components;
 
 use creocoder\flysystem\Filesystem;

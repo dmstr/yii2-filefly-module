@@ -1,4 +1,11 @@
 <?php
+/**
+ * @link http://www.diemeisterei.de/
+ * @copyright Copyright (c) 2017 diemeisterei GmbH, Stuttgart
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
 
 namespace hrzg\filefly\models;
 
@@ -11,7 +18,9 @@ use yii\db\Expression;
 use yii\helpers\ArrayHelper;
 
 /**
- * This is the model class for table "filefly_hashmap".
+ * Class FileflyHashmap
+ * @package hrzg\filefly\models
+ * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  */
 class FileflyHashmap extends BaseFileflyHashmap
 {

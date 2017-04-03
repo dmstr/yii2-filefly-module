@@ -1,8 +1,6 @@
 <?php
 namespace hrzg\filefly\components;
 
-use yii\helpers\Url;
-
 /**
  * Response class
  * 
