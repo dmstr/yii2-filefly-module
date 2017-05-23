@@ -176,38 +176,51 @@ class FsController extends \yii\console\Controller
 
     /**
      * Synchronize source to destination
+     *
      * @param $src
      * @param $dest
      */
     public function actionSync($src, $dest)
     {
+        /**
+         * @var $manager \League\Flysystem\MountManager
+         */
         $manager = $this->manager;
 
         $this->mount($this->parseScheme($src));
         $this->mount($this->parseScheme($dest));
 
-        $contents = $manager->listContents($src, false);
+        $contents = $manager->listContents($src, $this->recursive);
+
+        if (!$this->confirm('Sync '.count($contents).' files(s)?')) {
+            return;
+        }
 
         foreach ($contents as $entry) {
             $update = false;
+            $srcUrl = $entry['filesystem'].'://'.$entry['path'];
+            $destUrl = $dest.$entry['path'];
 
-            if (is_array($entry['path'])) {
-                $this->stdout("Skipped directory '{$entry['path']}'");
+            if ($entry['type'] == 'dir') {
+                $this->stdout("Skipped directory '{$entry['path']}'\n");
                 continue;
             }
-            if (!$manager->has($dest.$entry['path'])) {
+
+            if (!$manager->has($destUrl)) {
                 $update = true;
-            } elseif ($manager->getTimestamp($src.$entry['path']) > $manager->getTimestamp($dest.$entry['path'])) {
+            } elseif ($manager->getTimestamp($srcUrl) > $manager->getTimestamp($dest.$entry['path'])) {
                 $update = true;
             }
 
             if ($update) {
-                $manager->copy($src.$entry['path'], $dest.$entry['path']);
-                $this->stdout($entry['path']."\n");
+                $manager->copy($srcUrl, $destUrl);
+                $this->stdout("+");
+                #$this->stdout($srcUrl."\n");
             } else {
                 $this->stdout('.');
             }
         }
+        $this->stdout("\nDone.\n");
     }
 
 
