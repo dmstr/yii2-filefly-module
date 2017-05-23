@@ -104,3 +104,18 @@ Remove permission
 
 - Multi delete option
 ```
+
+## CLI
+
+Configure
+
+    'controllerMap' => [
+        'fs' => [
+            'class' => '\hrzg\filefly\commands\FsController',
+            'filesystemComponents' => [
+                'local' => 'fs',
+                's3' => 'fsS3',
+                'storage' => 'fsFtp',
+            ],
+        ],
+    ]
