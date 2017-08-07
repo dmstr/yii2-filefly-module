@@ -794,7 +794,8 @@ Html;
             }
 
             if ($this->_filesystem->get($path)->isDir()) {
-                if ($this->_filesystem->isEmpty($path) === false) {
+                $allowDeleteRecursive = getenv('AFM_DELETE_RECURSIVE') ? (boolean)getenv('AFM_DELETE_RECURSIVE') : false;
+                if (!$allowDeleteRecursive && $this->_filesystem->isEmpty($path) === false) {
                     return 'notempty';
                 }
 
