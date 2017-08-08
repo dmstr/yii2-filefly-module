@@ -20,7 +20,6 @@ use hrzg\filefly\plugins\SetAccess;
 use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\FileNotFoundException;
-use League\Flysystem\Util;
 use yii\base\Component;
 use yii\helpers\ArrayHelper;
 use yii\helpers\Inflector;
