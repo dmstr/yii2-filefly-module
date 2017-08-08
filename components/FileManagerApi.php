@@ -807,7 +807,7 @@ Html;
             }
 
             // remove permission
-            $removedPermission = $this->_filesystem->removeAccess($path);
+            $removedPermission = $this->_filesystem->removeAccess($path, true);
             if ($removedPermission === false) {
                 return 'errorpermission';
             }
