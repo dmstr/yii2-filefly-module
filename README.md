@@ -17,6 +17,7 @@ Variable | Value | Required
 AFM_FILESYSTEM | yii component name | yes
 AFM_REPAIR | default: true | no
 AFM_SLUG_NAMES | default: true | no
+AFM_DELETE_RECURSIVE | default: false | no
 
 i.e. `AFM_FILESYSTEM=fsLocal`
 
