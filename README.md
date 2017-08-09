@@ -121,3 +121,12 @@ Configure
             ],
         ],
     ]
+    
+## Helper
+
+Description | Method call | Example output 
+--- | --- | ---
+Total size for all filesystems | `FileflyHashmap::getTotalSize()` | 202.82 MiB 
+Total size for all filesystems (raw bytes) | `FileflyHashmap::getTotalSize(true)` | 212670464
+Total size for `local` filesystems | `FileflyHashmap::getTotalSize(false, 'local')` | 48.32 MiB 
+Total size for `s3` filesystems (raw bytes) | `FileflyHashmap::getTotalSize(true, 's3')` | 166546843

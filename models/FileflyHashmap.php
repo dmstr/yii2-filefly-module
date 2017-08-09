@@ -92,13 +92,20 @@ class FileflyHashmap extends BaseFileflyHashmap
     }
 
     /**
+     * Returns the total file size for all or a specific filesystem component
+     *
      * @param bool|false $raw
+     * @param string|null $fsComponent
      *
      * @return mixed|string
      */
-    public static function getTotalSize($raw = false)
+    public static function getTotalSize($raw = false, $fsComponent = null)
     {
-        $totalBytes = self::find()->sum('size');
+        $query = self::find();
+        if (\Yii::$app->has($fsComponent)) {
+            $query = $query->andWhere(['component' => $fsComponent]);
+        }
+        $totalBytes = $query->sum('size');
 
         if ($totalBytes === null) {
             $totalBytes = 0;
