@@ -20,7 +20,6 @@ use hrzg\filefly\plugins\SetAccess;
 use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\FileNotFoundException;
-use League\Flysystem\Util;
 use yii\base\Component;
 use yii\helpers\ArrayHelper;
 use yii\helpers\Inflector;
@@ -794,8 +793,7 @@ Html;
             }
 
             if ($this->_filesystem->get($path)->isDir()) {
-                $allowDeleteRecursive = getenv('AFM_DELETE_RECURSIVE') ? (boolean)getenv('AFM_DELETE_RECURSIVE') : false;
-                if (!$allowDeleteRecursive && $this->_filesystem->isEmpty($path) === false) {
+                if (!$this->_module->deleteRecursive && $this->_filesystem->isEmpty($path) === false) {
                     return 'notempty';
                 }
 
@@ -809,7 +807,7 @@ Html;
             }
 
             // remove permission
-            $removedPermission = $this->_filesystem->removeAccess($path);
+            $removedPermission = $this->_filesystem->removeAccess($path, true);
             if ($removedPermission === false) {
                 return 'errorpermission';
             }

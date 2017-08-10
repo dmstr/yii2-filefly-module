@@ -32,6 +32,7 @@ i.e. `AFM_FILESYSTEM=fsLocal`
     'filesystem'         => getenv('AFM_FILESYSTEM'),
     'slugNames'			 => (getenv('AFM_SLUG_NAMES')) ? getenv('AFM_SLUG_NAMES') : true,
     'repair'             => (getenv('AFM_REPAIR')) ? getenv('AFM_REPAIR') : true,
+    'deleteRecursive'    => (getenv('AFM_DELETE_RECURSIVE')) ? getenv('AFM_DELETE_RECURSIVE') : false,
     'defaultPermissions' => [
         \hrzg\filefly\Module::ACCESS_OWNER  => 1,
         \hrzg\filefly\Module::ACCESS_READ   => \hrzg\filefly\models\FileflyHashmap::$_all,
@@ -120,3 +121,12 @@ Configure
             ],
         ],
     ]
+    
+## Helper
+
+Description | Method call | Example output 
+--- | --- | ---
+Total size for all filesystems | `FileflyHashmap::getTotalSize()` | 202.82 MiB 
+Total size for all filesystems (raw bytes) | `FileflyHashmap::getTotalSize(true)` | 212670464
+Total size for `local` filesystems | `FileflyHashmap::getTotalSize(false, 'local')` | 48.32 MiB 
+Total size for `s3` filesystems (raw bytes) | `FileflyHashmap::getTotalSize(true, 's3')` | 166546843
