@@ -17,6 +17,10 @@ use yii\web\UrlRuleInterface;
  *
  *  [ 'filefly/api', ['action => 'stream', 'path' => 'folder/example.jpg'] ]
  *
+ * A URL can have an optional numeric part at the end to invalidate caches
+ *
+ *  /img/stream/header.jpg,p12345
+ *
  * @package hrzg\filefly\components
  */
 class ImageUrlRule extends Object implements UrlRuleInterface
@@ -34,7 +38,7 @@ class ImageUrlRule extends Object implements UrlRuleInterface
     public function parseRequest($manager, $request)
     {
         $pathInfo = $request->getPathInfo();
-        if (preg_match('%^('.$this->prefix.')/([^/]*)/(.*)('.$this->suffix.')$%', $pathInfo, $matches)) {
+        if (preg_match('%^('.$this->prefix.')/([^/]*)/(.*)('.$this->suffix.')([0-9]*)$%', $pathInfo, $matches)) {
             return ['filefly/api', ['action' => 'stream', 'path' => $matches[3]]];
         }
         return false; // this rule does not apply
