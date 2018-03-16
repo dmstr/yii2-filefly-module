@@ -211,6 +211,6 @@ class Rest
 			header($header);
 		}
 
-		echo $response->getBody();
+		\Yii::$app->response->content = $response->getBody();
 	}
 }
