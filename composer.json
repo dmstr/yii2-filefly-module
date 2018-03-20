@@ -15,7 +15,7 @@
         }
     ],
     "require": {
-        "yiisoft/yii2": "*",
+        "yiisoft/yii2": "~2.0.13",
         "creocoder/yii2-flysystem": "^0.8.1",
         "league/flysystem-sftp": "~1.0",
         "league/flysystem-webdav": "~1.0",

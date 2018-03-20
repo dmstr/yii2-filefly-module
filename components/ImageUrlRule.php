@@ -2,7 +2,7 @@
 
 namespace hrzg\filefly\components;
 
-use yii\base\Object;
+use yii\base\BaseObject;
 use yii\web\UrlRuleInterface;
 
 /**
@@ -23,7 +23,7 @@ use yii\web\UrlRuleInterface;
  *
  * @package hrzg\filefly\components
  */
-class ImageUrlRule extends Object implements UrlRuleInterface
+class ImageUrlRule extends BaseObject implements UrlRuleInterface
 {
     public $prefix = 'img';
     public $suffix = '';
