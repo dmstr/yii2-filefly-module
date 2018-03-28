@@ -553,9 +553,8 @@ Html;
             header('Pragma: public');
 
             $stream = $this->_filesystem->readStream($path);
-            echo stream_get_contents($stream);
+            fpassthru($stream);
             fclose($stream);
-
 
         } catch (FileNotFoundException $e) {
             return false;
@@ -595,7 +594,7 @@ Html;
             header('Pragma: public');
 
             $stream = $this->_filesystem->readStream($path);
-            echo stream_get_contents($stream);
+            fpassthru($stream);
             fclose($stream);
 
         } catch (FileNotFoundException $e) {
