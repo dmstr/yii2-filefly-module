@@ -489,10 +489,15 @@ Html;
             foreach ($files as $file) {
                 $stream   = fopen($file['tmp_name'], 'r+');
 
-                // parse $file['name'] for slugging, im enabled
+                // parse $file['name'] for slugging if enabled
                 if ($this->_module->slugNames) {
                     $pathInfo = pathinfo($file['name']);
-                    $fullPath = $path.'/'.Inflector::slug($pathInfo['filename']).'.'.strtolower($pathInfo['extension']);
+                    // check if filename has extension
+                    if(empty($pathInfo['extension'])) {
+                        $fullPath = $path . '/' . Inflector::slug($pathInfo['filename']);
+                    } else {
+                        $fullPath = $path . '/' . Inflector::slug($pathInfo['filename']) . '.' . strtolower($pathInfo['extension']);
+                    }
                 } else {
                     $fullPath = $path.'/'.$file['name'];
                 }
