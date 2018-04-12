@@ -587,8 +587,6 @@ Html;
             $size   = $this->_filesystem->getSize($path);
 
             // set headers
-            header('Content-Type: ' . $mimeType);
-            header('Content-Length: ' . $size);
             header('Content-Transfer-Encoding: binary');
             header('Connection: Keep-Alive');
             $offset = 604800; # 1 week
@@ -599,9 +597,11 @@ Html;
             header('Pragma: public');
 
             $stream = $this->_filesystem->readStream($path);
-            fpassthru($stream);
-            fclose($stream);
-
+            \Yii::$app->response->sendStreamAsFile(
+                $stream,
+                basename($path),
+                ['mimeType' => $mimeType, 'fileSize'=>$size]
+            );
         } catch (FileNotFoundException $e) {
             return false;
         }
