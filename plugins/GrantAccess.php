@@ -96,9 +96,9 @@ class GrantAccess extends AccessPlugin
             if (empty($hash->{$permissionType})) {
                 // match if owner right can be granted
                 if ($hash->hasPermission($permissionType)) {
+                    \Yii::trace("Permission '{$permissionType}' found for {$hash->path}", __METHOD__);
                     return true;
                 } else {
-                    \Yii::error('continue', 'empty access and no perm');
                     continue;
                 }
             }
