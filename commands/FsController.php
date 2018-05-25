@@ -227,7 +227,7 @@ class FsController extends \yii\console\Controller
     private function mount($fs)
     {
         $component = $this->filesystemComponents[$fs];
-        $this->manager->mountFilesystem($fs, \Yii::$app->{$component}->getNativeFilesystem());
+        $this->manager->mountFilesystem($fs, \Yii::$app->{$component}->getFilesystem());
     }
 
     private function parseScheme($uri = '/')
