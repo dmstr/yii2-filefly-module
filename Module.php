@@ -10,6 +10,7 @@ namespace hrzg\filefly;
 
 use creocoder\flysystem\Filesystem;
 use dmstr\web\traits\AccessBehaviorTrait;
+use hrzg\filefly\helpers\FsManager;
 use yii\web\HttpException;
 
 /**
@@ -68,9 +69,14 @@ class Module extends \yii\base\Module
     public $filesystem;
 
     /**
-     * @var object creocoder\flysystem\Filesystem
+     * @var object creocoder\flysystem\Filesystem default filesystem
      */
     public $filesystemComponent;
+
+    /**
+     * @var array mapping for filesystems 'scheme' => 'component'
+     */
+    public $filesystemComponents = [];
 
     /**
      * @inheritdoc
@@ -108,6 +114,8 @@ class Module extends \yii\base\Module
         self::ACCESS_DELETE => '*',
     ];
 
+    private $_manager;
+
     /**
      * @inheritdoc
      *
@@ -144,4 +152,13 @@ class Module extends \yii\base\Module
 
         return true;
     }
+
+    public function getManager(){
+        if (!$this->_manager) {
+            $this->_manager = new FsManager();
+            $this->_manager->setModule($this);
+        }
+        return $this->_manager;
+    }
+
 }

@@ -10,17 +10,20 @@ namespace hrzg\filefly\commands;
  * file that was distributed with this source code.
  */
 
+use hrzg\filefly\helpers\FsManager;
 use League\Flysystem\MountManager;
 use yii\helpers\ArrayHelper;
 use yii\helpers\Console;
 
 class FsController extends \yii\console\Controller
 {
-    public $filesystemComponents = [];
 
     public $recursive = false;
     public $long = false;
 
+    /**
+     * @var $manager FsManager
+     */
     private $manager = null;
 
     public function options($actionID)
@@ -49,7 +52,8 @@ class FsController extends \yii\console\Controller
 
     public function init()
     {
-        $this->manager = new MountManager();
+        $this->manager = new FsManager();
+        $this->manager->setModule(\Yii::$app->getModule('filefly'));
     }
 
     /**
@@ -59,7 +63,7 @@ class FsController extends \yii\console\Controller
     {
         $this->stdout("FlyCLI\n", Console::FG_BLUE, Console::UNDERLINE);
         $this->stdout("\n");
-        foreach ($this->filesystemComponents as $scheme => $component) {
+        foreach ($this->manager->getModule()->filesystemComponents as $scheme => $component) {
             $this->stdout(str_pad($scheme."://", 10, ' ')."\t".$component);
             $this->stdout("\n");
         }
@@ -73,7 +77,7 @@ class FsController extends \yii\console\Controller
      */
     public function actionLs($uri)
     {
-        $this->mount($this->parseScheme($uri));
+        $this->manager->mount($this->parseScheme($uri));
 
         try {
             $contents = $this->manager->listContents($uri, $this->recursive);
@@ -105,7 +109,7 @@ class FsController extends \yii\console\Controller
      */
     public function actionMkdir($uri)
     {
-        $this->mount($this->parseScheme($uri));
+        $this->manager->mount($this->parseScheme($uri));
 
         $this->manager->createDir($uri);
     }
@@ -119,8 +123,8 @@ class FsController extends \yii\console\Controller
     public function actionCp($src, $dest)
     {
 
-        $this->mount($this->parseScheme($src));
-        $this->mount($this->parseScheme($dest));
+        $this->manager->mount($this->parseScheme($src));
+        $this->manager->mount($this->parseScheme($dest));
 
         $success = $this->manager->copy($src, $dest);
 
@@ -138,8 +142,8 @@ class FsController extends \yii\console\Controller
     public function actionMv($src, $dest)
     {
 
-        $this->mount($this->parseScheme($src));
-        $this->mount($this->parseScheme($dest));
+        $this->manager->mount($this->parseScheme($src));
+        $this->manager->mount($this->parseScheme($dest));
 
         $success = $this->manager->move($src, $dest);
 
@@ -156,7 +160,7 @@ class FsController extends \yii\console\Controller
     public function actionRm($uri)
     {
         if ($this->confirm("Do you want delete the file '$uri' ?")) {
-            $this->mount($this->parseScheme($uri));
+            $this->manager->mount($this->parseScheme($uri));
             $this->manager->delete($uri);
         }
     }
@@ -169,7 +173,7 @@ class FsController extends \yii\console\Controller
     public function actionRmdir($uri)
     {
         if ($this->confirm("Do you want delete the directory '$uri' ?")) {
-            $this->mount($this->parseScheme($uri));
+            $this->manager->mount($this->parseScheme($uri));
             $this->manager->deleteDir($uri);
         }
     }
@@ -187,8 +191,8 @@ class FsController extends \yii\console\Controller
          */
         $manager = $this->manager;
 
-        $this->mount($this->parseScheme($src));
-        $this->mount($this->parseScheme($dest));
+        $this->manager->mount($this->parseScheme($src));
+        $this->manager->mount($this->parseScheme($dest));
 
         $contents = $manager->listContents($src, $this->recursive);
 
@@ -221,13 +225,6 @@ class FsController extends \yii\console\Controller
             }
         }
         $this->stdout("\nDone.\n");
-    }
-
-
-    private function mount($fs)
-    {
-        $component = $this->filesystemComponents[$fs];
-        $this->manager->mountFilesystem($fs, \Yii::$app->{$component}->getFilesystem());
     }
 
     private function parseScheme($uri = '/')
