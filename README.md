@@ -33,6 +33,7 @@ i.e. `AFM_FILESYSTEM=fsLocal`
     'slugNames'			 => (getenv('AFM_SLUG_NAMES')) ? getenv('AFM_SLUG_NAMES') : true,
     'repair'             => (getenv('AFM_REPAIR')) ? getenv('AFM_REPAIR') : true,
     'deleteRecursive'    => (getenv('AFM_DELETE_RECURSIVE')) ? getenv('AFM_DELETE_RECURSIVE') : false,
+    'streamExpireOffset' => 604800 # Offset (in seconds) for Expires Header in stream action
     'defaultPermissions' => [
         \hrzg\filefly\Module::ACCESS_OWNER  => 1,
         \hrzg\filefly\Module::ACCESS_READ   => \hrzg\filefly\models\FileflyHashmap::$_all,

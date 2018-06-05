@@ -114,6 +114,13 @@ class Module extends \yii\base\Module
         self::ACCESS_DELETE => '*',
     ];
 
+
+    /**
+     * Offset (in seconds) for Expires Header in stream action, default: 1 week
+     * @var int
+     */
+    public $streamExpireOffset = 604800;
+
     private $_manager;
 
     /**

@@ -546,21 +546,21 @@ Html;
             $mimeType = $this->_filesystem->getMimetype($path);
             $size   = $this->_filesystem->getSize($path);
 
+            // we must use \yii\web\HeaderCollection here, otherwise \yii\web\Response::sendStreamAsFile will override
+            // with defaults from \yii\web\Response::setDownloadHeaders
+            $headers = \Yii::$app->response->getHeaders();
+
             // set headers
-            header('Content-Description: File Transfer');
-            header('Content-Type: ' . $mimeType);
-            header('Content-Disposition: attachment; filename=' . $fileName);
-            header('Content-Length: ' . $size);
-            header('Content-Transfer-Encoding: binary');
-            header('Connection: Keep-Alive');
-            header('Expires: 0');
-            header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
-            header('Pragma: public');
+            $headers->add('Content-Description', 'File Transfer');
+            $headers->add('Content-Transfer-Encoding', 'binary');
+            $headers->add('Connection', 'Keep-Alive');
 
             $stream = $this->_filesystem->readStream($path);
-            fpassthru($stream);
-            fclose($stream);
-
+            \Yii::$app->response->sendStreamAsFile(
+                $stream,
+                basename($path),
+                ['mimeType' => $mimeType, 'fileSize' => $size]
+            );
         } catch (FileNotFoundException $e) {
             return false;
         }
@@ -586,21 +586,24 @@ Html;
             $mimeType = $this->_filesystem->getMimetype($path);
             $size   = $this->_filesystem->getSize($path);
 
+            // we must use \yii\web\HeaderCollection here, otherwise \yii\web\Response::sendStreamAsFile will override
+            // with defaults from \yii\web\Response::setDownloadHeaders
+            $headers = \Yii::$app->response->getHeaders();
+
             // set headers
-            header('Content-Transfer-Encoding: binary');
-            header('Connection: Keep-Alive');
-            $offset = 604800; # 1 week
+            $headers->add('Content-Transfer-Encoding', 'binary');
+            $headers->add('Connection', 'Keep-Alive');
+            $offset = $this->_module->streamExpireOffset ? $this->_module->streamExpireOffset : 604800; # 1 week
             if ($expiringDate = gmdate("D, d M Y H:i:s", time() + $offset)) {
-                header("Expires: $expiringDate GMT");
+                $headers->add('Expires', $expiringDate . ' GMT');
             }
-            header('Cache-Control: public');
-            header('Pragma: public');
+            $headers->add('Cache-Control', 'public');
 
             $stream = $this->_filesystem->readStream($path);
             \Yii::$app->response->sendStreamAsFile(
                 $stream,
                 basename($path),
-                ['mimeType' => $mimeType, 'fileSize'=>$size]
+                ['mimeType' => $mimeType, 'fileSize' => $size, 'inline' => 1]
             );
         } catch (FileNotFoundException $e) {
             return false;
