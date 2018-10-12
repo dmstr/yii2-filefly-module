@@ -125,7 +125,7 @@ class FileManagerApi extends Component
 
             case 'list':
                 if (array_key_exists('recycle', $request) && $request['recycle'] === true) {
-                    $recycle = $this->_filesystem->check(null, $this->_module->repair, true);
+                    $recycle = $this->_filesystem->check(null, $this->_module->repair, false);
                     if ($recycle === false) {
                         return $this->simpleErrorResponse($this->_translate->recycling_failed);
                     }
@@ -438,6 +438,7 @@ Html;
     {
         $query = FileflyHashmap::find()
             ->select(['path'])
+            ->andWhere(['=', 'component', $this->_module->filesystem])
             ->andWhere(['LIKE', 'path', $path])
             ->limit($limit)
             ->orderBy(['updated_at' => SORT_DESC])
@@ -453,20 +454,11 @@ Html;
             }
 
             try {
-                $element = $this->_filesystem->get($item['path']);
                 $item['id'] = $item['path'];
-                $item['mime'] = $this->_filesystem->getMimetype($item['path']);
-                $item['type'] = $element->getType();
-
-                if ($type === 'file' && $element->isFile()) {
-                    $result[] = $item;
-                }
-
-                if ($type === 'dir' && $element->isDir()) {
-                    $result[] = $item;
-                }
-
+                $item['mime'] = ''; // TODO: store and use mimetype in DB
+                $result[] = $item;
             } catch (FileNotFoundException $e) {
+                \Yii::warning($e->getMessage(), __METHOD__);
                 continue;
             }
         }
