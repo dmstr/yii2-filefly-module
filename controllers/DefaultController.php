@@ -21,4 +21,9 @@ class DefaultController extends Controller
     {
         return $this->render('index');
     }
+
+    public function actionFilemanager()
+    {
+        return $this->render('filemanager');
+    }
 }
