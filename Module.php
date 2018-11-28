@@ -69,7 +69,7 @@ class Module extends \yii\base\Module
     public $filesystem;
 
     /**
-     * @var object creocoder\flysystem\Filesystem default filesystem
+     * @var \creocoder\flysystem\Filesystem default filesystem
      */
     public $filesystemComponent;
 
