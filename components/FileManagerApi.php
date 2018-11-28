@@ -95,7 +95,7 @@ class FileManagerApi extends Component
     public function postHandler($query, $request, $files)
     {
         // default response
-        $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
+        $response = $this->simpleErrorResponse($this->_translate->function_not_implemented, 501);
 
         // Probably file upload
         if (!isset($request['action'])
@@ -112,7 +112,7 @@ class FileManagerApi extends Component
                     $response = $this->simpleErrorResponse($this->_translate->upload_failed);
                     break;
                 case $uploaded === 'nopermission':
-                    $response = $this->simpleErrorResponse($this->_translate->permission_upload_denied);
+                    $response = $this->simpleErrorResponse($this->_translate->permission_upload_denied,403);
                     break;
                 case $uploaded === true:
                     $response = $this->simpleSuccessResponse();
@@ -148,10 +148,10 @@ class FileManagerApi extends Component
                 $renamed = $this->renameAction($request['item'], $request['newItemPath']);
                 switch (true) {
                     case $renamed === 'notfound':
-                        $response = $this->simpleErrorResponse($this->_translate->file_not_found);
+                        $response = $this->simpleErrorResponse($this->_translate->file_not_found, 404);
                         break;
                     case $renamed === 'nopermission':
-                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied);
+                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied,403);
                         break;
                     case $renamed === 'renamefailed':
                         $response = $this->simpleErrorResponse($this->_translate->renaming_failed);
@@ -166,10 +166,10 @@ class FileManagerApi extends Component
                 $moved = $this->moveAction($request['items'], $request['newPath']);
                 switch (true) {
                     case $moved === 'notfound':
-                        $response = $this->simpleErrorResponse($this->_translate->file_not_found);
+                        $response = $this->simpleErrorResponse($this->_translate->file_not_found, 404);
                         break;
                     case $moved === 'nopermission':
-                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied);
+                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied,403);
                         break;
                     case $moved === 'movefailed':
                         $response = $this->simpleErrorResponse($this->_translate->moving_failed);
@@ -208,7 +208,7 @@ class FileManagerApi extends Component
                         $response = $this->simpleErrorResponse($this->_translate->permission_delete_error);
                         break;
                     case $removed === 'nopermission':
-                        $response = $this->simpleErrorResponse($this->_translate->permission_delete_denied);
+                        $response = $this->simpleErrorResponse($this->_translate->permission_delete_denied,403);
                         break;
                     case $removed === 'removefailed':
                         $response = $this->simpleErrorResponse($this->_translate->removing_failed);
@@ -223,7 +223,7 @@ class FileManagerApi extends Component
                 $edited = $this->editAction($request['item'], $request['content']);
                 switch (true) {
                     case $edited === 'nopermission':
-                        $response = $this->simpleErrorResponse($this->_translate->permission_edit_denied);
+                        $response = $this->simpleErrorResponse($this->_translate->permission_edit_denied,403);
                         break;
                     case $edited === true:
                         $response = $this->simpleSuccessResponse();
@@ -243,7 +243,7 @@ class FileManagerApi extends Component
                         ]
                     );
                 } else {
-                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
+                    $response = $this->simpleErrorResponse($this->_translate->file_not_found, 404);
                 }
                 break;
 
@@ -295,7 +295,7 @@ class FileManagerApi extends Component
                 }
                 break;
             default:
-                $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
+                $response = $this->simpleErrorResponse($this->_translate->function_not_implemented, 501);
                 break;
         }
 
@@ -326,7 +326,7 @@ class FileManagerApi extends Component
                 if ($downloaded === true) {
                     exit;
                 } else {
-                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
+                    $response = $this->simpleErrorResponse($this->_translate->file_not_found, 404);
                 }
 
                 break;
@@ -345,9 +345,9 @@ class FileManagerApi extends Component
                 $streamed = $this->streamAction($queries['path']);
                 if ($streamed === true) {
                     exit;
-                } else {
-                    $response = $this->simpleErrorResponse($this->_translate->file_not_found);
                 }
+
+                $response = $this->simpleErrorResponse($this->_translate->file_not_found ,404);
 
                 break;
             case 'search':
@@ -364,7 +364,7 @@ class FileManagerApi extends Component
                 break;
 
             default:
-                $response = $this->simpleErrorResponse($this->_translate->function_not_implemented);
+                $response = $this->simpleErrorResponse($this->_translate->function_not_implemented, 501);
                 break;
         }
 
@@ -407,14 +407,15 @@ Html;
 
     /**
      * @param $message
+     * @param $statusCode
      *
      * @return Response
      */
-    private function simpleErrorResponse($message)
+    private function simpleErrorResponse($message,$statusCode = 500)
     {
         $response = new Response();
         $response
-            ->setStatus(500, 'Internal Server Error')
+            ->setStatus($statusCode, $message)
             ->setData(
                 [
                     'result' => [
@@ -432,7 +433,7 @@ Html;
      * @param string $type
      * @param integer $limit
      *
-     * @return string
+     * @return array
      */
     private function searchAction($path, $type, $limit)
     {
@@ -479,7 +480,7 @@ Html;
         $this->_filesystem->check($path, $this->_module->repair);
         if ($this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             foreach ($files as $file) {
-                $stream   = fopen($file['tmp_name'], 'r+');
+                $stream   = fopen($file['tmp_name'], 'rb+');
 
                 // parse $file['name'] for slugging if enabled
                 if ($this->_module->slugNames) {
