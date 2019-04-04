@@ -638,13 +638,6 @@ Html;
                 continue;
             }
 
-            // fix for filesystems where folders has no date
-            if (array_key_exists('timestamp', $item)) {
-                $date = new \DateTime('@' . $this->_filesystem->getTimestamp($item['path']));
-            } else {
-                $date = new \DateTime();
-            }
-
             // fix for filesystems where folders has no size
             if (array_key_exists('size', $item)) {
                 $size = $item['size'];
@@ -655,7 +648,7 @@ Html;
             $files[] = [
                 'name' => $item['basename'],
                 'size' => $size,
-                'date' => $date->format('Y-m-d H:i:s'),
+                'date' => date('Y-m-d H:i:s',$this->_filesystem->getTimestamp($item['path']) ?: time()),
                 'type' => $item['type'],
             ];
         }
