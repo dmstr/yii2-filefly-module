@@ -6,6 +6,7 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace hrzg\filefly\components;
 
 use creocoder\flysystem\Filesystem;
@@ -20,13 +21,14 @@ use hrzg\filefly\plugins\SetAccess;
 use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\FileNotFoundException;
-use yii\base\Component;
 use Yii;
+use yii\base\Component;
 use yii\helpers\ArrayHelper;
 use yii\helpers\Inflector;
 
 /**
  * Class FileManagerApi
+ *
  * @package hrzg\filefly\models
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  * @author Elias Luhr <e.luhr@herzogkommunikation.de>
@@ -47,6 +49,7 @@ class FileManagerApi extends Component
 
     /**
      * the filefly module instance
+     *
      * @var Filefly
      */
     private $_module;
@@ -117,8 +120,7 @@ class FileManagerApi extends Component
             && (isset($_SERVER['CONTENT_TYPE'])
                 && strpos($_SERVER['CONTENT_TYPE'], 'multipart/form-data') !== false)
         ) {
-            $path = $this->_scope . $request['destination'];
-            $uploaded = $this->uploadAction($path, $files);
+            $uploaded = $this->uploadAction($request['destination'], $files);
 
             switch (true) {
                 case $uploaded === 'fileexists':
@@ -128,7 +130,7 @@ class FileManagerApi extends Component
                     $response = $this->simpleErrorResponse($this->_translate->upload_failed);
                     break;
                 case $uploaded === 'nopermission':
-                    $response = $this->simpleErrorResponse($this->_translate->permission_upload_denied,403);
+                    $response = $this->simpleErrorResponse($this->_translate->permission_upload_denied, 403);
                     break;
                 case $uploaded === true:
                     $response = $this->simpleSuccessResponse();
@@ -162,13 +164,13 @@ class FileManagerApi extends Component
                 break;
 
             case 'rename':
-                $renamed = $this->renameAction($request['item'], $request['newItemPath']);
+                $renamed = $this->renameAction($this->_scope . $request['item'], $this->_scope . $request['newItemPath']);
                 switch (true) {
                     case $renamed === 'notfound':
                         $response = $this->simpleErrorResponse($this->_translate->file_not_found, 404);
                         break;
                     case $renamed === 'nopermission':
-                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied,403);
+                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied, 403);
                         break;
                     case $renamed === 'renamefailed':
                         $response = $this->simpleErrorResponse($this->_translate->renaming_failed);
@@ -186,7 +188,7 @@ class FileManagerApi extends Component
                         $response = $this->simpleErrorResponse($this->_translate->file_not_found, 404);
                         break;
                     case $moved === 'nopermission':
-                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied,403);
+                        $response = $this->simpleErrorResponse($this->_translate->permission_update_denied, 403);
                         break;
                     case $moved === 'movefailed':
                         $response = $this->simpleErrorResponse($this->_translate->moving_failed);
@@ -225,7 +227,7 @@ class FileManagerApi extends Component
                         $response = $this->simpleErrorResponse($this->_translate->permission_delete_error);
                         break;
                     case $removed === 'nopermission':
-                        $response = $this->simpleErrorResponse($this->_translate->permission_delete_denied,403);
+                        $response = $this->simpleErrorResponse($this->_translate->permission_delete_denied, 403);
                         break;
                     case $removed === 'removefailed':
                         $response = $this->simpleErrorResponse($this->_translate->removing_failed);
@@ -240,7 +242,7 @@ class FileManagerApi extends Component
                 $edited = $this->editAction($request['item'], $request['content']);
                 switch (true) {
                     case $edited === 'nopermission':
-                        $response = $this->simpleErrorResponse($this->_translate->permission_edit_denied,403);
+                        $response = $this->simpleErrorResponse($this->_translate->permission_edit_denied, 403);
                         break;
                     case $edited === true:
                         $response = $this->simpleSuccessResponse();
@@ -275,7 +277,7 @@ class FileManagerApi extends Component
                 // slug new folder name
                 if ($this->_module->slugNames) {
 
-                    $newPath = $pathInfo['dirname'].'/'.Inflector::slug($pathInfo['basename']);
+                    $newPath = $pathInfo['dirname'] . '/' . Inflector::slug($pathInfo['basename']);
                 }
                 $created = $this->createFolderAction($newPath);
                 switch (true) {
@@ -369,7 +371,7 @@ class FileManagerApi extends Component
                     exit;
                 }
 
-                $response = $this->simpleErrorResponse($this->_translate->file_not_found ,404);
+                $response = $this->simpleErrorResponse($this->_translate->file_not_found, 404);
 
                 break;
             case 'search':
@@ -378,7 +380,8 @@ class FileManagerApi extends Component
                     return $this->unauthorizedResponse($queries['action']);
                 }
 
-                $path = strtolower(ArrayHelper::getValue($queries, 'q', '%'));
+                $path = $this->_scope . strtolower(ArrayHelper::getValue($queries, 'q', '%'));
+
                 $type = strtolower(ArrayHelper::getValue($queries, 'type', 'file'));
                 $limit = ArrayHelper::getValue($queries, 'limit', 10);
 
@@ -400,7 +403,7 @@ class FileManagerApi extends Component
      */
     private function unauthorizedResponse($action)
     {
-        $bodyHtml  = <<<Html
+        $bodyHtml = <<<Html
 You are not allowed to <strong>$action</strong> this file!
 Html;
 
@@ -433,7 +436,7 @@ Html;
      *
      * @return Response
      */
-    private function simpleErrorResponse($message,$statusCode = 500)
+    private function simpleErrorResponse($message, $statusCode = 500)
     {
         $response = new Response();
         $response
@@ -442,7 +445,7 @@ Html;
                 [
                     'result' => [
                         'success' => false,
-                        'error'   => $message
+                        'error' => $message
                     ]
                 ]
             );
@@ -472,7 +475,7 @@ Html;
         foreach ($query->all() as $item) {
 
             // check read permissions
-            if ( ! $this->_filesystem->grantAccess($item['path'], Filefly::ACCESS_READ)) {
+            if (!$this->_filesystem->grantAccess($item['path'], Filefly::ACCESS_READ)) {
                 continue;
             }
 
@@ -499,6 +502,7 @@ Html;
     private function uploadAction($path, $files)
     {
         // ensure hashmap entry
+        $path = $this->_scope . ltrim($path,'/');
         $this->_filesystem->check($path, $this->_module->repair);
         if ($this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             foreach ($files as $file) {
@@ -559,7 +563,7 @@ Html;
             // get meta info
             $fileName = sprintf('"%s"', addcslashes(basename($path), '"\\'));
             $mimeType = $this->_filesystem->getMimetype($path);
-            $size   = $this->_filesystem->getSize($path);
+            $size = $this->_filesystem->getSize($path);
 
             // we must use \yii\web\HeaderCollection here, otherwise \yii\web\Response::sendStreamAsFile will override
             // with defaults from \yii\web\Response::setDownloadHeaders
@@ -584,6 +588,7 @@ Html;
 
     /**
      * Stream a file
+     *
      * @param $path
      *
      * @return bool
@@ -599,7 +604,7 @@ Html;
             }
 
             $mimeType = $this->_filesystem->getMimetype($path);
-            $size   = $this->_filesystem->getSize($path);
+            $size = $this->_filesystem->getSize($path);
 
             // we must use \yii\web\HeaderCollection here, otherwise \yii\web\Response::sendStreamAsFile will override
             // with defaults from \yii\web\Response::setDownloadHeaders
@@ -670,7 +675,7 @@ Html;
             $files[] = [
                 'name' => $item['basename'],
                 'size' => $size,
-                'date' => date('Y-m-d H:i:s',$this->_filesystem->getTimestamp($item['path']) ?: time()),
+                'date' => date('Y-m-d H:i:s', $this->_filesystem->getTimestamp($item['path']) ?: time()),
                 'type' => $item['type'],
             ];
         }
@@ -837,6 +842,7 @@ Html;
 
     /**
      * TODO option globally tmp disabled in hrzg/yii2-filemanager-widgets
+     *
      * @param string $path
      * @param string $content
      *
@@ -860,6 +866,7 @@ Html;
 
     /**
      * TODO option globally tmp disabled in hrzg/yii2-filemanager-widgets
+     *
      * @param string $path
      *
      * @return bool|string
