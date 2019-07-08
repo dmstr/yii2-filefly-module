@@ -6,77 +6,79 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace hrzg\filefly\controllers;
 
 use hrzg\filefly\components\FileManagerApi;
-use hrzg\filefly\Module;
-use \yii\web\Response as WebResponse;
 use hrzg\filefly\components\Rest;
+use hrzg\filefly\Module;
 use Yii;
 use yii\filters\AccessControl;
-use yii\helpers\ArrayHelper;
+use yii\filters\Cors;
+use yii\rest\Controller;
 use yii\web\HttpException;
+use yii\web\Response as WebResponse;
 
 /**
  * Class ApiController
+ *
  * @package hrzg\filefly\controllers
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  *
  * @property Module $module
  */
-class ApiController extends \yii\rest\Controller
+class ApiController extends Controller
 {
     /**
      * @inheritdoc
      */
     public function behaviors()
     {
-        return ArrayHelper::merge(
-            parent::behaviors(),
-            [
-                'corsFilter' => [
-                    'class' => \yii\filters\Cors::className(),
-                    'cors'  => [
-                        'Origin'                           => ['*'],
-                        'Access-Control-Request-Method'    => [
-                            'GET',
-                            'POST',
-                            'PUT',
-                            'PATCH',
-                            'DELETE',
-                            'HEAD',
-                            'OPTIONS'
-                        ],
-                        'Access-Control-Request-Headers'   => ['*'],
-                        'Access-Control-Allow-Credentials' => true,
-                        'Access-Control-Max-Age'           => 86400,
-                    ],
+        $behaviors = parent::behaviors();
+
+        $behaviors['corsFilter'] = [
+            'class' => Cors::class,
+            'cors' => [
+                'Origin' => ['*'],
+                'Access-Control-Request-Method' => [
+                    'GET',
+                    'POST',
+                    'PUT',
+                    'PATCH',
+                    'DELETE',
+                    'HEAD',
+                    'OPTIONS'
                 ],
-                'access'     => [
-                    'class' => AccessControl::className(),
-                    'rules' => [
-                        [
-                            'allow'         => true,
-                            'matchCallback' => function ($rule, $action) {
-                                return \Yii::$app->user->can(
-                                    $this->module->id . '_' . $this->id . '_' . $action->id,
-                                    ['route' => true]
-                                );
-                            },
-                        ]
-                    ]
+                'Access-Control-Request-Headers' => ['*'],
+                'Access-Control-Allow-Credentials' => true,
+                'Access-Control-Max-Age' => 86400,
+            ],
+        ];
+        $behaviors['access'] = [
+            'class' => AccessControl::class,
+            'rules' => [
+                [
+                    'allow' => true,
+                    'matchCallback' => function ($rule, $action) {
+                        return Yii::$app->user->can(
+                            $this->module->id . '_' . $this->id . '_' . $action->id,
+                            ['route' => true]
+                        );
+                    },
                 ]
             ]
-        );
+        ];
+
+        return $behaviors;
     }
 
     /**
      * @inheritdoc
      */
-    public function actionIndex()
+    public function actionIndex($scope = null)
     {
         // Manager API
-        $fileManagerApi = new FileManagerApi($this->module->filesystemComponent, $this->module->filesystem, false, $this->module);
+        $fileManagerApi = new FileManagerApi($this->module->filesystemComponent, $this->module->filesystem, $this->module, $scope);
 
         try {
             $rest = new Rest();

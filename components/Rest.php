@@ -2,6 +2,8 @@
 
 namespace hrzg\filefly\components;
 
+use Yii;
+use yii\base\NotSupportedException;
 use yii\web\HttpException;
 
 /**
@@ -9,12 +11,14 @@ use yii\web\HttpException;
  *
  * For server side REST API implementation (POST, GET, PUT, DELETE as CRUD)
  * Chaineable
+ *
  * @author      Jakub Ďuraš <jakub@duras.me>
  */
 class Rest
 {
     /**
      * List of callbacks which are assigned and later called in handle method: post, get, put, delete, before and after
+     *
      * @var array
      */
     private $callbacks = [];
@@ -26,14 +30,17 @@ class Rest
 
     /**
      * Add callback for specific HTTP method (post, get, put, delete)
-     * @param  string $method name of the HTTP method
-     * @param  array $arguments expects only one argument, callback, with number of arguments based on request method ($queries, $body['data'], $body['files'])
+     *
+     * @param string $method name of the HTTP method
+     * @param array $arguments expects only one argument, callback, with number of arguments based on request method ($queries, $body['data'], $body['files'])
+     *
      * @return object            this
+     * @throws NotSupportedException
      */
     public function __call($method, $arguments)
     {
-        if (!\in_array($method, ['post', 'get', 'put', 'delete'])) {
-            throw new Exception('REST method "' . $method . '" not supported.');
+        if (!in_array($method, ['post', 'get', 'put', 'delete'])) {
+            throw new NotSupportedException('REST method "' . $method . '" not supported.');
         }
 
         $this->callbacks[$method] = $arguments[0];
@@ -43,7 +50,9 @@ class Rest
 
     /**
      * Should authentication be required
+     *
      * @param boolean $option defaults to true
+     *
      * @return Rest
      */
     public function setRequireAuthentication($option = true)
@@ -55,7 +64,9 @@ class Rest
 
     /**
      * Add callback called before every request
-     * @param  callable $callback arguments: $queries, $body['data'], $body['files']
+     *
+     * @param callable $callback arguments: $queries, $body['data'], $body['files']
+     *
      * @return object              this
      */
     public function before($callback)
@@ -67,7 +78,9 @@ class Rest
 
     /**
      * Add callback called after every request
-     * @param  callable $callback arguments: $queries, $body['data'], $body['files']
+     *
+     * @param callable $callback arguments: $queries, $body['data'], $body['files']
+     *
      * @return object              this
      */
     public function after($callback)
@@ -79,6 +92,7 @@ class Rest
 
     /**
      * Should be called manually as last method
+     *
      * @throws HttpException
      */
     public function handle()
@@ -94,7 +108,7 @@ class Rest
         $request_method = $_SERVER['REQUEST_METHOD'];
 
         $body = [
-            'data' => NULL,
+            'data' => null,
             'files' => []
         ];
         $queries = [];
@@ -136,7 +150,7 @@ class Rest
                 $response->setData([
                     'result' => [
                         'success' => false,
-                        'error'   => 'Not Implemented'
+                        'error' => 'Not Implemented'
                     ]
                 ]);
                 break;
@@ -151,6 +165,7 @@ class Rest
 
     /**
      * Uses _POST and _FILES superglobals if available, otherwise tries to parse JSON body if Content Type header is set to application/json, otherwise manually parses body as form data
+     *
      * @return array associative array with data and files ['data' => ?, 'files' => ?]
      */
     private function parseBody()
@@ -189,6 +204,7 @@ class Rest
 
     /**
      * Check whether client is authorized and returns Response object with autorization request if not
+     *
      * @return mixed Response object if client is not authorized, otherwise nothing
      */
     private function verifyAuthentication()
@@ -209,11 +225,14 @@ class Rest
 
             return $response;
         }
+        return true;
     }
 
     /**
      * Use Response object to modify headers and output body
-     * @param  Response $response
+     *
+     * @param Response $response
+     *
      * @throws HttpException
      */
     private function respond(Response $response)
@@ -228,6 +247,6 @@ class Rest
             header($header);
         }
 
-        \Yii::$app->response->content = $response->getBody();
+        Yii::$app->response->content = $response->getBody();
     }
 }

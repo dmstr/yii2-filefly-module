@@ -21,6 +21,7 @@ use hrzg\filefly\plugins\UpdatePermission;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\FileNotFoundException;
 use yii\base\Component;
+use Yii;
 use yii\helpers\ArrayHelper;
 use yii\helpers\Inflector;
 
@@ -28,42 +29,56 @@ use yii\helpers\Inflector;
  * Class FileManagerApi
  * @package hrzg\filefly\models
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
+ * @author Elias Luhr <e.luhr@herzogkommunikation.de>
+ *
+ * --- PRIVATE PROPERTIES ---
+ *
+ * @property Filesystem $_filesystem
+ * @property Filefly $_module
+ * @property Translate $_translate
+ * @property null|string $_scope
  */
 class FileManagerApi extends Component
 {
     /**
-     * @var null
+     * @var Filesystem
      */
-    private $_filesystem = null;
+    private $_filesystem;
 
     /**
      * the filefly module instance
-     * @var null
+     * @var Filefly
      */
-    private $_module = null;
+    private $_module;
 
     /**
-     * @var null
+     * @var Translate
      */
     private $_translate;
 
     /**
-     * @param Filesystem $fs
-     * @param bool|true $muteErrors
+     * @var null|string
      */
-    public function __construct(Filesystem $fs, $fsComponent = null, $muteErrors = false, Filefly $module)
+    private $_scope;
+
+    /**
+     * @param Filesystem $fs
+     * @param null $fsComponent
+     * @param Filefly $module
+     * @param null|string $scope
+     */
+    public function __construct(Filesystem $fs, $fsComponent, Filefly $module, $scope = null)
     {
         parent::__construct();
-
-        if (!$muteErrors) {
-            ini_set('display_errors', 1);
-        }
 
         // set module
         $this->_module = $module;
 
         // set filesystem
         $this->_filesystem = $fs;
+
+        // set scope and format if set
+        $this->_scope = $scope ? '/' . trim($scope, '/') : null;
 
         // add plugins
         $component = ['component' => $fsComponent];
@@ -76,7 +91,7 @@ class FileManagerApi extends Component
         $this->_filesystem->addPlugin(new RecursiveIterator($component));
 
         // init language handler
-        $this->_translate = new Translate(\Yii::$app->language);
+        $this->_translate = new Translate(Yii::$app->language);
 
         // disable find, beforeSave, beforeDelete for FileflyHashmap
         FileflyHashmap::$activeAccessTrait = false;
@@ -99,10 +114,11 @@ class FileManagerApi extends Component
 
         // Probably file upload
         if (!isset($request['action'])
-            && (isset($_SERVER["CONTENT_TYPE"])
-                && strpos($_SERVER["CONTENT_TYPE"], 'multipart/form-data') !== false)
+            && (isset($_SERVER['CONTENT_TYPE'])
+                && strpos($_SERVER['CONTENT_TYPE'], 'multipart/form-data') !== false)
         ) {
-            $uploaded = $this->uploadAction($request['destination'], $files);
+            $path = $this->_scope . $request['destination'];
+            $uploaded = $this->uploadAction($path, $files);
 
             switch (true) {
                 case $uploaded === 'fileexists':
@@ -131,7 +147,8 @@ class FileManagerApi extends Component
                     }
                 }
 
-                $list = $this->listAction($request['path']);
+                $path = $this->_scope . $request['path'];
+                $list = $this->listAction($path);
                 if (!is_array($list)) {
                     $response = $this->simpleErrorResponse($this->_translate->listing_filed);
                 } else {
@@ -248,8 +265,9 @@ class FileManagerApi extends Component
                 break;
 
             case 'createFolder':
-                $newPath = $request['newPath'];
-                $pathInfo = pathinfo($request['newPath']);
+
+                $newPath = $this->_scope . $request['newPath'];
+                $pathInfo = pathinfo($newPath);
 
                 // ensure hashmap entry
                 $this->_filesystem->check($pathInfo['dirname'], $this->_module->repair);
@@ -278,16 +296,18 @@ class FileManagerApi extends Component
 
             case 'resolvePermissions':
                 $response = new Response();
+                $path = $this->_scope . $request['path'];
                 $response->setData(
                     [
-                        'auth' => $this->_filesystem->getPermissions($request['path'])
+                        'auth' => $this->_filesystem->getPermissions($path)
                     ]
                 );
 
                 break;
 
             case 'changePermissions':
-                $changed = $this->changePermissionsAction($request['path'], $request['item']);
+                $path = $this->_scope . $request['path'];
+                $changed = $this->changePermissionsAction($path, $request['item']);
                 if ($changed === true) {
                     $response = $this->simpleSuccessResponse();
                 } else {
@@ -317,12 +337,13 @@ class FileManagerApi extends Component
                 }
 
                 // check access first, and redirect to login if false
-                if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
+                $path = $this->_scope . $queries['path'];
+                if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
 
                 // try to download file
-                $downloaded = $this->downloadAction($queries['path']);
+                $downloaded = $this->downloadAction($path);
                 if ($downloaded === true) {
                     exit;
                 } else {
@@ -336,13 +357,14 @@ class FileManagerApi extends Component
                     return $this->simpleErrorResponse($this->_translate->streaming_failed);
                 }
 
+                $path = $this->_scope . $queries['path'];
                 // check access first, and redirect to login if false
-                if (!$this->_filesystem->grantAccess($queries['path'], Filefly::ACCESS_READ)) {
+                if (!$this->_filesystem->grantAccess($path, Filefly::ACCESS_READ)) {
                     return $this->unauthorizedResponse($queries['action']);
                 }
 
                 // try to stream file
-                $streamed = $this->streamAction($queries['path']);
+                $streamed = $this->streamAction($path);
                 if ($streamed === true) {
                     exit;
                 }
@@ -776,6 +798,7 @@ Html;
     {
         $anyDeniedPerm = false;
         foreach ($paths as $path) {
+            $path = $this->_scope . $path;
 
             // ensure hashmap entry
             $this->_filesystem->check($path, $this->_module->repair);
