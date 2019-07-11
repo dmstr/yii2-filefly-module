@@ -119,11 +119,24 @@ class SelfHealKit extends AccessPlugin
                     Module::ACCESS_DELETE => $defaultPermissions[Module::ACCESS_DELETE],
                 ]
             );
+
             if (!$repairHash->save()) {
                 \Yii::error('filefly hash could not been repaired for path ' . $path, __METHOD__);
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * ensure one beginning forward slash
+     *
+     * @param string $path
+     *
+     * @return string normalized path string
+     */
+    protected function normalize($path)
+    {
+        return '/' . trim($path, '/');
     }
 }

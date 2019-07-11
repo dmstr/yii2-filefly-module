@@ -120,8 +120,7 @@ class FileManagerApi extends Component
             && (isset($_SERVER['CONTENT_TYPE'])
                 && strpos($_SERVER['CONTENT_TYPE'], 'multipart/form-data') !== false)
         ) {
-            $path = $this->_scope . $request['destination'];
-            $uploaded = $this->uploadAction($path, $files);
+            $uploaded = $this->uploadAction($request['destination'], $files);
 
             switch (true) {
                 case $uploaded === 'fileexists':
@@ -165,7 +164,7 @@ class FileManagerApi extends Component
                 break;
 
             case 'rename':
-                $renamed = $this->renameAction($request['item'], $request['newItemPath']);
+                $renamed = $this->renameAction($this->_scope . $request['item'], $this->_scope . $request['newItemPath']);
                 switch (true) {
                     case $renamed === 'notfound':
                         $response = $this->simpleErrorResponse($this->_translate->file_not_found, 404);
@@ -381,7 +380,8 @@ class FileManagerApi extends Component
                     return $this->unauthorizedResponse($queries['action']);
                 }
 
-                $path = strtolower(ArrayHelper::getValue($queries, 'q', '%'));
+                $path = $this->_scope . strtolower(ArrayHelper::getValue($queries, 'q', '%'));
+
                 $type = strtolower(ArrayHelper::getValue($queries, 'type', 'file'));
                 $limit = ArrayHelper::getValue($queries, 'limit', 10);
 
@@ -504,6 +504,7 @@ Html;
         $path = rtrim($path, '/') . '/';
 
         // ensure hashmap entry
+        $path = $this->_scope . ltrim($path,'/');
         $this->_filesystem->check($path, $this->_module->repair);
         if ($this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             foreach ($files as $file) {
