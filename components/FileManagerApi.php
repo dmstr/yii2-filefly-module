@@ -514,14 +514,14 @@ Html;
                 if ($this->_module->slugNames) {
                     $pathInfo = pathinfo($file['name']);
                     // check if filename has extension
-                    $fileName = ltrim(Inflector::slug($pathInfo['filename']), '/');
+                    $fileName = trim(Inflector::slug($pathInfo['filename']), '/');
                     if (empty($pathInfo['extension'])) {
-                        $fullPath = $path . $fileName;
+                        $fullPath = $path . '/' . $fileName;
                     } else {
-                        $fullPath = $path . $fileName . '.' . strtolower($pathInfo['extension']);
+                        $fullPath = $path . '/' . $fileName . '.' . strtolower($pathInfo['extension']);
                     }
                 } else {
-                    $fullPath = $path . ltrim($file['name'], '/');
+                    $fullPath = $path . '/' . trim($file['name'], '/');
                 }
 
                 try {
