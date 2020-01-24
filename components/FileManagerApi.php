@@ -501,10 +501,11 @@ Html;
      */
     private function uploadAction($path, $files)
     {
-        $path = rtrim($path, '/') . '/';
+        $path = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
         // ensure hashmap entry
-        $path = $this->_scope . ltrim($path,'/');
+        $path = $this->_scope . ltrim($path,DIRECTORY_SEPARATOR);
+
         $this->_filesystem->check($path, $this->_module->repair);
         if ($this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
             foreach ($files as $file) {
@@ -516,12 +517,12 @@ Html;
                     // check if filename has extension
                     $fileName = trim(Inflector::slug($pathInfo['filename']), '/');
                     if (empty($pathInfo['extension'])) {
-                        $fullPath = $path . '/' . $fileName;
+                        $fullPath = $path . $fileName;
                     } else {
-                        $fullPath = $path . '/' . $fileName . '.' . strtolower($pathInfo['extension']);
+                        $fullPath = $path . $fileName . '.' . strtolower($pathInfo['extension']);
                     }
                 } else {
-                    $fullPath = $path . '/' . trim($file['name'], '/');
+                    $fullPath = $path . trim($file['name'], '/');
                 }
 
                 try {
