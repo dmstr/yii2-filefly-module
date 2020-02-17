@@ -1,7 +1,3 @@
-<?php
-$this->context->layout = '@backend/views/layouts/box';
-?>
-
 <?php if (class_exists(\hrzg\filemanager\widgets\FileManagerWidget::class)): ?>
 
 <?= \hrzg\filemanager\widgets\FileManagerWidget::widget(

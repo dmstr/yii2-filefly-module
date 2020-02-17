@@ -26,4 +26,10 @@ class DefaultController extends Controller
     {
         return $this->render('filemanager');
     }
+
+    public function actionFilemanagerFullScreen()
+    {
+        $this->layout = "plain";
+        return $this->render('filemanager');
+    }
 }

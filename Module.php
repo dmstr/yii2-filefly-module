@@ -155,7 +155,7 @@ class Module extends \yii\base\Module
         }
 
         // breadcrumbs
-        \Yii::$app->controller->view->params['breadcrumbs'][] = ['label' => 'Filefly module', 'url' => ['/'.$this->module->id]];
+        \Yii::$app->controller->view->params['breadcrumbs'][] = ['label' => 'Filefly module', 'url' => ['/'.$this->id]];
 
         return true;
     }

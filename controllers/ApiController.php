@@ -50,7 +50,7 @@ class ApiController extends Controller
                     'OPTIONS'
                 ],
                 'Access-Control-Request-Headers' => ['*'],
-                'Access-Control-Allow-Credentials' => true,
+                'Access-Control-Allow-Credentials' => false,
                 'Access-Control-Max-Age' => 86400,
             ],
         ];
