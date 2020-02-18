@@ -676,10 +676,16 @@ Html;
                 $size = 0;
             }
 
+            if (array_key_exists('timestamp', $item) && !empty($item['timestamp'])) {
+                $time = $item['timestamp'];
+            } else {
+                $time = $this->_filesystem->getTimestamp($item['path']) ?: time();
+            }
+
             $files[] = [
                 'name' => $item['basename'],
                 'size' => $size,
-                'date' => date('Y-m-d H:i:s', $this->_filesystem->getTimestamp($item['path']) ?: time()),
+                'date' => date('Y-m-d H:i:s', $time),
                 'type' => $item['type'],
             ];
         }
