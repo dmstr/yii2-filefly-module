@@ -20,7 +20,7 @@
         "league/flysystem-sftp": "~1.0",
         "league/flysystem-webdav": "~1.0",
         "dmstr/yii2-db": "^1.0.0",
-        "yii2assets/yii2-fullscreen-modal": "*"
+        "yii2assets/yii2-fullscreen-modal": "^1.0.2"
     },
     "autoload": {
         "psr-4": {
