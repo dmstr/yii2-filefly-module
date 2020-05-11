@@ -53,7 +53,7 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 - `access_owner` permission before `access_read`, `access_update`, `access_delete`
 
 **ActiveRecord: FileflyHashmap**
-- uses `dmstr\db\traits\ActiveRecordAccessTrait` with `$activeAccessTrait = false`
+- uses `dmstr\activeRecordPermissions\ActiveRecordAccessTrait` with `$activeAccessTrait = false`
 - access checks will be done for each permission type explicitly, `hasPermission($action)`
 - uses a `pathValidator` rule to ensure the `path` syntax on active record operations
 

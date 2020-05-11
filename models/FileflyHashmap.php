@@ -9,7 +9,7 @@
 
 namespace hrzg\filefly\models;
 
-use dmstr\db\traits\ActiveRecordAccessTrait;
+use dmstr\activeRecordPermissions\ActiveRecordAccessTrait;
 use hrzg\filefly\models\base\FileflyHashmap as BaseFileflyHashmap;
 use hrzg\filefly\Module;
 use Yii;
