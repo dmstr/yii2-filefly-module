@@ -77,9 +77,14 @@ class ApiController extends Controller
      */
     public function actionIndex($scope = null)
     {
+        if (!Yii::$app->request->isGet){
+            if (!Yii::$app->user->can(Module::ACCESS_ROLE_DEFAULT)) {
+                throw new HttpException(403, 'Action not allowed');
+            }
+        }
+
         // Manager API
         $fileManagerApi = new FileManagerApi($this->module->filesystemComponent, $this->module->filesystem, $this->module, $scope);
-
         try {
             $rest = new Rest();
             $rest->post([$fileManagerApi, 'postHandler'])
