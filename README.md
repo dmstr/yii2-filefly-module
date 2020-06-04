@@ -1,7 +1,7 @@
 Yii2 FileFly Module
 =======
 
-[![Latest Stable Version](https://poser.pugx.org/dmstr/yii2-filefly-module/v/stable.svg)](https://packagist.org/packages/dmstr/yii2-filefly-module) 
+[![Latest Stable Version](https://poser.pugx.org/dmstr/yii2-filefly-module/v/stable.svg)](https://packagist.org/packages/dmstr/yii2-filefly-module)
 [![Total Downloads](https://poser.pugx.org/dmstr/yii2-filefly-module/downloads.svg)](https://packagist.org/packages/dmstr/yii2-filefly-module)
 [![License](https://poser.pugx.org/dmstr/yii2-filefly-module/license.svg)](https://packagist.org/packages/dmstr/yii2-filefly-module)
 
@@ -46,7 +46,8 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 ## RBAC
 
 **Prosa**
-- `FileflyAdmin` have all access!
+- `FileflyAdmin` full module access including debug information
+- `FileflyDefault` management access (eg. POST request for upload, change, delete)
 - `FileflyPermissions` assigned users can set or unset roles or permissions which the user himself has assigned
 
 - If no permission is set, it will check if any inherited permission can be granted
@@ -61,15 +62,15 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 
 - FileflyAdmin
 	- filefly
-	
+
 - FileflyDefault
 	- filefly_default_index
-	
+
 - FileflyApi
 	- filefly_api_index
-	
+
 - FileflyPermissions
-	
+
 #### Permissions
 
 - filefly
@@ -82,7 +83,7 @@ Permission checks will ever come after file or older operation
 
 **GrantPermission**
 ```
-Granted or deny permission 
+Granted or deny permission
 
 1. access field empty (is owner, true or continue)
 2. access field set (permission granted, true)
@@ -122,12 +123,12 @@ Configure
             ],
         ],
     ]
-    
+
 ## Helper
 
-Description | Method call | Example output 
+Description | Method call | Example output
 --- | --- | ---
-Total size for all filesystems | `FileflyHashmap::getTotalSize()` | 202.82 MiB 
+Total size for all filesystems | `FileflyHashmap::getTotalSize()` | 202.82 MiB
 Total size for all filesystems (raw bytes) | `FileflyHashmap::getTotalSize(true)` | 212670464
-Total size for `local` filesystems | `FileflyHashmap::getTotalSize(false, 'local')` | 48.32 MiB 
+Total size for `local` filesystems | `FileflyHashmap::getTotalSize(false, 'local')` | 48.32 MiB
 Total size for `s3` filesystems (raw bytes) | `FileflyHashmap::getTotalSize(true, 's3')` | 166546843
