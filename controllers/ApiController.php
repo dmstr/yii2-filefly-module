@@ -80,6 +80,20 @@ class ApiController extends WebController
                             ['route' => true]
                         );
                     },
+                ],
+                [
+                    'allow' => true,
+                    'actions' => [
+                       'remove',
+                       'move',
+                       'copy',
+                       'create-folder',
+                       'rename',
+                       'upload'
+                    ],
+                    'matchCallback' => function ($rule, $action) {
+                        return Yii::$app->user->can(Module::ACCESS_ROLE_DEFAULT);
+                    }
                 ]
             ]
         ];
@@ -96,6 +110,7 @@ class ApiController extends WebController
      */
     public function runAction($id, $params = [])
     {
+
         if (Yii::$app->request->isPost) {
             $params = json_decode(Yii::$app->request->rawBody, true);
 
