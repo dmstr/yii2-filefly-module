@@ -26,6 +26,9 @@
             "hrzg\\filefly\\": ""
         }
     },
+    "suggest": {
+        "dmstr/yii2-filemanager-widgets": "Useful widget for working with files via the filefly api"
+    },
     "extra": {
         "bootstrap": "hrzg\\filefly\\Bootstrap"
     }
