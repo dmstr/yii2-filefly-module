@@ -684,6 +684,7 @@ Html;
 
             $files[] = [
                 'name' => $item['basename'],
+                'thumbnail' => $this->_module->thumbnailCallback($item['basename']),
                 'size' => $size,
                 'date' => date('Y-m-d H:i:s', $time),
                 'type' => $item['type'],
