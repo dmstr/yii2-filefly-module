@@ -504,7 +504,7 @@ Html;
         $path = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
         // ensure hashmap entry
-        $path = $this->_scope . ltrim($path,DIRECTORY_SEPARATOR);
+        $path = $this->_scope . ltrim($path, DIRECTORY_SEPARATOR);
 
         $this->_filesystem->check($path, $this->_module->repair);
         if ($this->_filesystem->grantAccess($path, Filefly::ACCESS_UPDATE)) {
@@ -552,8 +552,8 @@ Html;
     /**
      * @param string $path
      *
-     * @return bool
      * @throws \yii\base\ExitException
+     * @return bool
      */
     private function downloadAction($path)
     {
@@ -595,8 +595,8 @@ Html;
      *
      * @param $path
      *
-     * @return bool
      * @throws \yii\base\ExitException
+     * @return bool
      */
     private function streamAction($path)
     {
@@ -651,7 +651,7 @@ Html;
         $parentFolderAccess = $this->_filesystem->grantAccess($path, Filefly::ACCESS_READ);
 
         // get all filesystem path contents
-        foreach ($this->_filesystem->listContents($path) AS $item) {
+        foreach ($this->_filesystem->listContents($path) as $item) {
 
             // ensure hashmap entry
             $this->_filesystem->check($item['path'], $this->_module->repair);
@@ -682,9 +682,14 @@ Html;
                 $time = $this->_filesystem->getTimestamp($item['path']) ?: time();
             }
 
+            if (is_callable($this->_module->thumbnailCallback)) {
+                $thumbnail = call_user_func($this->_module->thumbnailCallback, $item['basename']);
+            } else {
+                $thumbnail = '';
+            }
             $files[] = [
                 'name' => $item['basename'],
-                'thumbnail' => $this->_module->thumbnailCallback($item['basename']),
+                'thumbnail' => $thumbnail,
                 'size' => $size,
                 'date' => date('Y-m-d H:i:s', $time),
                 'type' => $item['type'],
