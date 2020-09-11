@@ -7,11 +7,11 @@ use yii\helpers\Url;
 if (class_exists(\hrzg\filemanager\widgets\FileManagerWidget::class)) {
 
     if (isset(Yii::$app->components['settings'])) {
-        $enableThumbnails = Yii::$app->settings->get('enableThumbnails', 'filefly',0);
-        $enableIconPreviewView = Yii::$app->settings->get('enableIconPreviewView', 'filefly',0);
+        $enableThumbnails = Yii::$app->settings->get('enableThumbnails', 'filefly',false);
+        $enableIconPreviewView = Yii::$app->settings->get('enableIconPreviewView', 'filefly',false);
     } else {
-        $enableThumbnails = 0;
-        $enableIconPreviewView = 0;
+        $enableThumbnails = false;
+        $enableIconPreviewView = false;
     }
 
     echo \hrzg\filemanager\widgets\FileManagerWidget::widget(
