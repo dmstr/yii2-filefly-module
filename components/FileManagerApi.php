@@ -683,7 +683,7 @@ Html;
             }
 
             if (is_callable($this->_module->thumbnailCallback)) {
-                $thumbnail = call_user_func($this->_module->thumbnailCallback, $item['basename']);
+                $thumbnail = call_user_func($this->_module->thumbnailCallback, $item);
             } else {
                 $thumbnail = '';
             }
