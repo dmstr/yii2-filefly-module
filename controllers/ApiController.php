@@ -90,9 +90,9 @@ class ApiController extends WebController
      * @param string $id
      * @param array $params
      *
-     * @throws NotFoundHttpException
-     * @throws \yii\base\InvalidRouteException
      * @return mixed
+     * @throws \yii\base\InvalidRouteException
+     * @throws NotFoundHttpException
      */
     public function runAction($id, $params = [])
     {
@@ -109,6 +109,12 @@ class ApiController extends WebController
                     'action' => 'upload'
                 ];
                 $this->_uploadedFiles = $_FILES;
+            }
+        }
+
+        if (!Yii::$app->request->isGet) {
+            if (!Yii::$app->user->can(Module::ACCESS_ROLE_DEFAULT)) {
+                throw new HttpException(403, 'Action not allowed');
             }
         }
 
@@ -136,7 +142,7 @@ class ApiController extends WebController
         // ensure hashmap entry
         $fileSystem->check($newPath, $this->module->repair);
 
-        if (!$fileSystem->grantAccess($newPath, Filefly::ACCESS_UPDATE)) {
+        if (!$fileSystem->grantAccess($newPath, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'nopermission';
         }
 
@@ -365,7 +371,7 @@ class ApiController extends WebController
 
         $parentFolderAccess = $fileSystem->grantAccess($path, FileManager::ACCESS_READ);
         if ($parentFolderAccess) {
-            foreach ($fileSystem->listContents($path) AS $item) {
+            foreach ($fileSystem->listContents($path) as $item) {
 
                 // ensure hashmap entry
                 $fileSystem->check($item['path'], $this->module->repair);
@@ -385,8 +391,15 @@ class ApiController extends WebController
                         $time = $fileSystem->getTimestamp($item['path']) ?: time();
                     }
 
+                    if (is_callable($this->_module->thumbnailCallback)) {
+                        $thumbnail = call_user_func($this->_module->thumbnailCallback, $item);
+                    } else {
+                        $thumbnail = '';
+                    }
+
                     $files[] = [
                         'name' => $item['basename'],
+                        'thumbnail' => $thumbnail,
                         'size' => $size,
                         'date' => date('Y-m-d H:i:s', $time),
                         'type' => $item['type'],
@@ -459,8 +472,9 @@ class ApiController extends WebController
     /**
      * @param $path
      *
-     * @throws NotFoundHttpException
+     * @return bool
      * @throws \yii\base\ExitException
+     * @throws NotFoundHttpException
      */
     public function actionDownload($path)
     {
@@ -498,8 +512,9 @@ class ApiController extends WebController
     /**
      * @param $path
      *
-     * @throws NotFoundHttpException
+     * @return bool
      * @throws \yii\base\ExitException
+     * @throws NotFoundHttpException
      */
     public function actionStream($path)
     {
@@ -534,5 +549,17 @@ class ApiController extends WebController
             throw new NotFoundHttpException();
         }
         Yii::$app->end();
+    }
+
+    /**
+     *
+     * @param $path
+     */
+    public function actionResolvePermissions($path)
+    {
+        $fileSystem = FileManager::fileSystem();
+        return $this->asJson([
+            'auth' => $fileSystem->getPermissions($path)
+        ]);
     }
 }
