@@ -48,7 +48,9 @@ class ApiController extends WebController
                 'copy' => ['POST'],
                 'create-folder' => ['POST'],
                 'rename' => ['POST'],
-                'upload' => ['POST']
+                'upload' => ['POST'],
+                'resolve-permissions' => ['POST'],
+                'change-permissions' => ['POST']
             ]
         ];
         $behaviors['corsFilter'] = [
@@ -101,6 +103,10 @@ class ApiController extends WebController
 
             if (isset($params['items']) && in_array($params['action'], ['remove', 'move', 'copy'], true)) {
                 $params['items'] = json_encode($params['items']);
+            }
+
+            if (isset($params['item']) && in_array($params['action'], ['changePermissions'], true)) {
+                $params['item'] = json_encode($params['item']);
             }
 
             if (!empty(Yii::$app->request->post('destination'))) {
@@ -269,7 +275,7 @@ class ApiController extends WebController
         $errorMessage = '';
         $fileSystem->check($item, $this->module->repair);
 
-        if (!$fileSystem->grantAccess($item, Filefly::ACCESS_UPDATE)) {
+        if (!$fileSystem->grantAccess($item, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'permission_edit_denied';
         }
 
@@ -391,8 +397,8 @@ class ApiController extends WebController
                         $time = $fileSystem->getTimestamp($item['path']) ?: time();
                     }
 
-                    if (is_callable($this->_module->thumbnailCallback)) {
-                        $thumbnail = call_user_func($this->_module->thumbnailCallback, $item);
+                    if (is_callable($this->module->thumbnailCallback)) {
+                        $thumbnail = call_user_func($this->module->thumbnailCallback, $item);
                     } else {
                         $thumbnail = '';
                     }
@@ -560,6 +566,34 @@ class ApiController extends WebController
         $fileSystem = FileManager::fileSystem();
         return $this->asJson([
             'auth' => $fileSystem->getPermissions($path)
+        ]);
+    }
+
+    /**
+     * @param null $path
+     * @param null $item
+     * @return Response
+     */
+    public function actionChangePermissions($path = null, $item = null)
+    {
+        $fileSystem = FileManager::fileSystem();
+        $item = json_decode($item, true);
+
+        // ensure hashmap entry
+        $fileSystem->check($path, $this->module->repair);
+
+        $updateItemAuth = $fileSystem->updatePermission($item, $path);
+
+        $errorMessage = "";
+        if ($updateItemAuth === false) {
+            $errorMessage = "error updating permissions";
+        }
+
+        return $this->asJson([
+            'result' => [
+                'success' => $updateItemAuth,
+                'error' => FileManager::translate($errorMessage)
+            ]
         ]);
     }
 }
