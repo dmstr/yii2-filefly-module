@@ -17,6 +17,9 @@ use yii\web\HttpException;
  * Class Module
  * @package hrzg\filefly
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
+ *
+ * @property-read \hrzg\filefly\helpers\FsManager $manager
+ * @property-read callable $thumbnailCallback
  */
 class Module extends \yii\base\Module
 {
@@ -122,6 +125,19 @@ class Module extends \yii\base\Module
     public $streamExpireOffset = 604800;
 
     private $_manager;
+
+    /**
+     * @var callable $thumbnailCallback
+     *
+     * Example:
+     *
+     * ```php
+     * function ($path) {
+     *      return dmstr\willnorrisImageproxy\Url::image($path, '50x50q50');
+     * }
+     * ```
+    */
+    public $thumbnailCallback;
 
     /**
      * @inheritdoc
