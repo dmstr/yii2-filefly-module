@@ -102,7 +102,7 @@ class Module extends \yii\base\Module
      * Active / deactivate the filesystem recursive folder delete
      * @var bool
      */
-    public $deleteRecursive = true;
+    public $deleteRecursive = false;
 
     /**
      * Used as default permissions on active \hrzg\filefly\plugins\RepairKit
