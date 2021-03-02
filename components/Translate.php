@@ -30,8 +30,8 @@ class Translate
     {
         if (isset($this->strings[$name])) {
             return $this->strings[$name];
-        } else {
-            return $name;
         }
+
+        return $name;
     }
 }
