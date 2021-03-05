@@ -50,8 +50,7 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
             [['created_at', 'updated_at'], 'safe'],
             [['component'], 'string', 'max' => 45],
             [['type'], 'string', 'max' => 32],
-            [['path'], 'string', 'max' => 745],
-            [['access_read', 'access_update', 'access_delete'], 'string', 'max' => 255],
+            [['access_read', 'access_update', 'access_delete'.'path'], 'string', 'max' => 255],
             [
                 ['component', 'path', 'access_owner'],
                 'unique',
