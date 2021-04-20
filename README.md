@@ -124,6 +124,58 @@ Configure
         ],
     ]
 
+## Widget
+
+see https://github.com/dmstr/yii2-filemanager-widgets
+
+```
+    {{ use ('hrzg/filemanager/widgets') }}
+    {{ file_manager_widget_widget(
+        {
+            "handlerUrl": "/#{app.language}/filefly/api"
+        }
+    ) }}
+```
+
+### Controller action in iFrame
+
+Modal button
+
+```
+<a type="button" data-toggle="modal" data-target="#modal-filemanager" id="filefly-iframe-toggle">  
+    <i class="fa fa-folder-open"></i>
+</a>
+```
+
+Load event listener
+
+```
+<script>
+    window.addEventListener('load', function () {
+        var fileflyIframeToggle = document.querySelector('#filefly-iframe-toggle');
+        var iframe = document.querySelector('#filefly-iframe');
+        
+        fileflyIframeToggle.addEventListener('click', function () {
+            iframe.src = "/filefly/default/filemanager-full-screen";
+        });
+    });
+</script>
+```
+
+Iframe
+```
+{{ use ('yii/bootstrap') }}
+{{ modal_begin(    
+{        
+    'id': 'modal-filemanager',
+	'size': 'modal-lg'    
+}) }}
+
+<iframe id="filefly-iframe"  width="100%" height="100%" frameborder="0" src=""></iframe>
+
+{{ modal_end() }}'
+```
+
 ## Helper
 
 Description | Method call | Example output
