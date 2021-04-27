@@ -331,13 +331,20 @@ class ApiController extends WebController
                 }
 
                 try {
-                    $uploaded = $fileSystem->writeStream(
-                        $fullPath,
-                        $stream,
-                        [
-                            'mimetype' => mime_content_type($file['tmp_name']),
-                        ]);
+                    $mimeTypes = \Yii::$app->settings->get('mime-whitelist', 'filefly');
+                    empty($mimeTypes) ? $acceptedMimeTypes = [] : $acceptedMimeTypes = explode(",", $mimeTypes);
 
+                    if( in_array(mime_content_type($file['tmp_name']), $acceptedMimeTypes, false) || empty($acceptedMimeTypes)){
+                        $uploaded = $fileSystem->writeStream(
+                            $fullPath,
+                            $stream,
+                            [
+                                'mimetype' => mime_content_type($file['tmp_name']),
+                            ]);
+                    } else {
+                        Yii::error('MIME Type not allowed', __METHOD__);
+                        $errorMessage = 'file_type_not_allowed';
+                    }
                 } catch (FileExistsException $e) {
                     Yii::error($e->getMessage(), __METHOD__);
                     $errorMessage = 'file_already_exists';

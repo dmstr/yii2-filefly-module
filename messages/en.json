@@ -11,6 +11,7 @@
     "streaming_failed": "Stream file failed",
     "download_failed": "Download file failed",
     "file_already_exists": "File already exists",
+	"file_type_not_allowed": "File type not allowed",
 	"folder_already_exists": "Folder already exists",
 	"folder_creation_failed": "Folder creation failed",
     "folder_invalid_name": "Invalid folder name. No slashes allowed",
