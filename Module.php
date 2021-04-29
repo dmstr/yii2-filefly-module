@@ -174,7 +174,7 @@ class Module extends \yii\base\Module
         \Yii::$app->controller->view->params['breadcrumbs'][] = ['label' => 'Filefly module', 'url' => ['/'.$this->id]];
 
         // Set the allowed MIME types to all files as default
-        \Yii::$app->settings->getOrSet('mime-whitelist', '', 'filefly');
+        \Yii::$app->settings->getOrSet('mime-whitelist', '', 'filefly', 'string');
 
         return true;
     }
