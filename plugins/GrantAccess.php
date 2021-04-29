@@ -42,9 +42,15 @@ class GrantAccess extends AccessPlugin
     {
         $path = $this->normalize($path);
 
-        // in root path allow access to all
+        // in root path allow access depending on module setting
         if ($path === '/') {
-            return true;
+            $currentModule = \Yii::$app->controller->module->id;
+            $rootFolderManageRole = \Yii::$app->getModule($currentModule)->rootFolderManageRole;
+            if ($rootFolderManageRole && $permissionType !== 'access_readqq') {
+                return \Yii::$app->user->can($rootFolderManageRole);
+            } else {
+                return true;
+            }
         }
 
         // Grand ALL access for admins

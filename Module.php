@@ -117,6 +117,11 @@ class Module extends \yii\base\Module
         self::ACCESS_DELETE => '*',
     ];
 
+    /**
+     * @var null role for accessing and managing items on the root folder, `null` means anyone
+     */
+    public $rootFolderManageRole = null;
+
 
     /**
      * Offset (in seconds) for Expires Header in stream action, default: 1 week
