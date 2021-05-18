@@ -83,6 +83,11 @@ class SelfHealKit extends AccessPlugin
     {
         $path = $this->normalize($path);
 
+        // root folder management is handled by module property `rootFolderManageRole`
+        if ($path === '/') {
+            return true;
+        }
+
         /** @var $hash \hrzg\filefly\models\FileflyHashmap */
         $query = FileflyHashmap::find();
         $query->andWhere(['component' => $this->component]);
@@ -90,6 +95,8 @@ class SelfHealKit extends AccessPlugin
         $hash = $query->one();
 
         if ($hash === null) {
+            \Yii::info("Repairing '$path'", __METHOD__);
+
             $defaultPermissions = FileflyHashmap::accessDefaults();
 
             // get meta information
@@ -101,10 +108,6 @@ class SelfHealKit extends AccessPlugin
                 \Yii::error($e->getMessage(), __METHOD__);
                 $type = null;
                 $size = null;
-            }
-
-            if ($path === '/') {
-                $type = 'root';
             }
 
             $repairHash         = new FileflyHashmap(

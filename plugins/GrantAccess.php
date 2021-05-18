@@ -46,7 +46,7 @@ class GrantAccess extends AccessPlugin
         if ($path === '/') {
             $currentModule = \Yii::$app->controller->module->id;
             $rootFolderManageRole = \Yii::$app->getModule($currentModule)->rootFolderManageRole;
-            if ($rootFolderManageRole && $permissionType !== 'access_readqq') {
+            if ($rootFolderManageRole && $permissionType !== 'access_read') {
                 return \Yii::$app->user->can($rootFolderManageRole);
             } else {
                 return true;

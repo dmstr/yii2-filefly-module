@@ -316,13 +316,18 @@ class ApiController extends WebController
      */
     public function actionUpload($path)
     {
+        Yii::info('Starting upload action...', __METHOD__);
+
         $path = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
         $fileSystem = FileManager::fileSystem();
         $path = ltrim($path, DIRECTORY_SEPARATOR);
         $success = false;
         $errorMessage = '';
+
+        Yii::debug("Checking '$path'", __METHOD__);
         $fileSystem->check($path, $this->module->repair);
+
         if ($fileSystem->grantAccess($path, FileManager::ACCESS_UPDATE)) {
             foreach ($this->_uploadedFiles as $file) {
                 $stream = fopen($file['tmp_name'], 'rb+');
