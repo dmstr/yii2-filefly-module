@@ -41,9 +41,8 @@ class FileManager extends Component
      */
     public static function fileSystem()
     {
-
-        $fsComponent = getenv('APP_FILEFLY_DEFAULT_FILESYSTEM');
-
+        $currentModule = \Yii::$app->controller->module->id;
+        $fsComponent = \Yii::$app->getModule($currentModule)->filesystem;
         $fileSystem = \Yii::$app->{$fsComponent};
 
         $pluginConfig = ['component' => $fsComponent];
