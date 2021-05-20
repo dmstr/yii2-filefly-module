@@ -10,8 +10,11 @@
 namespace hrzg\filefly\controllers;
 
 use hrzg\filefly\components\FileManager;
+use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
+use hrzg\filefly\Module as Filefly;
 use League\Flysystem\FileExistsException;
+use League\Flysystem\FileNotFoundException;
 use yii\filters\AccessControl;
 use yii\filters\Cors;
 use yii\filters\VerbFilter;
@@ -50,7 +53,8 @@ class ApiController extends WebController
                 'rename' => ['POST'],
                 'upload' => ['POST'],
                 'resolve-permissions' => ['POST'],
-                'change-permissions' => ['POST']
+                'change-permissions' => ['POST'],
+                'search' => ['GET']
             ]
         ];
         $behaviors['corsFilter'] = [
@@ -602,5 +606,38 @@ class ApiController extends WebController
                 'error' => FileManager::translate($errorMessage)
             ]
         ]);
+    }
+
+    public function actionSearch($q)
+    {
+
+        $query = FileflyHashmap::find()
+            ->select(['path'])
+            ->andWhere(['=', 'component', $this->module->filesystem])
+            ->andWhere(['LIKE', 'path', $q])
+            ->orderBy(['updated_at' => SORT_DESC])
+            ->asArray();
+
+        $fileSystem = FileManager::fileSystem();
+        // filter results, only files
+        $result = [];
+        foreach ($query->all() as $item) {
+
+            // check read permissions or is folder
+            if (!$fileSystem->grantAccess($item['path'], Filefly::ACCESS_READ) || $fileSystem->get($item['path'])->isDir()) {
+                continue;
+            }
+
+            try {
+                $item['id'] = $item['path'];
+                $item['mime'] = '';
+                $result[] = $item;
+            } catch (FileNotFoundException $e) {
+                \Yii::warning($e->getMessage(), __METHOD__);
+                continue;
+            }
+        }
+
+        return $this->asJson($result);
     }
 }
