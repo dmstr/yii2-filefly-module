@@ -21,6 +21,7 @@ use yii\filters\VerbFilter;
 use yii\helpers\Inflector;
 use yii\web\Controller as WebController;
 use yii\web\NotFoundHttpException;
+use yii\web\HttpException;
 use yii\web\Response;
 use \Exception;
 use Yii;
