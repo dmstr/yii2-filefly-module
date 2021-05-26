@@ -14,7 +14,7 @@ class m160616_120810_add_filesystem_hash_table extends Migration
             [
                 'id'            => $this->primaryKey(11),
                 'component'     => $this->string(45)->notNull(),
-                'path'          => $this->string(745)->notNull(),
+                'path'          => $this->string(255)->notNull(),
                 'access_owner'  => $this->integer(11),
                 'access_read'   => $this->string(255),
                 'access_update' => $this->string(255),
