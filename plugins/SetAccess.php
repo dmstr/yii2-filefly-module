@@ -10,6 +10,7 @@
 namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\models\FileflyHashmap;
+use hrzg\filefly\Module;
 use League\Flysystem\FileNotFoundException;
 
 
@@ -64,13 +65,17 @@ class SetAccess extends AccessPlugin
                 $size = null;
             }
 
+            $defaultPermissions = FileflyHashmap::accessDefaults();
             $newHash = new FileflyHashmap(
                 [
                     'component'    => $this->component,
                     'type'         => $type,
                     'path'         => $oldItemPath,
                     'size'         => $size,
-                    'access_owner' => \Yii::$app->user->id
+                    'access_owner' => \Yii::$app->user->id,
+                    Module::ACCESS_READ   => $defaultPermissions[Module::ACCESS_READ],
+                    Module::ACCESS_UPDATE => $defaultPermissions[Module::ACCESS_UPDATE],
+                    Module::ACCESS_DELETE => $defaultPermissions[Module::ACCESS_DELETE],
                 ]
             );
             if (!$newHash->save()) {

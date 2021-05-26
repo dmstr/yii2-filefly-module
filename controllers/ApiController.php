@@ -20,6 +20,7 @@ use yii\filters\Cors;
 use yii\filters\VerbFilter;
 use yii\helpers\Inflector;
 use yii\web\Controller as WebController;
+use yii\web\HttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\HttpException;
 use yii\web\Response;
@@ -155,28 +156,31 @@ class ApiController extends WebController
 
         if (!$fileSystem->grantAccess($newPath, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'nopermission';
-        }
+        } else {
 
-        foreach ($paths as $oldPath) {
+            foreach ($paths as $oldPath) {
 
-            $fileSystem->check($oldPath, $this->module->repair);
+                $fileSystem->check($oldPath, $this->module->repair);
 
-            if (!$fileSystem->get($oldPath)->isFile() && !$fileSystem->get($oldPath)->isDir()) {
-                $errorMessage = 'notfound';
-                break;
+                if (!$fileSystem->get($oldPath)->isFile() && !$fileSystem->get($oldPath)->isDir()) {
+                    $errorMessage = 'notfound';
+                    break;
+                }
+
+                $destPath = $newPath . '/' . basename($oldPath);
+
+                $moved = $fileSystem->get($oldPath)->rename($destPath);
+                if ($moved === false) {
+                    $errorMessage = 'movefailed';
+                    break;
+                }
+
+                // Update permissions
+                $fileSystem->setAccess($oldPath, $destPath);
             }
 
-            $destPath = $newPath . '/' . basename($oldPath);
-
-            $moved = $fileSystem->get($oldPath)->rename($destPath);
-            if ($moved === false) {
-                $errorMessage = 'movefailed';
-                break;
-            }
-
-            // Update permissions
-            $fileSystem->setAccess($oldPath, $destPath);
         }
+
         return $this->asJson([
             'result' => [
                 'success' => $success,
@@ -202,32 +206,35 @@ class ApiController extends WebController
 
         if (!$fileSystem->grantAccess($newPath, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'nopermission';
+        } else {
+
+            foreach ($paths as $oldPath) {
+
+                // ensure hashmap entry
+                $fileSystem->check($oldPath, $this->module->repair);
+                if (!$fileSystem->get($oldPath)->isFile()) {
+                    return false;
+                }
+
+                // Build new path
+                if ($newFilename === null) {
+                    $filename = $newPath . '/' . basename($oldPath);
+                } else {
+                    $filename = $newPath . '/' . $newFilename;
+                }
+
+                // copy file
+                $copied = $fileSystem->get($oldPath)->copy($filename);
+                if ($copied === false) {
+                    $errorMessage = 'copyfailed';
+                }
+
+                // Set new permission
+                $fileSystem->setAccess($filename);
+            }
+
         }
 
-        foreach ($paths as $oldPath) {
-
-            // ensure hashmap entry
-            $fileSystem->check($oldPath, $this->module->repair);
-            if (!$fileSystem->get($oldPath)->isFile()) {
-                return false;
-            }
-
-            // Build new path
-            if ($newFilename === null) {
-                $filename = $newPath . '/' . basename($oldPath);
-            } else {
-                $filename = $newPath . '/' . $newFilename;
-            }
-
-            // copy file
-            $copied = $fileSystem->get($oldPath)->copy($filename);
-            if ($copied === false) {
-                $errorMessage = 'copyfailed';
-            }
-
-            // Set new permission
-            $fileSystem->setAccess($filename);
-        }
         return $this->asJson([
             'result' => [
                 'success' => $success,
@@ -248,17 +255,18 @@ class ApiController extends WebController
         $errorMessage = '';
         if (!$fileSystem->grantAccess($newPath, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'nopermission';
+        } else {
+
+            if ($fileSystem->has($newPath)) {
+                $errorMessage = 'exists';
+            } else if ($fileSystem->createDir($newPath)) {
+                $success = true;
+            }
+
+            $fileSystem->setAccess($newPath);
+
         }
 
-        if ($fileSystem->has($newPath)) {
-            $errorMessage = 'exists';
-        }
-
-        if ($fileSystem->createDir($newPath)) {
-            $success = true;
-        }
-
-        $fileSystem->setAccess($newPath);
         return $this->asJson([
             'result' => [
                 'success' => $success,
@@ -282,19 +290,21 @@ class ApiController extends WebController
 
         if (!$fileSystem->grantAccess($item, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'permission_edit_denied';
-        }
-
-        if (!$fileSystem->get($item)->isFile() && !$fileSystem->get($item)->isDir()) {
-            $errorMessage = 'file_not_found';
-        }
-
-        if ($fileSystem->get($item)->rename($newItemPath)) {
-            $success = true;
         } else {
-            $errorMessage = 'renaming_failed';
+
+            if (!$fileSystem->get($item)->isFile() && !$fileSystem->get($item)->isDir()) {
+                $errorMessage = 'file_not_found';
+            }
+
+            if ($fileSystem->get($item)->rename($newItemPath)) {
+                $success = true;
+                $fileSystem->setAccess($item, $newItemPath);
+            } else {
+                $errorMessage = 'renaming_failed';
+            }
+
         }
 
-        $fileSystem->setAccess($item, $newItemPath);
 
         return $this->asJson([
             'result' => [
@@ -311,13 +321,18 @@ class ApiController extends WebController
      */
     public function actionUpload($path)
     {
+        Yii::info('Starting upload action...', __METHOD__);
+
         $path = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
         $fileSystem = FileManager::fileSystem();
         $path = ltrim($path, DIRECTORY_SEPARATOR);
         $success = false;
         $errorMessage = '';
+
+        Yii::debug("Checking '$path'", __METHOD__);
         $fileSystem->check($path, $this->module->repair);
+
         if ($fileSystem->grantAccess($path, FileManager::ACCESS_UPDATE)) {
             foreach ($this->_uploadedFiles as $file) {
                 $stream = fopen($file['tmp_name'], 'rb+');
@@ -353,7 +368,7 @@ class ApiController extends WebController
                 } catch (FileExistsException $e) {
                     Yii::error($e->getMessage(), __METHOD__);
                     $errorMessage = 'file_already_exists';
-                    break;
+                    // continue with other uploads
                 }
                 if ($uploaded === false) {
                     Yii::error('Upload failed', __METHOD__);
