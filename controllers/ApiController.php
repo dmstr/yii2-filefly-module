@@ -293,13 +293,13 @@ class ApiController extends WebController
 
             if ($fileSystem->get($item)->rename($newItemPath)) {
                 $success = true;
+                $fileSystem->setAccess($item, $newItemPath);
             } else {
                 $errorMessage = 'renaming_failed';
             }
 
         }
 
-        $fileSystem->setAccess($item, $newItemPath);
 
         return $this->asJson([
             'result' => [
