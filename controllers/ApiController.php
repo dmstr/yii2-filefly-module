@@ -623,7 +623,7 @@ class ApiController extends WebController
         ]);
     }
 
-    public function actionSearch($q)
+    public function actionSearch($q, $limit = '')
     {
 
         $query = FileflyHashmap::find()
@@ -631,6 +631,7 @@ class ApiController extends WebController
             ->andWhere(['=', 'component', $this->module->filesystem])
             ->andWhere(['LIKE', 'path', $q])
             ->orderBy(['updated_at' => SORT_DESC])
+            ->limit($limit ?: null)
             ->asArray();
 
         $fileSystem = FileManager::fileSystem();
