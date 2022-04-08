@@ -9,12 +9,15 @@
 
 namespace hrzg\filefly\controllers;
 
+use Exception;
 use hrzg\filefly\components\FileManager;
+use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
 use hrzg\filefly\Module as Filefly;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\FileNotFoundException;
+use Yii;
 use yii\filters\AccessControl;
 use yii\filters\Cors;
 use yii\filters\VerbFilter;
@@ -23,8 +26,6 @@ use yii\web\Controller as WebController;
 use yii\web\HttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
-use \Exception;
-use Yii;
 
 /**
  * --- PUBLIC PROPERTIES ---
@@ -158,7 +159,7 @@ class ApiController extends WebController
         } else {
 
             foreach ($paths as $oldPath) {
-
+                $this->trigger(FileEvent::EVENT_BEFORE_MOVE, new FileEvent(['filename' => $oldPath]));
                 $fileSystem->check($oldPath, $this->module->repair);
 
                 if (!$fileSystem->get($oldPath)->isFile() && !$fileSystem->get($oldPath)->isDir()) {
@@ -173,11 +174,21 @@ class ApiController extends WebController
                     $errorMessage = 'movefailed';
                     break;
                 }
+                $success = true;
 
                 // Update permissions
                 $fileSystem->setAccess($oldPath, $destPath);
+                $this->trigger(FileEvent::EVENT_AFTER_MOVE, new FileEvent(['filename' => $destPath]));
             }
 
+        }
+
+        if ($success) {
+            $this->trigger(FileEvent::EVENT_MOVE_SUCCESS, new FileEvent());
+        } else {
+            $this->trigger(FileEvent::EVENT_MOVE_ERROR, new FileEvent([
+                'errorMessage' => $errorMessage
+            ]));
         }
 
         return $this->asJson([
@@ -208,7 +219,7 @@ class ApiController extends WebController
         } else {
 
             foreach ($paths as $oldPath) {
-
+                $this->trigger(FileEvent::EVENT_BEFORE_COPY, new FileEvent(['filename' => $oldPath]));
                 // ensure hashmap entry
                 $fileSystem->check($oldPath, $this->module->repair);
                 if (!$fileSystem->get($oldPath)->isFile()) {
@@ -226,12 +237,23 @@ class ApiController extends WebController
                 $copied = $fileSystem->get($oldPath)->copy($filename);
                 if ($copied === false) {
                     $errorMessage = 'copyfailed';
+                } else {
+                    $success = true;
                 }
 
                 // Set new permission
                 $fileSystem->setAccess($filename);
+                $this->trigger(FileEvent::EVENT_AFTER_COPY, new FileEvent(['filename' => $oldPath]));
             }
 
+        }
+
+        if ($success) {
+            $this->trigger(FileEvent::EVENT_COPY_SUCCESS, new FileEvent());
+        } else {
+            $this->trigger(FileEvent::EVENT_COPY_ERROR, new FileEvent([
+                'errorMessage' => $errorMessage
+            ]));
         }
 
         return $this->asJson([
@@ -255,15 +277,24 @@ class ApiController extends WebController
         if (!$fileSystem->grantAccess($newPath, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'nopermission';
         } else {
-
+            $this->trigger(FileEvent::EVENT_BEFORE_CREATE_FOLDER, new FileEvent(['filename' => $newPath]));
             if ($fileSystem->has($newPath)) {
                 $errorMessage = 'exists';
-            } else if ($fileSystem->createDir($newPath)) {
-                $success = true;
+            } else {
+                if ($fileSystem->createDir($newPath)) {
+                    $success = true;
+                }
             }
-
             $fileSystem->setAccess($newPath);
+            $this->trigger(FileEvent::EVENT_AFTER_CREATE_FOLDER, new FileEvent(['filename' => $newPath]));
+        }
 
+        if ($success) {
+            $this->trigger(FileEvent::EVENT_CREATE_FOLDER_SUCCESS, new FileEvent());
+        } else {
+            $this->trigger(FileEvent::EVENT_CREATE_FOLDER_ERROR, new FileEvent([
+                'errorMessage' => $errorMessage
+            ]));
         }
 
         return $this->asJson([
@@ -294,16 +325,23 @@ class ApiController extends WebController
             if (!$fileSystem->get($item)->isFile() && !$fileSystem->get($item)->isDir()) {
                 $errorMessage = 'file_not_found';
             }
-
+            $this->trigger(FileEvent::EVENT_BEFORE_RENAME, new FileEvent(['filename' => $item]));
             if ($fileSystem->get($item)->rename($newItemPath)) {
                 $success = true;
                 $fileSystem->setAccess($item, $newItemPath);
             } else {
                 $errorMessage = 'renaming_failed';
             }
-
+            $this->trigger(FileEvent::EVENT_AFTER_RENAME, new FileEvent(['filename' => $newItemPath]));
         }
 
+        if ($success) {
+            $this->trigger(FileEvent::EVENT_RENAME_SUCCESS, new FileEvent());
+        } else {
+            $this->trigger(FileEvent::EVENT_RENAME_ERROR, new FileEvent([
+                'errorMessage' => $errorMessage
+            ]));
+        }
 
         return $this->asJson([
             'result' => [
@@ -334,6 +372,7 @@ class ApiController extends WebController
 
         if ($fileSystem->grantAccess($path, FileManager::ACCESS_UPDATE)) {
             foreach ($this->_uploadedFiles as $file) {
+                $this->trigger(FileEvent::EVENT_BEFORE_UPLOAD, new FileEvent(['filename' => $file['name'] ?? 'name']));
                 $stream = fopen($file['tmp_name'], 'rb+');
 
                 if ($this->module->slugNames) {
@@ -353,7 +392,8 @@ class ApiController extends WebController
                     $mimeTypes = \Yii::$app->settings->get('mime-whitelist', 'filefly');
                     empty($mimeTypes) ? $acceptedMimeTypes = [] : $acceptedMimeTypes = explode(",", $mimeTypes);
 
-                    if( in_array(mime_content_type($file['tmp_name']), $acceptedMimeTypes, false) || empty($acceptedMimeTypes)){
+                    if (in_array(mime_content_type($file['tmp_name']), $acceptedMimeTypes,
+                            false) || empty($acceptedMimeTypes)) {
                         $uploaded = $fileSystem->writeStream(
                             $fullPath,
                             $stream,
@@ -376,9 +416,18 @@ class ApiController extends WebController
 
                 $success = true;
                 $fileSystem->setAccess($fullPath);
+                $this->trigger(FileEvent::EVENT_AFTER_UPLOAD, new FileEvent(['filename' => $file['name'] ?? '']));
             }
         } else {
             $errorMessage = 'permission_upload_denied';
+        }
+
+        if ($success) {
+            $this->trigger(FileEvent::EVENT_UPLOAD_SUCCESS, new FileEvent());
+        } else {
+            $this->trigger(FileEvent::EVENT_UPLOAD_ERROR, new FileEvent([
+                'errorMessage' => $errorMessage
+            ]));
         }
 
         return $this->asJson([
@@ -458,7 +507,7 @@ class ApiController extends WebController
         $success = false;
         $errorMessage = '';
         foreach ($paths as $path) {
-
+            $this->trigger(FileEvent::EVENT_BEFORE_REMOVE, new FileEvent(['filename' => $path]));
             $fileSystem->check($path, $this->module->repair);
 
             if (!$fileSystem->grantAccess($path, FileManager::ACCESS_DELETE)) {
@@ -488,9 +537,18 @@ class ApiController extends WebController
                 break;
             }
             $success = true;
+            $this->trigger(FileEvent::EVENT_AFTER_REMOVE, new FileEvent(['filename' => $path]));
         }
         if ($anyDeniedPerm) {
             $errorMessage = 'permission_delete_denied';
+        }
+
+        if ($success) {
+            $this->trigger(FileEvent::EVENT_REMOVE_SUCCESS, new FileEvent(['filename' => $paths]));
+        } else {
+            $this->trigger(FileEvent::EVENT_REMOVE_ERROR, new FileEvent([
+                'errorMessage' => $errorMessage
+            ]));
         }
 
         return $this->asJson([
@@ -530,6 +588,7 @@ class ApiController extends WebController
             $headers->add('Connection', 'Keep-Alive');
 
             $stream = $fileSystem->readStream($path);
+            $this->trigger(FileEvent::EVENT_BEFORE_DOWNLOAD, new FileEvent(['filename' => $path]));
             $response->sendStreamAsFile(
                 $stream,
                 basename($path),
@@ -538,6 +597,7 @@ class ApiController extends WebController
         } catch (Exception $e) {
             throw new NotFoundHttpException();
         }
+        $this->trigger(FileEvent::EVENT_AFTER_DOWNLOAD, new FileEvent(['filename' => $path]));
         Yii::$app->end();
     }
 
@@ -608,11 +668,20 @@ class ApiController extends WebController
         // ensure hashmap entry
         $fileSystem->check($path, $this->module->repair);
 
+        $this->trigger(FileEvent::EVENT_BEFORE_CHANGE_PERMISSION, new FileEvent(['filename' => $path]));
         $updateItemAuth = $fileSystem->updatePermission($item, $path);
-
+        $this->trigger(FileEvent::EVENT_AFTER_CHANGE_PERMISSION, new FileEvent(['filename' => $path]));
         $errorMessage = "";
         if ($updateItemAuth === false) {
             $errorMessage = "error updating permissions";
+        }
+
+        if ($updateItemAuth) {
+            $this->trigger(FileEvent::EVENT_CHANGE_PERMISSION_SUCCESS, new FileEvent(['filename' => $path]));
+        } else {
+            $this->trigger(FileEvent::EVENT_CHANGE_PERMISSION_ERROR, new FileEvent([
+                'errorMessage' => $errorMessage
+            ]));
         }
 
         return $this->asJson([
@@ -640,7 +709,8 @@ class ApiController extends WebController
         foreach ($query->all() as $item) {
 
             // check read permissions or is folder
-            if (!$fileSystem->grantAccess($item['path'], Filefly::ACCESS_READ) || $fileSystem->get($item['path'])->isDir()) {
+            if (!$fileSystem->grantAccess($item['path'],
+                    Filefly::ACCESS_READ) || $fileSystem->get($item['path'])->isDir()) {
                 continue;
             }
 
