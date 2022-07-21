@@ -349,9 +349,10 @@ class ApiController extends WebController
                     $fullPath = $path . trim($file['name'], '/');
                 }
 
+                $uploaded = false;
                 try {
                     $mimeTypes = \Yii::$app->settings->get('mime-whitelist', 'filefly');
-                    empty($mimeTypes) ? $acceptedMimeTypes = [] : $acceptedMimeTypes = explode(",", $mimeTypes);
+                    $acceptedMimeTypes = empty($mimeTypes) ? [] : explode(",", $mimeTypes);
 
                     if( in_array(mime_content_type($file['tmp_name']), $acceptedMimeTypes, false) || empty($acceptedMimeTypes)){
                         $uploaded = $fileSystem->writeStream(
