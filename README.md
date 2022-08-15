@@ -39,7 +39,22 @@ i.e. `AFM_FILESYSTEM=fsLocal`
         \hrzg\filefly\Module::ACCESS_READ   => \hrzg\filefly\models\FileflyHashmap::$_all,
         \hrzg\filefly\Module::ACCESS_UPDATE => \hrzg\filefly\models\FileflyHashmap::$_all,
         \hrzg\filefly\Module::ACCESS_DELETE => \hrzg\filefly\models\FileflyHashmap::$_all,
-    ]
+    ],
+    # the urlCallbck property can be used to provide customized urls for each file item which (if defined) will overrite 
+    # the default handler URLs
+    'urlCallback'        => function($item) {
+                $urls = [];
+                $isImageFileExtList = ['jpg', 'jpeg', 'gif', 'tiff', 'tif', 'svg', 'png', 'bmp'] ;
+                if ($item['type'] === 'file') {
+                    if (in_array(strtolower($item['extension']), $isImageFileExtList)) {
+                        $urls['image url'] = \dmstr\willnorrisImageproxy\Url::image($item['path']);
+                    }
+                    else {
+                        $urls['download url'] = implode('/', ['/img/download', ltrim($item['path'], '/')]) . ',p1';
+                    }
+                }
+                return $urls;
+            },
 ],
 ```
 
