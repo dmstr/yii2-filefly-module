@@ -479,8 +479,15 @@ class ApiController extends WebController
                         $thumbnail = '';
                     }
 
+                    $itemUrls = [];
+                    if (is_callable($this->module->urlCallback)) {
+                        $itemUrls = call_user_func($this->module->urlCallback, $item);
+                    }
+
                     $files[] = [
                         'name' => $item['basename'],
+                        'path' => $item['path'],
+                        'urls' => $itemUrls,
                         'thumbnail' => $thumbnail,
                         'size' => $size,
                         'date' => date('Y-m-d H:i:s', $time),

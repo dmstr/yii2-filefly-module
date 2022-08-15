@@ -144,6 +144,17 @@ class Module extends \yii\base\Module
     */
     public $thumbnailCallback;
 
+
+    /**
+     * optional callback that can define a list of urls that will be displayed in filemanager
+     * backend in the item 'copy urls' overlay.
+     *
+     * Return value of the callback has to be an array!
+     *
+     * @var null|callable
+     */
+    public $urlCallback;
+
     /**
      * @inheritdoc
      *
