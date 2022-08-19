@@ -25,7 +25,7 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 
 #### Yii config
 
-```
+```php
 'filefly' => [
     'class'              => 'hrzg\filefly\Module',
     'layout'             => '@backend/views/layouts/main',
@@ -40,21 +40,31 @@ i.e. `AFM_FILESYSTEM=fsLocal`
         \hrzg\filefly\Module::ACCESS_UPDATE => \hrzg\filefly\models\FileflyHashmap::$_all,
         \hrzg\filefly\Module::ACCESS_DELETE => \hrzg\filefly\models\FileflyHashmap::$_all,
     ],
-    # the urlCallbck property can be used to provide customized urls for each file item which (if defined) will overrite 
+    # the urlCallbck property can be used to provide customized urls for each file item which (if defined) will overwrite 
     # the default handler URLs
     'urlCallback'        => function($item) {
-                $urls = [];
-                $isImageFileExtList = ['jpg', 'jpeg', 'gif', 'tiff', 'tif', 'svg', 'png', 'bmp'] ;
-                if ($item['type'] === 'file') {
-                    if (in_array(strtolower($item['extension']), $isImageFileExtList)) {
-                        $urls['image url'] = \dmstr\willnorrisImageproxy\Url::image($item['path']);
-                    }
-                    else {
-                        $urls['download url'] = implode('/', ['/img/download', ltrim($item['path'], '/')]) . ',p1';
-                    }
-                }
-                return $urls;
-            },
+		$urls = [];
+		$isImageFileExtList = ['jpg', 'jpeg', 'gif', 'tiff', 'tif', 'svg', 'png', 'bmp'] ;
+		if ($item['type'] === 'file') {
+			if (in_array(strtolower($item['extension']), $isImageFileExtList)) {
+				$urls['image url'] = \dmstr\willnorrisImageproxy\Url::image($item['path']);
+			}
+			else {
+				$urls['download url'] = implode('/', ['/img/download', ltrim($item['path'], '/')]) . ',p1';
+			}
+		}
+		return $urls;
+	},
+	// previewCallback can be used to overwrite the default downloadUrl for preview URLs within filemanagerApp
+	'previewCallback' => function($item) {
+		$isImageFileExtList = ['jpg', 'jpeg', 'gif', 'tiff', 'tif', 'png', 'bmp'] ;
+		if ($item['type'] === 'file') {
+			if (in_array(strtolower($item['extension']), $isImageFileExtList)) {
+				return \dmstr\willnorrisImageproxy\Url::image($item['path'], '500x');
+			}
+		}
+		return '';
+	}
 ],
 ```
 
