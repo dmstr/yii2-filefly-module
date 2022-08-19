@@ -473,10 +473,9 @@ class ApiController extends WebController
                         $time = $fileSystem->getTimestamp($item['path']) ?: time();
                     }
 
+                    $thumbnail = '';
                     if (is_callable($this->module->thumbnailCallback)) {
                         $thumbnail = call_user_func($this->module->thumbnailCallback, $item);
-                    } else {
-                        $thumbnail = '';
                     }
 
                     $itemUrls = [];
