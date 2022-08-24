@@ -473,25 +473,31 @@ class ApiController extends WebController
                         $time = $fileSystem->getTimestamp($item['path']) ?: time();
                     }
 
+                    $thumbnail = '';
                     if (is_callable($this->module->thumbnailCallback)) {
                         $thumbnail = call_user_func($this->module->thumbnailCallback, $item);
-                    } else {
-                        $thumbnail = '';
                     }
 
                     $itemUrls = [];
                     if (is_callable($this->module->urlCallback)) {
                         $itemUrls = call_user_func($this->module->urlCallback, $item);
                     }
+                    $previewUrl = '';
+                    if (is_callable($this->module->previewCallback)) {
+                        $previewUrl = call_user_func($this->module->previewCallback, $item);
+                    }
 
                     $files[] = [
                         'name' => $item['basename'],
+                        'dirname' => $item['dirname'],
                         'path' => $item['path'],
                         'urls' => $itemUrls,
                         'thumbnail' => $thumbnail,
+                        'preview' => $previewUrl,
                         'size' => $size,
                         'date' => date('Y-m-d H:i:s', $time),
                         'type' => $item['type'],
+                        'extension' => $item['extension'] ?? ''
                     ];
                 }
             }

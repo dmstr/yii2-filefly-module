@@ -156,6 +156,14 @@ class Module extends \yii\base\Module
     public $urlCallback;
 
     /**
+     * optional callback that can define the preview URL for an item
+     * if not set the default filemanager downloadURL will be used
+     *
+     * @var
+     */
+    public $previewCallback;
+
+    /**
      * @inheritdoc
      *
      * @throws HttpException
