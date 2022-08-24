@@ -1,5 +1,5 @@
 <?php
-/*
+/**
  * @var yii\web\View $this
  */
 
@@ -9,28 +9,16 @@ use yii\helpers\Inflector;
 $this->title = 'Filefly';
 ?>
 
-<?php $url = \yii\helpers\Url::to($this->context->module->id . '/api', true) ?>
-<?php $relativeUrl = '/' . \yii\helpers\Url::to($this->context->module->id . '/api', false) ?>
-
 <h1><?= Inflector::titleize($this->context->module->id) ?></h1>
 
-<?php if (class_exists(\hrzg\filemanager\widgets\FileManagerWidget::class)): ?>
-
-    <div class="box">
-        <?= \hrzg\filemanager\widgets\FileManagerWidget::widget(
-            ['handlerUrl' => \yii\helpers\Url::to('/' . $this->context->module->id . '/api')]
-        ) ?>
-    </div>
-
-<?php else : ?>
-
-    <div class="callout callout-warning">
-        Filemanager widgets are not available.
-    </div>
-
-<?php endif; ?>
+<?php
+echo $this->render('filemanager');
+?>
 
 <?php if (Yii::$app->user->can(Module::ACCESS_ROLE_ADMIN)): ?>
+
+    <?php $url = \yii\helpers\Url::to($this->context->module->id . '/api', true) ?>
+    <?php $relativeUrl = '/' . \yii\helpers\Url::to($this->context->module->id . '/api', false) ?>
 
     <div class="row">
         <div class="col-xs-12 col-md-6">
