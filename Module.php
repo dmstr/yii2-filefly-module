@@ -144,7 +144,6 @@ class Module extends \yii\base\Module
     */
     public $thumbnailCallback;
 
-
     /**
      * optional callback that can define a list of urls that will be displayed in filemanager
      * backend in the item 'copy urls' overlay.
@@ -162,6 +161,14 @@ class Module extends \yii\base\Module
      * @var
      */
     public $previewCallback;
+
+    /**
+     * additional options for the angular fileManagerApp
+     * @see: dmstr/yii2-filemanager-widgets
+     *
+     * @var array
+     */
+    public $fileManagerWidgetOptions = [];
 
     /**
      * @inheritdoc

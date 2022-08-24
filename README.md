@@ -162,6 +162,31 @@ see https://github.com/dmstr/yii2-filemanager-widgets
     ) }}
 ```
 
+Options for the yii2-filemanager-widgets Widget can be injected via the Module property `fileManagerWidgetOptions`
+
+example:
+```php
+
+        'filefly' => [
+            'filesystemComponents' => [
+                'ftp' => 'fsFtp',
+                'ftpcrud' => 'fsFtpCrud',
+            ],
+            // ...
+            // other configs
+            // ...
+            // Options for the angular fileManagerWidget
+            'fileManagerWidgetOptions' => [
+                'searchForm' => false,
+                'allowedActions' => [
+                    'move' => false,
+                    'upload' => false,
+                    'createFolder' => false,
+                    ],
+            ],
+        ],
+```        
+
 ### Controller action in iFrame
 
 Modal button

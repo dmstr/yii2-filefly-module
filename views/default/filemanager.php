@@ -14,14 +14,16 @@ if (class_exists(\hrzg\filemanager\widgets\FileManagerWidget::class)) {
         $enableIconPreviewView = false;
     }
 
+    $filemanagerWidgetConfig = [
+        'handlerUrl' => Url::to('/' . $this->context->module->id . '/api'),
+        'enableThumbnails' =>  $enableThumbnails,
+        'enableIconPreviewView' => $enableIconPreviewView,
+        'options' => !empty($this->context->module->fileManagerWidgetOptions) ? $this->context->module->fileManagerWidgetOptions : [],
+    ];
+
     echo \hrzg\filemanager\widgets\FileManagerWidget::widget(
-        [
-            'handlerUrl' => Url::to('/' . $this->context->module->id . '/api'),
-            'enableThumbnails' =>  $enableThumbnails,
-            'enableIconPreviewView' => $enableIconPreviewView,
-        ]
+        $filemanagerWidgetConfig
     );
 } else {
     echo Html::tag('p', Yii::t('filefly', 'Filemanager widgets are not available.'));
 }
-
