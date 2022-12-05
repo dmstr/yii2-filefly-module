@@ -66,6 +66,10 @@ abstract class AccessPlugin extends Component implements PluginInterface
      */
     protected function normalize($path)
     {
+        if(empty($path)) {
+            return $path;
+        }
+
         return '/' . ltrim($path, '/');
     }
 }
