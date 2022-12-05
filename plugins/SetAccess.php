@@ -46,7 +46,7 @@ class SetAccess extends AccessPlugin
             ->where(
                 [
                     'component' => $this->component,
-                    'path'      => $oldItemPath,
+                    'path' => $oldItemPath,
                 ]
             )
             ->one();
@@ -68,12 +68,12 @@ class SetAccess extends AccessPlugin
             $defaultPermissions = FileflyHashmap::accessDefaults();
             $newHash = new FileflyHashmap(
                 [
-                    'component'    => $this->component,
-                    'type'         => $type,
-                    'path'         => $oldItemPath,
-                    'size'         => $size,
+                    'component' => $this->component,
+                    'type' => $type,
+                    'path' => $oldItemPath,
+                    'size' => $size,
                     'access_owner' => \Yii::$app->user->id,
-                    Module::ACCESS_READ   => $defaultPermissions[Module::ACCESS_READ],
+                    Module::ACCESS_READ => $defaultPermissions[Module::ACCESS_READ],
                     Module::ACCESS_UPDATE => $defaultPermissions[Module::ACCESS_UPDATE],
                     Module::ACCESS_DELETE => $defaultPermissions[Module::ACCESS_DELETE],
                 ]
@@ -97,6 +97,10 @@ class SetAccess extends AccessPlugin
      */
     private function updateRecursive($oldItemPath, $newItemPath)
     {
+        if (empty($newItemPath)) {
+            return true;
+        }
+
         $find = $oldItemPath . '%';
 
         $items = FileflyHashmap::find()
