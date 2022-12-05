@@ -1,5 +1,5 @@
 {
-    "name": "oddity-agency/yii2-filefly-module",
+    "name": "dmstr/yii2-filefly-module",
     "description": "FlySystem API for Filemanager",
     "type": "yii2-extension",
     "keywords": ["yii2","extension"],
