@@ -19,7 +19,7 @@
 	"compression_failed": "Compression failed",
 	"archive_opening_failed": "Could not open archive, it is either corrupted or unsupported",
 	"extraction_failed": "Extraction failed",
-	"upload_failed": "Upload filed",
+	"upload_failed": "Upload failed",
 	"recycling_failed": "An error occured during the filesystem recycling",
     "permission_edit_denied" : "You are not allowed to edit this file",
     "permission_upload_denied" : "You are not allowed to upload files to this directory",

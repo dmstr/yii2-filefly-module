@@ -63,8 +63,22 @@ class FileflyHashmap extends BaseFileflyHashmap
      */
     public static function accessDefaults()
     {
-        $currentModule = Yii::$app->controller->module->id;
-        return \Yii::$app->getModule($currentModule)->defaultPermissions;
+        $currentModule = Yii::$app->loadedModules[Module::class] ?? null;
+
+        if (isset($currentModule->defaultPermissions))
+            return $currentModule->defaultPermissions;
+
+        $currentModule = Yii::$app->getModule(Yii::$app->controller->module->id);
+
+        if (isset($currentModule->defaultPermissions))
+            return $currentModule->defaultPermissions;
+
+        $currentModule = Yii::$app->getModule(Module::NAME);
+
+        if (isset($currentModule->defaultPermissions))
+            return $currentModule->defaultPermissions;
+
+        return Module::getInstance()->defaultPermissions;
     }
 
     /**

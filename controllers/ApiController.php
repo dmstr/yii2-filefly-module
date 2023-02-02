@@ -723,19 +723,19 @@ class ApiController extends WebController
         foreach ($query->all() as $item) {
 
             // check read permissions or is folder
-            if (!$fileSystem->grantAccess($item['path'],
-                    Filefly::ACCESS_READ) || $fileSystem->get($item['path'])->isDir()) {
-                continue;
-            }
-
             try {
-                $item['id'] = $item['path'];
-                $item['mime'] = '';
-                $result[] = $item;
+                if (!$fileSystem->grantAccess($item['path'],
+                        Filefly::ACCESS_READ) || $fileSystem->get($item['path'])->isDir()) {
+                    continue;
+                }
             } catch (FileNotFoundException $e) {
                 \Yii::warning($e->getMessage(), __METHOD__);
                 continue;
             }
+
+            $item['id'] = $item['path'];
+            $item['mime'] = '';
+            $result[] = $item;
         }
 
         return $this->asJson($result);
