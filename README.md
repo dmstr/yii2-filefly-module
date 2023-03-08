@@ -75,8 +75,19 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 - `FileflyDefault` management access (eg. POST request for upload, change, delete)
 - `FileflyPermissions` assigned users can set or unset roles or permissions which the user himself has assigned
 
-- If no permission is set, it will check if any inherited permission can be granted
 - `access_owner` permission before `access_read`, `access_update`, `access_delete`
+- If no permission is set, it will check if any inherited permission can be granted
+
+So if inherited `access_*` permissions should be used, set defaultPermissions to `null` NOT to `'*'`.
+
+```
+            'defaultPermissions' => [
+                \hrzg\filefly\Module::ACCESS_OWNER  => 1,
+                \hrzg\filefly\Module::ACCESS_READ   => null,
+                \hrzg\filefly\Module::ACCESS_UPDATE => null,
+                \hrzg\filefly\Module::ACCESS_DELETE => null,
+            ],
+```
 
 **ActiveRecord: FileflyHashmap**
 - uses `dmstr\activeRecordPermissions\ActiveRecordAccessTrait` with `$activeAccessTrait = false`
@@ -104,7 +115,7 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 
 ## RBAC Plugins
 
-Permission checks will ever come after file or older operation
+Permission checks will ever come after file or folder operation
 
 **GrantPermission**
 ```

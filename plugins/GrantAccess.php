@@ -19,6 +19,14 @@ use hrzg\filefly\Module;
  */
 class GrantAccess extends AccessPlugin
 {
+
+    /**
+     * internal cache var to reduce subPath iterator checks e.g. in search req.
+     *
+     * @var array
+     */
+    private $_iteratorChecked = [];
+
     /**
      * @return string
      */
@@ -36,7 +44,7 @@ class GrantAccess extends AccessPlugin
      * @param string $permissionType
      * @param bool $checkParent
      *
-     * @return array|\yii\db\ActiveRecord[]
+     * @return bool|null
      */
     public function handle($path, $permissionType = 'access_read', $checkParent = true)
     {
@@ -54,11 +62,11 @@ class GrantAccess extends AccessPlugin
         }
 
         // Grand ALL access for admins
-        if (in_array(Module::ACCESS_ROLE_ADMIN, array_keys(FileflyHashmap::getUsersAuthItems()))) {
+        if (array_key_exists(Module::ACCESS_ROLE_ADMIN, FileflyHashmap::getUsersAuthItems())) {
             return true;
         }
 
-        // do direct permission check for item
+        // do direct permission check for path
         if ($checkParent === false) {
 
             /** @var $hash \hrzg\filefly\models\FileflyHashmap */
@@ -81,9 +89,22 @@ class GrantAccess extends AccessPlugin
         // build path iterator list
         $this->buildIterator($path);
 
+        // init iterator items cache for this permissionType
+        if (!array_key_exists($permissionType, $this->_iteratorChecked)) {
+            $this->_iteratorChecked[$permissionType] = [];
+        }
+        // do recursive permission check for given path
         foreach ($this->_iterator as $subPath) {
 
             $subPath = $this->normalize($subPath);
+
+            // already checked? hint: value can be null, so isset() can not be used here!
+            if (array_key_exists($subPath, $this->_iteratorChecked[$permissionType])) {
+                if ($this->_iteratorChecked[$permissionType][$subPath] === null) {
+                    continue;
+                }
+                return $this->_iteratorChecked[$permissionType][$subPath];
+            }
 
             /** @var $hash \hrzg\filefly\models\FileflyHashmap */
             $query = FileflyHashmap::find();
@@ -92,28 +113,32 @@ class GrantAccess extends AccessPlugin
             $hash = $query->one();
 
             if ($hash === null) {
-
                 if ($permissionType === Module::ACCESS_UPDATE) {
                     continue;
                 }
-                return false;
+                $this->_iteratorChecked[$permissionType][$subPath] = false;
+                return $this->_iteratorChecked[$permissionType][$subPath];
             }
 
             if (empty($hash->{$permissionType})) {
                 // match if owner right can be granted
                 if ($hash->hasPermission($permissionType)) {
-                    \Yii::trace("Permission '{$permissionType}' found for {$hash->path}", __METHOD__);
-                    return true;
-                } else {
-                    continue;
+                    \Yii::debug("Permission '{$permissionType}' found for {$hash->path}", __METHOD__);
+                    $this->_iteratorChecked[$permissionType][$subPath] = true;
+                    return $this->_iteratorChecked[$permissionType][$subPath];
                 }
+                // set value in cache to null, as this will trigger 'cached continue'
+                $this->_iteratorChecked[$permissionType][$subPath] = null;
+                continue;
             }
 
             if (!empty($hash->{$permissionType})) {
                 // direct or owner permission granted
-                return $hash->hasPermission($permissionType);
+                $this->_iteratorChecked[$permissionType][$subPath] = $hash->hasPermission($permissionType);
+                return $this->_iteratorChecked[$permissionType][$subPath];
             }
         }
+        $this->_iteratorChecked[$permissionType][$subPath] = false;
         return false;
     }
 

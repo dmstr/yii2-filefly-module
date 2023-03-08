@@ -706,25 +706,36 @@ class ApiController extends WebController
         ]);
     }
 
-    public function actionSearch($q, $limit = '')
+    /**
+     * @param string $q search string
+     * @param int $limit limit result
+     * @param bool $only_files limit result to files, default true
+     * @param int $q_limit limit items in the db query that will be checked for read access, default 1000
+     *
+     * @return Response
+     */
+    public function actionSearch($q, $limit = null, $only_files = true, $q_limit = 1000)
     {
 
+        // use default find() WITHOUT constraints from ActiveRecordAccessTrait here, as we MUST check permissions
+        // via $fileSystem->grantAccess() to get recursive read access checks
+        FileflyHashmap::$activeAccessTrait = false;
         $query = FileflyHashmap::find()
             ->select(['path'])
-            ->andWhere(['=', 'component', $this->module->filesystem])
+            ->andWhere(['component' => $this->module->filesystem])
+            ->andWhere(['type' => 'file'])
             ->andWhere(['LIKE', 'path', $q])
             ->orderBy(['updated_at' => SORT_DESC])
-            ->limit($limit ?: null)
+            ->limit($q_limit ?: 1000)
             ->asArray();
 
         $fileSystem = FileManager::fileSystem();
-        // filter results, only files
         $result = [];
+        $found = 0;
         foreach ($query->all() as $item) {
 
-            // check read permissions or is folder
-            if (!$fileSystem->grantAccess($item['path'],
-                    Filefly::ACCESS_READ) || $fileSystem->get($item['path'])->isDir()) {
+            // check read permissions
+            if (!$fileSystem->grantAccess($item['path'], Filefly::ACCESS_READ)) {
                 continue;
             }
 
@@ -736,6 +747,12 @@ class ApiController extends WebController
                 \Yii::warning($e->getMessage(), __METHOD__);
                 continue;
             }
+            $found++;
+            // if result limit is reached, we're done
+            if ($found === (int)$limit) {
+                break;
+            }
+
         }
 
         return $this->asJson($result);
