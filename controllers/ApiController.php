@@ -723,11 +723,14 @@ class ApiController extends WebController
         $query = FileflyHashmap::find()
             ->select(['path'])
             ->andWhere(['component' => $this->module->filesystem])
-            ->andWhere(['type' => 'file'])
             ->andWhere(['LIKE', 'path', $q])
             ->orderBy(['updated_at' => SORT_DESC])
             ->limit($q_limit ?: 1000)
             ->asArray();
+
+        if ($only_files) {
+            $query->andWhere(['type' => 'file']);
+        }
 
         $fileSystem = FileManager::fileSystem();
         $result = [];
