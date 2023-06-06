@@ -18,7 +18,7 @@ use Yii;
  * @property string $type
  * @property string $path
  * @property integer $size
- * @property integer $access_owner
+ * @property string $access_owner
  * @property string $access_read
  * @property string $access_update
  * @property string $access_delete
