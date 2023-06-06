@@ -50,8 +50,8 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
             [['created_at', 'updated_at'], 'safe'],
             [['component'], 'string', 'max' => 45],
             [['type'], 'string', 'max' => 32],
-            // we want to allow int ids and uuid strings, so we do not check strict string type here
-            [['access_owner'], 'string', 'max' => 36, 'strict' => false],
+            // we want to allow int ids and (uuid) strings, so we do not check strict string type here
+            [['access_owner'], 'string', 'max' => 255, 'strict' => false],
             [['access_read', 'access_update', 'access_delete', 'path'], 'string', 'max' => 255],
             [
                 ['component', 'path', 'access_owner'],
