@@ -111,7 +111,7 @@ class Module extends \yii\base\Module
      * @var array
      */
     public $defaultPermissions = [
-        self::ACCESS_OWNER  => 1,
+        self::ACCESS_OWNER  => '1',
         self::ACCESS_READ   => '*',
         self::ACCESS_UPDATE => '*',
         self::ACCESS_DELETE => '*',
