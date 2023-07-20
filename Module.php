@@ -162,7 +162,9 @@ class Module extends \yii\base\Module
      */
     public function beforeAction($action)
     {
-        parent::beforeAction($action);
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
 
         if (empty($this->filesystem)) {
             \Yii::$app->session->addFlash(
