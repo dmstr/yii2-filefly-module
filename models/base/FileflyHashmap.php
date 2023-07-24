@@ -18,7 +18,7 @@ use Yii;
  * @property string $type
  * @property string $path
  * @property integer $size
- * @property integer $access_owner
+ * @property string $access_owner
  * @property string $access_read
  * @property string $access_update
  * @property string $access_delete
@@ -46,10 +46,12 @@ abstract class FileflyHashmap extends \yii\db\ActiveRecord
     {
         return [
             [['component', 'path'], 'required'],
-            [['access_owner', 'size'], 'integer'],
+            [['size'], 'integer'],
             [['created_at', 'updated_at'], 'safe'],
             [['component'], 'string', 'max' => 45],
             [['type'], 'string', 'max' => 32],
+            // we want to allow int ids and (uuid) strings, so we do not check strict string type here
+            [['access_owner'], 'string', 'max' => 255, 'strict' => false],
             [['access_read', 'access_update', 'access_delete', 'path'], 'string', 'max' => 255],
             [
                 ['component', 'path', 'access_owner'],
