@@ -599,7 +599,9 @@ class ApiController extends WebController
             $element = $fileSystem->get($path);
 
             if (!$element->isFile()) {
-                throw new NotFoundHttpException();
+                throw new NotFoundHttpException(Yii::t('filefly', 'File not found at path: {path}', [
+                    'path' => $path
+                ]));
             }
 
             $mimeType = $fileSystem->getMimetype($path);
@@ -621,7 +623,7 @@ class ApiController extends WebController
                 ['mimeType' => $mimeType, 'fileSize' => $size]
             );
         } catch (Exception $e) {
-            throw new NotFoundHttpException();
+            throw new NotFoundHttpException($e->getMessage());
         }
         $this->trigger(FileEvent::EVENT_AFTER_DOWNLOAD, new FileEvent(['filename' => $path]));
         Yii::$app->end();
