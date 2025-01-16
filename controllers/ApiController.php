@@ -473,31 +473,17 @@ class ApiController extends WebController
                         $time = $fileSystem->getTimestamp($item['path']) ?: time();
                     }
 
-                    $thumbnail = '';
-                    if (is_callable($this->module->thumbnailCallback)) {
-                        $thumbnail = call_user_func($this->module->thumbnailCallback, $item);
-                    }
-
-                    $itemUrls = [];
-                    if (is_callable($this->module->urlCallback)) {
-                        $itemUrls = call_user_func($this->module->urlCallback, $item);
-                    }
-                    $previewUrl = '';
-                    if (is_callable($this->module->previewCallback)) {
-                        $previewUrl = call_user_func($this->module->previewCallback, $item);
-                    }
-
                     $files[] = [
                         'name' => $item['basename'],
                         'dirname' => $item['dirname'],
                         'path' => $item['path'],
-                        'urls' => $itemUrls,
-                        'thumbnail' => $thumbnail,
-                        'preview' => $previewUrl,
+                        'urls' => $this->getItemUrls($item),
+                        'thumbnail' => $this->getItemThumbnail($item),
+                        'preview' => $this->getItemPreview($item),
                         'size' => $size,
                         'date' => date('Y-m-d H:i:s', $time),
                         'type' => $item['type'],
-                        'extension' => $item['extension'] ?? ''
+                        'extension' => $item['extension'] ?? $this->getItemExtensionFromPath($item),
                     ];
                 }
             }
@@ -760,4 +746,42 @@ class ApiController extends WebController
 
         return $this->asJson($result);
     }
+
+
+    private function getItemThumbnail(array $item)
+    {
+        $thumbnail = '';
+        if (is_callable($this->module->thumbnailCallback)) {
+            $thumbnail = call_user_func($this->module->thumbnailCallback, $item);
+        }
+        return $thumbnail;
+    }
+
+    private function getItemPreview(array $item)
+    {
+        $previewUrl = '';
+        if (is_callable($this->module->previewCallback)) {
+            $previewUrl = call_user_func($this->module->previewCallback, $item);
+        }
+        return $previewUrl;
+    }
+
+    private function getItemUrls(array $item)
+    {
+        $itemUrls = [];
+        if (is_callable($this->module->urlCallback)) {
+            $itemUrls = call_user_func($this->module->urlCallback, $item);
+        }
+        return $itemUrls;
+    }
+
+    private function getItemExtensionFromPath(array $item)
+    {
+        $extension = '';
+        if (isset($item['path']) && $item['type'] === 'file') {
+            $extension = pathinfo($item['path'],  PATHINFO_EXTENSION);
+        }
+        return $extension;
+    }
+
 }
