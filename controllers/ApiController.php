@@ -120,6 +120,7 @@ class ApiController extends WebController
                     'path' => Yii::$app->request->post('destination'),
                     'action' => 'upload'
                 ];
+
                 $this->_uploadedFiles = $_FILES;
             }
         }
@@ -370,6 +371,7 @@ class ApiController extends WebController
         Yii::debug("Checking '$path'", __METHOD__);
         $fileSystem->check($path, $this->module->repair);
 
+        $uploadedFiles = [];
         if ($fileSystem->grantAccess($path, FileManager::ACCESS_UPDATE)) {
             foreach ($this->_uploadedFiles as $file) {
                 $this->trigger(FileEvent::EVENT_BEFORE_UPLOAD, new FileEvent(['filename' => $file['name'] ?? 'name']));
@@ -404,23 +406,31 @@ class ApiController extends WebController
                     } else {
                         Yii::error('MIME Type not allowed', __METHOD__);
                         $errorMessage = 'file_type_not_allowed';
+                        // continue with other uploads
+                        continue;
                     }
                 } catch (FileExistsException $e) {
                     Yii::error($e->getMessage(), __METHOD__);
                     $errorMessage = 'file_already_exists';
                     // continue with other uploads
+                    continue;
                 }
                 if ($uploaded === false) {
                     Yii::error('Upload failed', __METHOD__);
                     $errorMessage = 'upload_failed';
+                } else {
+                    $uploadedFiles[] = $fullPath;
+                    $success = true;
+                    $fileSystem->setAccess($fullPath);
+                    $this->trigger(FileEvent::EVENT_AFTER_UPLOAD, new FileEvent(['filename' => $file['name'] ?? '']));
                 }
-
-                $success = true;
-                $fileSystem->setAccess($fullPath);
-                $this->trigger(FileEvent::EVENT_AFTER_UPLOAD, new FileEvent(['filename' => $file['name'] ?? '']));
             }
         } else {
             $errorMessage = 'permission_upload_denied';
+        }
+
+        if (!empty($errorMessage)) {
+            $success = false;
         }
 
         if ($success) {
@@ -429,12 +439,14 @@ class ApiController extends WebController
             $this->trigger(FileEvent::EVENT_UPLOAD_ERROR, new FileEvent([
                 'errorMessage' => $errorMessage
             ]));
+            $this->response->setStatusCode(400);
         }
 
         return $this->asJson([
             'result' => [
                 'success' => $success,
-                'error' => FileManager::translate($errorMessage)
+                'error' => FileManager::translate($errorMessage),
+                'uploadedFiles' => $uploadedFiles
             ]
         ]);
     }
@@ -573,7 +585,9 @@ class ApiController extends WebController
             $element = $fileSystem->get($path);
 
             if (!$element->isFile()) {
-                throw new NotFoundHttpException();
+                throw new NotFoundHttpException(Yii::t('filefly', 'File not found at path: {path}', [
+                    'path' => $path
+                ]));
             }
 
             $mimeType = $fileSystem->getMimetype($path);
@@ -595,7 +609,7 @@ class ApiController extends WebController
                 ['mimeType' => $mimeType, 'fileSize' => $size]
             );
         } catch (Exception $e) {
-            throw new NotFoundHttpException();
+            throw new NotFoundHttpException($e->getMessage());
         }
         $this->trigger(FileEvent::EVENT_AFTER_DOWNLOAD, new FileEvent(['filename' => $path]));
         Yii::$app->end();

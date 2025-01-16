@@ -12,6 +12,7 @@ use creocoder\flysystem\Filesystem;
 use dmstr\web\traits\AccessBehaviorTrait;
 use hrzg\filefly\helpers\FsManager;
 use yii\web\HttpException;
+use Yii;
 
 /**
  * Class Module
@@ -204,7 +205,7 @@ class Module extends \yii\base\Module
         }
 
         // breadcrumbs
-        \Yii::$app->controller->view->params['breadcrumbs'][] = ['label' => 'Filefly module', 'url' => ['/'.$this->id]];
+        \Yii::$app->controller->view->params['breadcrumbs'][] = ['label' => Yii::t('filefly', 'Filefly module'), 'url' => ['/'.$this->id]];
 
         // Set the allowed MIME types to all files as default
         \Yii::$app->settings->getOrSet('mime-whitelist', '', 'filefly', 'string');
