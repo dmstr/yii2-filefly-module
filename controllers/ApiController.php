@@ -56,7 +56,7 @@ class ApiController extends WebController
                 'upload' => ['POST'],
                 'resolve-permissions' => ['POST'],
                 'change-permissions' => ['POST'],
-                'search' => ['GET']
+                'search' => ['GET', 'POST']
             ]
         ];
         $behaviors['corsFilter'] = [
@@ -694,22 +694,26 @@ class ApiController extends WebController
 
     /**
      * @param string $q search string
-     * @param int $limit limit result
+     * @param null $limit limit result
      * @param bool $only_files limit result to files, default true
      * @param int $q_limit limit items in the db query that will be checked for read access, default 1000
+     * @param null $basePath optional basePath for the search, if set a `LIKE basePath%` condition will be added
      *
      * @return Response
      */
-    public function actionSearch($q, $limit = null, $only_files = true, $q_limit = 1000)
+    public function actionSearch($q, $limit = null, $only_files = true, $q_limit = 1000, $basePath = null)
     {
+
+        $basePath = (!empty($basePath) && is_string($basePath)) ? $basePath . '%' : null;
 
         // use default find() WITHOUT constraints from ActiveRecordAccessTrait here, as we MUST check permissions
         // via $fileSystem->grantAccess() to get recursive read access checks
         FileflyHashmap::$activeAccessTrait = false;
         $query = FileflyHashmap::find()
-            ->select(['path'])
+            ->select(['path', 'type'])
             ->andWhere(['component' => $this->module->filesystem])
             ->andWhere(['LIKE', 'path', $q])
+            ->andFilterWhere(['LIKE', 'path', $basePath, false])
             ->orderBy(['updated_at' => SORT_DESC])
             ->limit($q_limit ?: 1000)
             ->asArray();
@@ -727,9 +731,10 @@ class ApiController extends WebController
             if (!$fileSystem->grantAccess($item['path'], Filefly::ACCESS_READ)) {
                 continue;
             }
-
             try {
+                $item['extension'] = $this->getItemExtensionFromPath($item);
                 $item['id'] = $item['path'];
+                $item['thumbnail'] = $this->getItemThumbnail($item);
                 $item['mime'] = '';
                 $result[] = $item;
             } catch (FileNotFoundException $e) {
