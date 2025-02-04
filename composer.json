@@ -16,9 +16,15 @@
     ],
     "require": {
         "yiisoft/yii2": "~2.0.13",
-        "creocoder/yii2-flysystem": "^1.0.0",
+        "creocoder/yii2-flysystem": "dev-master as 1.2.0",
         "dmstr/yii2-active-record-permissions": "^1.0.0"
     },
+    "repositories" : [
+		{
+			"type": "git",
+			"url": "https://github.com/oddity-agency/yii2-flysystem.git"
+		}
+	],
     "autoload": {
         "psr-4": {
             "hrzg\\filefly\\": ""
