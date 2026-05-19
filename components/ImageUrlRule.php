@@ -30,6 +30,7 @@ class ImageUrlRule extends BaseObject implements UrlRuleInterface
     public $delimiter = '/';
     public $valid_actions = ['stream', 'download'];
     public $default_action = 'stream';
+    public $route = 'filefly/api';
 
     public function createUrl($manager, $route, $params)
     {
@@ -41,7 +42,7 @@ class ImageUrlRule extends BaseObject implements UrlRuleInterface
         $pathInfo = $request->getPathInfo();
         if (preg_match('%^('.$this->prefix.')/([^/]*)/(.*)('.$this->suffix.')([0-9]*)$%', $pathInfo, $matches)) {
             $action= in_array($matches[2], $this->valid_actions) ? $matches[2] : $this->default_action;
-            return ['filefly/api', ['action' => $action, 'path' => $matches[3]]];
+            return [$this->route, ['action' => $action, 'path' => $matches[3]]];
         }
         return false; // this rule does not apply
     }
