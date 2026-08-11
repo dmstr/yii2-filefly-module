@@ -17,6 +17,7 @@ use hrzg\filefly\Module;
 use hrzg\filefly\Module as Filefly;
 use League\Flysystem\FileExistsException;
 use League\Flysystem\FileNotFoundException;
+use League\Flysystem\Util\MimeType;
 use Yii;
 use yii\filters\AccessControl;
 use yii\filters\Cors;
@@ -581,33 +582,49 @@ class ApiController extends WebController
     public function actionDownload($path)
     {
         $fileSystem = FileManager::fileSystem();
-        try {
-            $element = $fileSystem->get($path);
+        $adapter = $fileSystem->getAdapter();
 
-            if (!$element->isFile()) {
+        try {
+            // Ein einziger getMetadata()-Call statt separater isFile()/getMimetype()/getSize()-Aufrufe
+            $metadata = $adapter->getMetadata($path);
+
+            if ($metadata === false || $metadata['type'] !== 'file') {
                 throw new NotFoundHttpException(Yii::t('filefly', 'File not found at path: {path}', [
                     'path' => $path
                 ]));
             }
 
-            $mimeType = $fileSystem->getMimetype($path);
-            $size = $fileSystem->getSize($path);
+            // getMetadata() liefert bei vielen Adaptern (u.a. S3) kein 'mimetype'.
+            // Statt eines weiteren HEAD-Requests (getMimetype()) leiten wir den Typ
+            // anhand der Dateiendung ab - kostet keinen zusätzlichen S3-Request.
+            $mimeType = $metadata['mimetype'] ?? (MimeType::detectByFilename($path) ?: 'application/octet-stream');
+            $size = $metadata['size'] ?? 0;
 
             $response = Yii::$app->response;
             $headers = $response->getHeaders();
 
-            // set headers
             $headers->add('Content-Description', 'File Transfer');
             $headers->add('Content-Transfer-Encoding', 'binary');
             $headers->add('Connection', 'Keep-Alive');
 
-            $stream = $fileSystem->readStream($path);
+            // Adapter->readStream() liefert ein Array ['type' => ..., 'stream' => resource],
+            // NICHT direkt die Stream-Resource (anders als die Filesystem-Fassade).
+            $streamResult = $adapter->readStream($path);
+            if ($streamResult === false || !isset($streamResult['stream'])) {
+                throw new NotFoundHttpException(Yii::t('filefly', 'File not found at path: {path}', [
+                    'path' => $path
+                ]));
+            }
+            $stream = $streamResult['stream'];
+
             $this->trigger(FileEvent::EVENT_BEFORE_DOWNLOAD, new FileEvent(['filename' => $path]));
             $response->sendStreamAsFile(
                 $stream,
                 basename($path),
                 ['mimeType' => $mimeType, 'fileSize' => $size]
             );
+        } catch (NotFoundHttpException $e) {
+            throw $e;
         } catch (Exception $e) {
             throw new NotFoundHttpException($e->getMessage());
         }
@@ -625,27 +642,37 @@ class ApiController extends WebController
     public function actionStream($path)
     {
         $fileSystem = FileManager::fileSystem();
-        try {
-            $element = $fileSystem->get($path);
+        $adapter = $fileSystem->getAdapter();
 
-            if (!$element->isFile()) {
+        try {
+            // Ein einziger getMetadata()-Call statt separater isFile()/getMimetype()/getSize()-Aufrufe
+            $metadata = $adapter->getMetadata($path);
+
+            if ($metadata === false || $metadata['type'] !== 'file') {
                 throw new NotFoundHttpException();
             }
 
-            $mimeType = $fileSystem->getMimetype($path);
-            $size = $fileSystem->getSize($path);
+            // getMetadata() liefert bei vielen Adaptern (u.a. S3) kein 'mimetype'.
+            // Statt eines weiteren HEAD-Requests (getMimetype()) leiten wir den Typ
+            // anhand der Dateiendung ab - kostet keinen zusätzlichen S3-Request.
+            $mimeType = $metadata['mimetype'] ?? (MimeType::detectByFilename($path) ?: 'application/octet-stream');
+            $size = $metadata['size'] ?? 0;
 
             $headers = Yii::$app->response->getHeaders();
-
             $headers->add('Content-Transfer-Encoding', 'binary');
             $headers->add('Connection', 'Keep-Alive');
-            $offset = $this->module->streamExpireOffset ?: 604800; # 1 week
-            if ($expiringDate = gmdate('D, d M Y H:i:s', time() + $offset)) {
-                $headers->add('Expires', $expiringDate . ' GMT');
-            }
+            $offset = $this->module->streamExpireOffset ?? 604800; // 1 week
+            $headers->add('Expires', gmdate('D, d M Y H:i:s', time() + $offset) . ' GMT');
             $headers->add('Cache-Control', 'public');
 
-            $stream = $fileSystem->readStream($path);
+            // Adapter->readStream() liefert ein Array ['type' => ..., 'stream' => resource],
+            // NICHT direkt die Stream-Resource (anders als die Filesystem-Fassade).
+            $streamResult = $adapter->readStream($path);
+            if ($streamResult === false || !isset($streamResult['stream'])) {
+                throw new NotFoundHttpException();
+            }
+            $stream = $streamResult['stream'];
+
             Yii::$app->response->sendStreamAsFile(
                 $stream,
                 basename($path),
@@ -654,7 +681,6 @@ class ApiController extends WebController
         } catch (Exception $e) {
             throw new NotFoundHttpException();
         }
-        Yii::$app->end();
     }
 
     /**
@@ -798,7 +824,7 @@ class ApiController extends WebController
     {
         $extension = '';
         if (isset($item['path']) && $item['type'] === 'file') {
-            $extension = pathinfo($item['path'],  PATHINFO_EXTENSION);
+            $extension = pathinfo($item['path'], PATHINFO_EXTENSION);
         }
         return $extension;
     }

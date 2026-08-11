@@ -1,0 +1,13 @@
+# Composer
+/vendor/
+composer.lock
+
+# PhpStorm / IDE
+.idea/
+
+# PHPUnit
+.phpunit.result.cache
+.phpunit.cache/
+
+# OS
+.DS_Store
