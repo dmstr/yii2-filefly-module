@@ -19,9 +19,17 @@
         "creocoder/yii2-flysystem": "^1.0.0",
         "dmstr/yii2-active-record-permissions": "^1.0.0"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6"
+    },
     "autoload": {
         "psr-4": {
             "hrzg\\filefly\\": ""
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "hrzg\\filefly\\tests\\": "tests/"
         }
     },
     "suggest": {
