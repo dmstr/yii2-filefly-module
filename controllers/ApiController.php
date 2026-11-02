@@ -10,6 +10,7 @@
 namespace hrzg\filefly\controllers;
 
 use Exception;
+use hrzg\filefly\components\ContentDeliveryPolicy;
 use hrzg\filefly\components\FileManager;
 use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\models\FileflyHashmap;
@@ -19,6 +20,7 @@ use League\Flysystem\FileExistsException;
 use League\Flysystem\FileNotFoundException;
 use League\Flysystem\Util\MimeType;
 use Yii;
+use yii\di\Instance;
 use yii\filters\AccessControl;
 use yii\filters\Cors;
 use yii\filters\VerbFilter;
@@ -611,6 +613,8 @@ class ApiController extends WebController
             $mimeType = $metadata['mimetype'] ?? (MimeType::detectByFilename($path) ?: 'application/octet-stream');
             $size = $metadata['size'] ?? 0;
 
+            $this->getDeliveryPolicy()->apply(Yii::$app->response, $path, $mimeType);
+
             $response = Yii::$app->response;
             $headers = $response->getHeaders();
 
@@ -669,6 +673,8 @@ class ApiController extends WebController
             $mimeType = $metadata['mimetype'] ?? (MimeType::detectByFilename($path) ?: 'application/octet-stream');
             $size = $metadata['size'] ?? 0;
 
+            $forceAttachment = $this->getDeliveryPolicy()->apply(Yii::$app->response, $path, $mimeType);
+
             $headers = Yii::$app->response->getHeaders();
             $headers->add('Content-Transfer-Encoding', 'binary');
             $headers->add('Connection', 'Keep-Alive');
@@ -687,7 +693,7 @@ class ApiController extends WebController
             Yii::$app->response->sendStreamAsFile(
                 $stream,
                 basename($path),
-                ['mimeType' => $mimeType, 'fileSize' => $size, 'inline' => 1]
+                ['mimeType' => $mimeType, 'fileSize' => $size, 'inline' => !$forceAttachment]
             );
         } catch (Exception $e) {
             throw new NotFoundHttpException();
@@ -829,6 +835,15 @@ class ApiController extends WebController
             $itemUrls = call_user_func($this->module->urlCallback, $item);
         }
         return $itemUrls;
+    }
+
+    /**
+     * @return ContentDeliveryPolicy
+     * @throws \yii\base\InvalidConfigException
+     */
+    private function getDeliveryPolicy()
+    {
+        return Instance::ensure($this->module->deliveryPolicy, ContentDeliveryPolicy::class);
     }
 
     private function getItemExtensionFromPath(array $item)
