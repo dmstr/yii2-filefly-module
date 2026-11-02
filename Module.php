@@ -220,6 +220,16 @@ class Module extends \yii\base\Module
     public $deliveryPolicy = [];
 
     /**
+     * Content checks for uploaded files: MIME type detection, blocked types, extension match
+     * and the `validateFile` event for own checks like a virus scanner.
+     *
+     * Configuration array or instance of \hrzg\filefly\components\ContentValidator
+     *
+     * @var array|\hrzg\filefly\components\ContentValidator
+     */
+    public $contentValidator = [];
+
+    /**
      * @inheritdoc
      *
      * @throws HttpException

@@ -11,6 +11,7 @@ namespace hrzg\filefly\controllers;
 
 use Exception;
 use hrzg\filefly\components\ContentDeliveryPolicy;
+use hrzg\filefly\components\ContentValidator;
 use hrzg\filefly\components\FileManager;
 use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\models\FileflyHashmap;
@@ -399,6 +400,14 @@ class ApiController extends WebController
                 if ($validationError !== null) {
                     Yii::warning("Upload of '$fullPath' rejected: $validationError", __METHOD__);
                     $errorMessage = $validationError;
+                    // continue with other uploads
+                    continue;
+                }
+
+                $contentError = $this->getContentValidator()->validate($file['tmp_name'], $file['name']);
+                if ($contentError !== null) {
+                    Yii::warning("Upload of '{$file['name']}' rejected: $contentError", __METHOD__);
+                    $errorMessage = $contentError;
                     // continue with other uploads
                     continue;
                 }
@@ -835,6 +844,15 @@ class ApiController extends WebController
             $itemUrls = call_user_func($this->module->urlCallback, $item);
         }
         return $itemUrls;
+    }
+
+    /**
+     * @return ContentValidator
+     * @throws \yii\base\InvalidConfigException
+     */
+    private function getContentValidator()
+    {
+        return Instance::ensure($this->module->contentValidator, ContentValidator::class);
     }
 
     /**
