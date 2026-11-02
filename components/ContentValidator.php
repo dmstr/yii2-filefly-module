@@ -9,10 +9,12 @@
 
 namespace hrzg\filefly\components;
 
+use enshrined\svgSanitize\Sanitizer;
 use finfo;
 use hrzg\filefly\events\UploadValidationEvent;
 use League\Flysystem\Util\MimeType;
 use yii\base\Component;
+use yii\base\InvalidConfigException;
 
 /**
  * Validates the content of uploaded files before they are written to the filesystem.
@@ -23,6 +25,7 @@ use yii\base\Component;
  * - `checkMimeTypeMatchesExtension` rejects files whose content does not match the extension,
  *   e.g. a shell script named `image.jpg`
  * - `EVENT_VALIDATE_FILE` lets the application add own checks, e.g. a virus scanner
+ * - `sanitizeSvg` removes scripts and event handlers from SVG files (requires enshrined/svg-sanitize)
  *
  * Configure via `Module::$contentValidator`:
  *
@@ -137,6 +140,14 @@ class ContentValidator extends Component
     public $mimeTypeAliases = [];
 
     /**
+     * Remove scripts, event handlers and remote references from uploaded SVG files.
+     * Requires `enshrined/svg-sanitize`. SVG files that can not be parsed are rejected.
+     *
+     * @var bool
+     */
+    public $sanitizeSvg = false;
+
+    /**
      * @param string $tempName path of the uploaded temporary file
      * @param string $fileName original file name
      * @return string|null message key if the file is rejected, null if it is valid
@@ -167,7 +178,34 @@ class ContentValidator extends Component
             return $event->errorMessage ?: 'file_content_rejected';
         }
 
+        if ($this->sanitizeSvg && $mimeType === 'image/svg+xml' && !$this->sanitizeSvgFile($tempName)) {
+            return 'file_content_rejected';
+        }
+
         return null;
+    }
+
+    /**
+     * Replaces the content of the file with the sanitized SVG
+     *
+     * @param string $file
+     * @return bool false if the file could not be sanitized
+     * @throws InvalidConfigException
+     */
+    protected function sanitizeSvgFile($file)
+    {
+        if (!class_exists(Sanitizer::class)) {
+            throw new InvalidConfigException('sanitizeSvg requires the package enshrined/svg-sanitize');
+        }
+
+        $sanitizer = new Sanitizer();
+        $sanitizer->removeRemoteReferences(true);
+        $clean = $sanitizer->sanitize(file_get_contents($file));
+
+        if ($clean === false || $clean === '') {
+            return false;
+        }
+        return file_put_contents($file, $clean) !== false;
     }
 
     /**

@@ -131,4 +131,32 @@ class ContentValidatorTest extends TestCase
 
         $this->assertNull($validator->validate($this->createFile('<?php echo 1;'), 'a.php'));
     }
+
+    public function testSanitizeSvg(): void
+    {
+        if (!class_exists(\enshrined\svgSanitize\Sanitizer::class)) {
+            $this->markTestSkipped('enshrined/svg-sanitize is not installed');
+        }
+
+        $validator = new ContentValidator(['sanitizeSvg' => true]);
+        $file = $this->createFile(
+            '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(2)</script><rect width="1" height="1"/></svg>'
+        );
+
+        $this->assertNull($validator->validate($file, 'logo.svg'));
+        $clean = file_get_contents($file);
+        $this->assertStringNotContainsString('script', $clean);
+        $this->assertStringNotContainsString('onload', $clean);
+        $this->assertStringContainsString('<rect', $clean);
+    }
+
+    public function testSvgIsNotSanitizedByDefault(): void
+    {
+        $validator = new ContentValidator();
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>';
+        $file = $this->createFile($svg);
+
+        $this->assertNull($validator->validate($file, 'logo.svg'));
+        $this->assertSame($svg, file_get_contents($file));
+    }
 }
