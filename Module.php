@@ -10,6 +10,7 @@ namespace hrzg\filefly;
 
 use creocoder\flysystem\Filesystem;
 use dmstr\web\traits\AccessBehaviorTrait;
+use hrzg\filefly\components\UploadValidator;
 use hrzg\filefly\helpers\FsManager;
 use yii\web\HttpException;
 use Yii;
@@ -21,6 +22,7 @@ use Yii;
  *
  * @property-read \hrzg\filefly\helpers\FsManager $manager
  * @property-read callable $thumbnailCallback
+ * @property-read \hrzg\filefly\components\UploadValidator $uploadValidator
  */
 class Module extends \yii\base\Module
 {
@@ -130,6 +132,42 @@ class Module extends \yii\base\Module
      */
     public $streamExpireOffset = 604800;
 
+    /**
+     * Allowed file extensions for uploads, renames and copies (case-insensitive), checked against the last extension.
+     * `null` allows all extensions
+     *
+     * Example: `['jpg', 'jpeg', 'png', 'gif', 'pdf']`
+     *
+     * @var string[]|null
+     */
+    public $allowedExtensions;
+
+    /**
+     * Denied file extensions (case-insensitive), checked against every extension of the file name,
+     * so `shell.php.jpg` is rejected if `php` is listed.
+     * \hrzg\filefly\components\UploadValidator::DANGEROUS_EXTENSIONS can be used as a starting point
+     *
+     * @var string[]
+     */
+    public $deniedExtensions = [];
+
+    /**
+     * Reject file names with more than one extension, e.g. `demo.pdf.jpg`
+     *
+     * @var bool
+     */
+    public $denyMultipleExtensions = false;
+
+    /**
+     * Max size of an uploaded file in bytes or as shorthand like `50M`, `null` means no limit.
+     * The limits of PHP (`upload_max_filesize`, `post_max_size`) and the web server still apply
+     *
+     * @var int|string|null
+     */
+    public $maxFileSize;
+
+    private $_uploadValidator;
+
     private $_manager;
 
     /**
@@ -219,6 +257,22 @@ class Module extends \yii\base\Module
             $this->_manager->setModule($this);
         }
         return $this->_manager;
+    }
+
+    /**
+     * @return UploadValidator
+     */
+    public function getUploadValidator()
+    {
+        if (!$this->_uploadValidator) {
+            $this->_uploadValidator = new UploadValidator([
+                'allowedExtensions' => $this->allowedExtensions,
+                'deniedExtensions' => $this->deniedExtensions,
+                'denyMultipleExtensions' => $this->denyMultipleExtensions,
+                'maxFileSize' => $this->maxFileSize,
+            ]);
+        }
+        return $this->_uploadValidator;
     }
 
 }
