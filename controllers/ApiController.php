@@ -218,6 +218,8 @@ class ApiController extends WebController
 
         if (!$fileSystem->grantAccess($newPath, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'nopermission';
+        } elseif ($newFilename !== null && ($validationError = $this->module->getUploadValidator()->validateFileName($newFilename)) !== null) {
+            $errorMessage = $validationError;
         } else {
 
             foreach ($paths as $oldPath) {
@@ -322,6 +324,8 @@ class ApiController extends WebController
 
         if (!$fileSystem->grantAccess($item, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'permission_edit_denied';
+        } elseif ($fileSystem->get($item)->isFile() && ($validationError = $this->module->getUploadValidator()->validateFileName(basename($newItemPath))) !== null) {
+            $errorMessage = $validationError;
         } else {
 
             if (!$fileSystem->get($item)->isFile() && !$fileSystem->get($item)->isDir()) {
@@ -376,8 +380,6 @@ class ApiController extends WebController
         if ($fileSystem->grantAccess($path, FileManager::ACCESS_UPDATE)) {
             foreach ($this->_uploadedFiles as $file) {
                 $this->trigger(FileEvent::EVENT_BEFORE_UPLOAD, new FileEvent(['filename' => $file['name'] ?? 'name']));
-                $stream = fopen($file['tmp_name'], 'rb+');
-
                 if ($this->module->slugNames) {
                     $pathInfo = pathinfo($file['name']);
                     // check if filename has extension
@@ -391,6 +393,15 @@ class ApiController extends WebController
                     $fullPath = $path . trim($file['name'], '/');
                 }
 
+                $validationError = $this->module->getUploadValidator()->validateUpload($file, $fullPath);
+                if ($validationError !== null) {
+                    Yii::warning("Upload of '$fullPath' rejected: $validationError", __METHOD__);
+                    $errorMessage = $validationError;
+                    // continue with other uploads
+                    continue;
+                }
+
+                $stream = fopen($file['tmp_name'], 'rb+');
                 $uploaded = false;
                 try {
                     $mimeTypes = \Yii::$app->settings->get('mime-whitelist', 'filefly');

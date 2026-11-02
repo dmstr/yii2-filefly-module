@@ -68,6 +68,35 @@ i.e. `AFM_FILESYSTEM=fsLocal`
 ],
 ```
 
+## Upload validation
+
+Uploaded files are validated on the server before they are written to the filesystem. The same extension rules are applied to the new file name on rename and copy.
+
+All rules are disabled by default, so existing installations keep their behavior. File names with control characters, null bytes or path separators are always rejected.
+
+Property | Default | Description
+------------- | ------------- | -------------
+allowedExtensions | `null` | allowed extensions (case-insensitive), checked against the last extension, `null` allows all
+deniedExtensions | `[]` | denied extensions, checked against every extension of the file name, so `shell.php.jpg` is rejected if `php` is listed
+denyMultipleExtensions | `false` | reject file names with more than one extension like `demo.pdf.jpg` (note that this also rejects names like `archive.tar.gz`)
+maxFileSize | `null` | max size of an uploaded file in bytes or as shorthand like `50M`
+
+Both the original file name and the name after slugging (`slugNames`) are checked. Trailing dots and spaces are ignored when the extensions are determined, so `shell.php.` is treated like `shell.php`.
+
+Recommended configuration:
+
+```php
+'filefly' => [
+    // ...
+    'allowedExtensions' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'docx', 'xlsx', 'zip'],
+    'deniedExtensions' => \hrzg\filefly\components\UploadValidator::DANGEROUS_EXTENSIONS,
+    'denyMultipleExtensions' => true,
+    'maxFileSize' => '50M',
+],
+```
+
+`maxFileSize` only works within the limits of PHP (`upload_max_filesize`, `post_max_size`) and the web server or proxy (e.g. `client_max_body_size` in nginx), which should be set accordingly.
+
 ## RBAC
 
 **Prosa**
