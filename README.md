@@ -274,3 +274,72 @@ Total size for all filesystems | `FileflyHashmap::getTotalSize()` | 202.82 MiB
 Total size for all filesystems (raw bytes) | `FileflyHashmap::getTotalSize(true)` | 212670464
 Total size for `local` filesystems | `FileflyHashmap::getTotalSize(false, 'local')` | 48.32 MiB
 Total size for `s3` filesystems (raw bytes) | `FileflyHashmap::getTotalSize(true, 's3')` | 166546843
+
+## Content security
+
+### Delivery of active content
+
+The `stream` and `download` actions deliver files from the same origin as the application. SVG, HTML, XML and script files could run embedded JavaScript in the context of the application when a browser opens them directly. These files are therefore delivered with `Content-Disposition: attachment` and a sandbox `Content-Security-Policy`, and every delivered file gets `X-Content-Type-Options: nosniff`. Embedding SVG files with `<img>` keeps working. This is enabled by default.
+
+```php
+'deliveryPolicy' => [
+    // 'enabled' => true,
+    // MIME types delivered as attachment, shell wildcards are supported
+    // 'activeContentMimeTypes' => ['text/html', 'image/svg+xml', '*+xml', ...],
+    // 'contentSecurityPolicy' => "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    // 'noSniff' => true,
+],
+```
+
+The type is checked for the MIME type reported by the filesystem and for the type derived from the file extension. The sandbox CSP is added after `Response::EVENT_BEFORE_SEND` handlers from the application config, so an application wide CSP header does not replace it.
+
+### Upload content validation
+
+Uploaded files are checked by `hrzg\filefly\components\ContentValidator` before they are written. The MIME type is detected from the file content (fileinfo), not taken from the client. By default only PHP files are rejected.
+
+Property | Default | Description
+--- | --- | ---
+`enabled` | `true` | Enable content checks
+`blockedMimeTypes` | PHP types | Detected MIME types that are rejected, shell wildcards are supported
+`checkMimeTypeMatchesExtension` | `false` | Reject files whose content does not match the extension, e.g. a script named `image.jpg`
+`mimeTypeAliases` | `[]` | Additional accepted MIME types per extension, e.g. `['dwg' => ['application/octet-stream']]`
+`sanitizeSvg` | `false` | Remove scripts, event handlers and remote references from SVG files, requires `enshrined/svg-sanitize`
+
+The existing `mime-whitelist` setting (`filefly` section) is still checked after the content validation.
+
+#### Virus scanner and own checks
+
+The validator triggers `ContentValidator::EVENT_VALIDATE_FILE` for every file that passed the built-in checks. Set `$event->isValid = false` to reject the file. The module has no dependency on a scanner, e.g. ClamAV can be connected by calling `clamdscan`:
+
+```php
+'contentValidator' => [
+    'on validateFile' => function (\hrzg\filefly\events\UploadValidationEvent $event) {
+        exec('clamdscan --no-summary --fdpass ' . escapeshellarg($event->tempName), $output, $exitCode);
+        if ($exitCode !== 0) {
+            $event->isValid = false;
+            // optional message key from messages/*.json, default: file_content_rejected
+            // $event->errorMessage = 'file_content_rejected';
+        }
+    },
+],
+```
+
+### Archives
+
+The API has no `compress` and `extract` actions, so archives are never unpacked on the server. The filemanager view of this module hides both actions in the widget. If the widget is rendered elsewhere, disable them via `'allowedActions' => ['compress' => false, 'extract' => false]`.
+
+### Recommended configuration
+
+```php
+'filefly' => [
+    // ...
+    'contentValidator' => [
+        'blockedMimeTypes' => \hrzg\filefly\components\ContentValidator::RECOMMENDED_BLOCKED_MIME_TYPES,
+        'checkMimeTypeMatchesExtension' => true,
+        // 'sanitizeSvg' => true,
+        // 'on validateFile' => function ($event) { /* virus scan */ },
+    ],
+],
+```
+
+`RECOMMENDED_BLOCKED_MIME_TYPES` blocks server side scripts (PHP, shell, Perl, Python, ...), executables and HTML/JavaScript files.

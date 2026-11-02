@@ -210,6 +210,26 @@ class Module extends \yii\base\Module
     public $fileManagerWidgetOptions = [];
 
     /**
+     * Security headers for files delivered by the stream and download actions.
+     * SVG, HTML, XML and script files are delivered as attachment with a sandbox CSP.
+     *
+     * Configuration array or instance of \hrzg\filefly\components\ContentDeliveryPolicy
+     *
+     * @var array|\hrzg\filefly\components\ContentDeliveryPolicy
+     */
+    public $deliveryPolicy = [];
+
+    /**
+     * Content checks for uploaded files: MIME type detection, blocked types, extension match
+     * and the `validateFile` event for own checks like a virus scanner.
+     *
+     * Configuration array or instance of \hrzg\filefly\components\ContentValidator
+     *
+     * @var array|\hrzg\filefly\components\ContentValidator
+     */
+    public $contentValidator = [];
+
+    /**
      * @inheritdoc
      *
      * @throws HttpException

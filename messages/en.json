@@ -15,6 +15,7 @@
 	"file_multiple_extensions_not_allowed": "File names with multiple extensions are not allowed",
 	"file_name_invalid": "Invalid file name",
 	"file_too_large": "File is too large",
+	"file_content_rejected": "File content not allowed",
 	"folder_already_exists": "Folder already exists",
 	"folder_creation_failed": "Folder creation failed",
     "folder_invalid_name": "Invalid folder name. No slashes allowed",

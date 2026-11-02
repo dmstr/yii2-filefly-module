@@ -1,5 +1,6 @@
 <?php
 
+use yii\helpers\ArrayHelper;
 use yii\helpers\Html;
 use yii\helpers\Url;
 
@@ -18,7 +19,11 @@ if (class_exists(\hrzg\filemanager\widgets\FileManagerWidget::class)) {
         'handlerUrl' => Url::to('/' . $this->context->module->id . '/api'),
         'enableThumbnails' =>  $enableThumbnails,
         'enableIconPreviewView' => $enableIconPreviewView,
-        'options' => !empty($this->context->module->fileManagerWidgetOptions) ? $this->context->module->fileManagerWidgetOptions : [],
+        // the api has no compress and extract actions, hide them unless enabled explicitly
+        'options' => ArrayHelper::merge(
+            ['allowedActions' => ['compress' => false, 'compressChooseName' => false, 'extract' => false]],
+            !empty($this->context->module->fileManagerWidgetOptions) ? $this->context->module->fileManagerWidgetOptions : []
+        ),
     ];
 
     echo \hrzg\filemanager\widgets\FileManagerWidget::widget(
