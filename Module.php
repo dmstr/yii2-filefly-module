@@ -96,7 +96,7 @@ class Module extends \yii\base\Module
     public $slugNames = true;
 
     /**
-     * Active / deactivate the filesystem and hashmap self healing plugins
+     * Active / deactivate the self healing of the hashmap (\hrzg\filefly\components\AccessManager::check())
      * @var bool
      */
     public $repair = true;
@@ -108,8 +108,9 @@ class Module extends \yii\base\Module
     public $deleteRecursive = false;
 
     /**
-     * Used as default permissions on active \hrzg\filefly\plugins\RepairKit
-     * if $this->repair = true
+     * Used as default permissions of new hashmap rows: by the self healing
+     * (\hrzg\filefly\components\AccessManager::check()) if $this->repair = true, and without the
+     * owner for new items (AccessManager::setAccess(), the owner is the acting user)
      *
      * @var array
      */

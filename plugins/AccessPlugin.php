@@ -9,6 +9,8 @@
 
 namespace hrzg\filefly\plugins;
 
+use hrzg\filefly\components\access\HashmapService;
+use hrzg\filefly\components\AccessManager;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
 use yii\base\Component;
@@ -17,6 +19,10 @@ use yii\base\Component;
  * Class AccessPlugin
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
+ * @deprecated since 1.9, removed in 2.0 with Flysystem 1: use \hrzg\filefly\components\AccessManager (FileManager::access())
+ *
+ * The plugins are thin shims: each handle() delegates to an AccessManager owned by the plugin
+ * instance, so access decisions stay cached for the lifetime of the plugin as before.
  */
 abstract class AccessPlugin extends Component implements PluginInterface
 {
@@ -33,14 +39,21 @@ abstract class AccessPlugin extends Component implements PluginInterface
 
     /**
      * @var array
+     * @deprecated not used any more, kept for subclasses
      */
     protected $permissions = [];
 
     /**
      * List of tree parents to be checked
      * @var array
+     * @deprecated not used any more, kept for subclasses
      */
     protected $_iterator = [];
+
+    /**
+     * @var AccessManager|null
+     */
+    private $_accessManager;
 
     /**
      * Get the method name.
@@ -55,6 +68,25 @@ abstract class AccessPlugin extends Component implements PluginInterface
     public function setFilesystem(FilesystemInterface $filesystem)
     {
         $this->filesystem = $filesystem;
+        if ($this->_accessManager !== null) {
+            $this->_accessManager->setFilesystem($filesystem);
+        }
+    }
+
+    /**
+     * The service this plugin delegates to, created on first use and kept for the plugin's lifetime
+     *
+     * @return AccessManager
+     */
+    protected function getAccessManager()
+    {
+        if ($this->_accessManager === null) {
+            $this->_accessManager = new AccessManager(['component' => $this->component]);
+            if ($this->filesystem !== null) {
+                $this->_accessManager->setFilesystem($this->filesystem);
+            }
+        }
+        return $this->_accessManager;
     }
 
     /**
@@ -66,9 +98,6 @@ abstract class AccessPlugin extends Component implements PluginInterface
      */
     protected function normalize($path)
     {
-        if (is_string($path)) {
-            return '/' . ltrim($path, '/');
-        }
-        return '/';
+        return HashmapService::normalizePath($path);
     }
 }

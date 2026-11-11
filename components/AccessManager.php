@@ -1,0 +1,189 @@
+<?php
+// file generated with AI assistance: Claude Code - [2026-11-11 18:00:00 UTC]
+/**
+ * @link http://www.diemeisterei.de/
+ * @copyright Copyright (c) 2017 diemeisterei GmbH, Stuttgart
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace hrzg\filefly\components;
+
+use hrzg\filefly\components\access\HashmapSynchronizer;
+use hrzg\filefly\components\access\PermissionResolver;
+use yii\base\BaseObject;
+
+/**
+ * Access control and hashmap maintenance for the items of one filesystem component.
+ *
+ * Replaces the Flysystem plugins in `hrzg\filefly\plugins`. Obtain an instance for the current
+ * module with FileManager::access(). An instance caches access decisions (grantAccess()), so it
+ * should not outlive one request.
+ *
+ * --- PUBLIC PROPERTIES ---
+ *
+ * @property \League\Flysystem\FilesystemInterface|\creocoder\flysystem\Filesystem $filesystem
+ */
+class AccessManager extends BaseObject
+{
+    /**
+     * The yii component name of the filesystem, stored in the `component` column of the hashmap
+     * @var string
+     */
+    public $component;
+
+    /**
+     * @var \League\Flysystem\FilesystemInterface|\creocoder\flysystem\Filesystem|null
+     */
+    private $_filesystem;
+
+    /**
+     * @var PermissionResolver|null
+     */
+    private $_permissions;
+
+    /**
+     * @var HashmapSynchronizer|null
+     */
+    private $_hashmap;
+
+    /**
+     * The filesystem the hashmap rows belong to; defaults to the application component `$component`
+     *
+     * @return \League\Flysystem\FilesystemInterface|\creocoder\flysystem\Filesystem
+     */
+    public function getFilesystem()
+    {
+        if ($this->_filesystem === null) {
+            $this->_filesystem = \Yii::$app->get($this->component);
+        }
+        return $this->_filesystem;
+    }
+
+    /**
+     * @param \League\Flysystem\FilesystemInterface|\creocoder\flysystem\Filesystem $filesystem
+     */
+    public function setFilesystem($filesystem)
+    {
+        $this->_filesystem = $filesystem;
+        // the synchronizer is stateless; the access cache of the resolver does not depend on the filesystem
+        $this->_hashmap = null;
+    }
+
+    /**
+     * Check if path has a hashmap row and create it with the default permissions if not
+     *
+     * @param string $path
+     * @param bool $repair nothing happens unless true (\hrzg\filefly\Module::$repair)
+     * @param bool $all sync the whole filesystem with the hashmap: delete orphan rows, add missing ones
+     *
+     * @return bool always true
+     */
+    public function check($path, $repair, $all = false)
+    {
+        return $this->hashmap()->check($path, $repair, $all);
+    }
+
+    /**
+     * Find permissions for paths by permission type, with parent permission support
+     *
+     * @param string $path
+     * @param string $permissionType one of the `access_*` columns
+     * @param bool $checkParent false: decide on the row of the path alone
+     *
+     * @return bool|null null only with $checkParent false and an empty column (or no row)
+     */
+    public function grantAccess($path, $permissionType = 'access_read', $checkParent = true)
+    {
+        return $this->permissions()->grantAccess($path, $permissionType, $checkParent);
+    }
+
+    /**
+     * Create the row of a new item ($oldItemPath), or move the rows of a renamed item to $newItemPath
+     *
+     * @param string $oldItemPath
+     * @param string $newItemPath
+     *
+     * @return bool
+     */
+    public function setAccess($oldItemPath = null, $newItemPath = null)
+    {
+        return $this->hashmap()->setAccess($oldItemPath, $newItemPath);
+    }
+
+    /**
+     * Delete the row of an item, with $recursive also the rows beneath it
+     *
+     * @param string $itemPath
+     * @param bool $recursive
+     *
+     * @return bool
+     */
+    public function removeAccess($itemPath = null, $recursive = false)
+    {
+        return $this->hashmap()->removeAccess($itemPath, $recursive);
+    }
+
+    /**
+     * Permissions of a path for the permission modal
+     *
+     * @param string $path
+     *
+     * @return array|false
+     */
+    public function getPermissions($path)
+    {
+        return $this->permissions()->getPermissions($path);
+    }
+
+    /**
+     * Write the roles selected in the permission modal to the row of a path
+     *
+     * @param array $item
+     * @param string $path
+     *
+     * @return bool
+     */
+    public function updatePermission($item, $path)
+    {
+        return $this->permissions()->updatePermission($item, $path);
+    }
+
+    /**
+     * Whether no hashmap row exists beneath the path (false if the path itself has no row)
+     *
+     * @param string $path
+     *
+     * @return bool
+     */
+    public function isEmpty($path)
+    {
+        return $this->hashmap()->isEmpty($path);
+    }
+
+    /**
+     * @return PermissionResolver
+     */
+    private function permissions()
+    {
+        if ($this->_permissions === null) {
+            $this->_permissions = new PermissionResolver(['component' => $this->component]);
+        }
+        return $this->_permissions;
+    }
+
+    /**
+     * @return HashmapSynchronizer
+     */
+    private function hashmap()
+    {
+        if ($this->_hashmap === null) {
+            $this->_hashmap = new HashmapSynchronizer([
+                'component' => $this->component,
+                'filesystem' => $this->getFilesystem(),
+            ]);
+        }
+        return $this->_hashmap;
+    }
+}

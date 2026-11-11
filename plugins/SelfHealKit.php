@@ -9,15 +9,13 @@
 
 namespace hrzg\filefly\plugins;
 
-use hrzg\filefly\models\FileflyHashmap;
-use hrzg\filefly\Module;
-use League\Flysystem\FileNotFoundException;
-
+use hrzg\filefly\components\access\HashmapSynchronizer;
 
 /**
  * Class SelfHealKit
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
+ * @deprecated since 1.9, removed in 2.0: use \hrzg\filefly\components\AccessManager::check() (FileManager::access())
  */
 class SelfHealKit extends AccessPlugin
 {
@@ -37,98 +35,11 @@ class SelfHealKit extends AccessPlugin
      * @param bool $all sync filesystem with database
      *
      * @return bool
+     * @see \hrzg\filefly\components\AccessManager::check()
      */
     public function handle($path, $repair, $all = false)
     {
-        // \hrzg\filefly\Module->repair
-        if ($repair) {
-            if ($all) {
-
-                // cleanup orphan hashes
-                $hashes = FileflyHashmap::find()->andWhere(['component' => $this->component])->each(100);
-                foreach ($hashes as $hash) {
-                    if ($hash->path === '/') {
-                        continue;
-                    }
-
-                    // try to find in filesystem by hash map path
-                    try {
-                        $this->filesystem->get($hash->path);
-                    } catch (FileNotFoundException $e) {
-                        \Yii::info($e->getMessage(), __METHOD__);
-                        $hash->delete();
-                    }
-                }
-
-                // add missing hashes
-                $allFilesystemItems = $this->filesystem->listContents('/', true);
-                foreach ($allFilesystemItems as $item) {
-                    $this->handleHash($item['path']);
-                }
-            } else {
-                // ensure single hash
-                $this->handleHash($path);
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Create hash if not exists for path
-     * @param $path
-     *
-     * @return bool
-     */
-    private function handleHash($path)
-    {
-        $path = $this->normalize($path);
-
-        // root folder management is handled by module property `rootFolderManageRole`
-        if ($path === '/') {
-            return true;
-        }
-
-        /** @var $hash \hrzg\filefly\models\FileflyHashmap */
-        $query = FileflyHashmap::find();
-        $query->andWhere(['component' => $this->component]);
-        $query->andWhere(['path' => $path]);
-        $hash = $query->one();
-
-        if ($hash === null) {
-            \Yii::info("Repairing '$path'", __METHOD__);
-
-            $defaultPermissions = FileflyHashmap::accessDefaults();
-
-            // get meta information
-            try {
-                $meta = $this->filesystem->getMetadata($path);
-                $type = (isset($meta['type'])) ? $meta['type'] : null;
-                $size = (isset($meta['size'])) ? $meta['size'] : null;
-            } catch (FileNotFoundException $e) {
-                \Yii::error($e->getMessage(), __METHOD__);
-                $type = null;
-                $size = null;
-            }
-
-            $repairHash         = new FileflyHashmap(
-                [
-                    'component'           => $this->component,
-                    'type'                => $type,
-                    'path'                => $path,
-                    'size'                => $size,
-                    Module::ACCESS_OWNER  => $defaultPermissions[Module::ACCESS_OWNER],
-                    Module::ACCESS_READ   => $defaultPermissions[Module::ACCESS_READ],
-                    Module::ACCESS_UPDATE => $defaultPermissions[Module::ACCESS_UPDATE],
-                    Module::ACCESS_DELETE => $defaultPermissions[Module::ACCESS_DELETE],
-                ]
-            );
-
-            if (!$repairHash->save()) {
-                \Yii::error('filefly hash could not been repaired for path ' . $path, __METHOD__);
-                return false;
-            }
-        }
-        return true;
+        return $this->getAccessManager()->check($path, $repair, $all);
     }
 
     /**
@@ -140,6 +51,6 @@ class SelfHealKit extends AccessPlugin
      */
     protected function normalize($path)
     {
-        return '/' . trim($path, '/');
+        return HashmapSynchronizer::normalizeRepairPath($path);
     }
 }
