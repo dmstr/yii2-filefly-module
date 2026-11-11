@@ -1,0 +1,16 @@
+# file generated with AI assistance: Claude Code - [2026-11-11 21:00:00 UTC]
+# Single-node Garage for the adapter probe. State lives on tmpfs (see
+# compose.yaml) and is gone after `docker compose down`. The RPC secret and the
+# default key and bucket come from ./test-credentials.env.
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+
+[s3_api]
+s3_region = "us-east-1"
+api_bind_addr = "[::]:3900"
+root_domain = ".s3.garage.localhost"

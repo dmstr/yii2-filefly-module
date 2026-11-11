@@ -1,0 +1,41 @@
+{
+    "name": "hrzg/filefly-adapter-probe",
+    "description": "Standalone probe that records how the Flysystem 3 adapters behave through creocoder/yii2-flysystem 2.0 (test tooling, not part of the module)",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.4",
+        "ext-ftp": "*",
+        "ext-json": "*",
+        "league/flysystem": "^3.35.3",
+        "league/flysystem-aws-s3-v3": "^3",
+        "league/flysystem-ftp": "^3",
+        "creocoder/yii2-flysystem": "^2.0@beta",
+        "yiisoft/yii2": "~2.0.53"
+    },
+    "autoload": {
+        "psr-4": {
+            "hrzg\\filefly\\adapterprobe\\": "src/"
+        }
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/dmstr-forks/yii2-flysystem.git",
+            "no-api": true
+        },
+        {
+            "type": "composer",
+            "url": "https://asset-packagist.org"
+        }
+    ],
+    "config": {
+        "platform": {
+            "php": "8.4.0"
+        },
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true
+        },
+        "sort-packages": true
+    }
+}
