@@ -63,9 +63,12 @@ abstract class HashmapService extends BaseObject
     /**
      * All hashmap rows of this component whose path starts with $prefix, compared byte by byte.
      *
-     * The query only narrows the candidates: Yii escapes the LIKE wildcards (`%`, `_`, `\`) for the
-     * current database driver, but the condition matches anywhere in the path and, under many MySQL
-     * collations, case-insensitively. The exact, case-sensitive prefix test is done here.
+     * The query only narrows the candidates: it matches the longest part of $prefix that contains
+     * no LIKE special character (`%`, `_`, `\`) anywhere in the path and, under many MySQL
+     * collations, case- and accent-insensitively. The exact, case-sensitive prefix test is done here.
+     * The narrowing term needs no escaping, because escaped wildcards are not portable: MySQL with
+     * the SQL mode NO_BACKSLASH_ESCAPES has no LIKE escape character, so the backslash escapes Yii
+     * adds would make the condition match nothing.
      *
      * @param string $prefix
      *
@@ -74,11 +77,13 @@ abstract class HashmapService extends BaseObject
     protected function findHashesWithPrefix($prefix)
     {
         $prefix = (string)$prefix;
+        $query = FileflyHashmap::find()->andWhere(['component' => $this->component]);
+        $term = static::likeNarrowingTerm($prefix);
+        if ($term !== '') {
+            $query->andWhere(['like', 'path', $term]);
+        }
         /** @var FileflyHashmap[] $candidates */
-        $candidates = FileflyHashmap::find()
-            ->andWhere(['component' => $this->component])
-            ->andWhere(['like', 'path', $prefix])
-            ->all();
+        $candidates = $query->all();
         $hashes = [];
         foreach ($candidates as $hash) {
             if (strncmp((string)$hash->path, $prefix, strlen($prefix)) === 0) {
@@ -86,5 +91,24 @@ abstract class HashmapService extends BaseObject
             }
         }
         return $hashes;
+    }
+
+    /**
+     * The longest part of $prefix without LIKE special characters (`%`, `_`, `\`); a path that
+     * starts with $prefix contains it under every collation. `''` if there is none.
+     *
+     * @param string $prefix
+     *
+     * @return string
+     */
+    protected static function likeNarrowingTerm($prefix)
+    {
+        $term = '';
+        foreach (preg_split('/[%_\\\\]/', (string)$prefix) as $part) {
+            if (strlen($part) > strlen($term)) {
+                $term = $part;
+            }
+        }
+        return $term;
     }
 }
