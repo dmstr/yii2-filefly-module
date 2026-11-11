@@ -333,15 +333,15 @@ class ApiController extends WebController
 
         if (!$accessManager->grantAccess($item, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'permission_edit_denied';
-        } elseif ($fileSystem->get($item)->isFile() && ($validationError = $this->module->getUploadValidator()->validateFileName(basename($newItemPath))) !== null) {
+        } elseif (($itemType = $this->getItemType($fileSystem, $item)) === 'file' && ($validationError = $this->module->getUploadValidator()->validateFileName(basename($newItemPath))) !== null) {
             $errorMessage = $validationError;
         } else {
 
-            if (!$fileSystem->get($item)->isFile() && !$fileSystem->get($item)->isDir()) {
+            if ($itemType !== 'file' && $itemType !== 'dir') {
                 $errorMessage = 'file_not_found';
             }
             $this->trigger(FileEvent::EVENT_BEFORE_RENAME, new FileEvent(['filename' => $item]));
-            if ($fileSystem->get($item)->rename($newItemPath)) {
+            if ($fileSystem->rename($item, $newItemPath)) {
                 $success = true;
                 $accessManager->setAccess($item, $newItemPath);
             } else {
