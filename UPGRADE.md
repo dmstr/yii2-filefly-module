@@ -50,6 +50,49 @@ All components: the caching and replica options of creocoder 1.x (`cache`, `cach
 - `permPublic` and `permPrivate` are replaced by `filePublic`, `filePrivate`, `directoryPublic` and `directoryPrivate`.
 - Known adapter limits of Flysystem 3 against real servers (vsftpd, ProFTPD, Pure-FTPd) are recorded in `tests/adapters/RESULTS.md` of this repository.
 
+## Storage behaviour per backend
+
+The module reaches every filesystem through `hrzg\filefly\components\Storage`, which keeps one contract on the local adapter, S3 and FTP: no write, copy or move replaces anything (only `fs sync` replaces older files), a path that leaves the root is refused before any request, nothing outside the component's root or `prefix` is reachable, deleting never touches siblings that share a name prefix, and a directory stays when its last item is deleted or moved away. The adapter suite in `tests/adapters` (see its `README.md`) runs the same contract tests against the local adapter, Garage and RustFS (S3), and vsftpd, ProFTPD and Pure-FTPd in plain FTP and explicit FTPS; it was not run against AWS S3 itself or other FTP servers. Below is what differs per backend and what applications have to configure. None of the operations is atomic: every check-then-act takes two or more requests on every backend, so two writers racing for the same path are not detected.
+
+### Local
+
+- Package: `league/flysystem-local` comes with the module. Configuration: see "Local (`LocalFilesystem`)" above (`'config' => ['directory_visibility' => 'public']` keeps `0755` for new directories).
+- Links: keep `linkHandling` at `DISALLOW_LINKS` (see above). A symlinked directory is never deleted as directory (`fs rmdir` and `remove` fail and keep link and target); `fs rm` of a link to a file removes only the link.
+- Deviation: `Storage::openFile()` and `Storage::fileStream()` of a directory do not fail (no stream on macOS, an empty stream that fails on the first read on Linux). The HTTP actions check with `fileStat()` first and answer 404; `fs cp` of a directory leaves an empty file at the target (pinned in the default suite).
+- Error messages of the local adapter can contain absolute disk paths; the module logs them and never shows them to end users.
+
+### S3 (`AwsS3Filesystem`)
+
+- Packages: `league/flysystem-aws-s3-v3` `^3` (pulls in `aws/aws-sdk-php`). Configuration as for 1.x without the removed options (see "S3" above); for S3-compatible servers set `endpoint` and `'pathStyleEndpoint' => true`. Set a `prefix` per application or environment: nothing outside it can be reached through the module, whatever path a request sends.
+- Directories: S3 has none, a directory is a key prefix. The module treats a directory as existing while a marker object `<dir>/` or any object below it exists: `createFolder` (and `fs mkdir`) writes one marker for the deepest level, the levels above exist through it. Before an item is deleted or moved away the module writes a marker for its parent, so a folder never vanishes with its last file (and its hashmap row stays valid). Recursive listings list every directory, also those without a marker.
+- Hierarchy: the module refuses a file or directory below a key that is a file (`f.txt/child`), as local and FTP do, at one `HeadObject` per parent level of the target. A bucket written by other tools may still contain the key `f` and keys below `f/`; the module then shows a file and a directory of the same name and adds nothing to either.
+- Moving and renaming a folder copies every object below it to the new prefix and then deletes the old prefix (S3 has no rename). If this fails half-way the error says in which phase: while copying the source is unchanged and the target holds a partial copy (remove it before retrying); while deleting the target is complete and the source may be partly left. Large folders cost one copy request per object.
+- Deviation: directories have no modification time. Listings report `null` for them (the API shows the time of the request), `Storage::lastModified()` of a directory returns `null`, and `fs sync` therefore treats a source file whose target is a directory as newer and stops with `ItemExistsException` (the directory is kept) instead of skipping it as on local.
+- Copies and moves do not read the source ACL (`retain_visibility` off, see above), so servers without ACL support (Garage) work.
+- Request costs (pinned by the adapter suite, item in the root; one more `HeadObject` per parent level of a target below the root):
+
+| Operation | S3 requests |
+| --- | --- |
+| `stream`, `download` of a file (`fileStat()` + `fileStream()`) | `HeadObject`, `GetObject` |
+| `stream`, `download` of a missing file or a directory | `HeadObject` |
+| any request with a path leaving the prefix | none |
+| `exists()` of a file | `HeadObject` |
+| `exists()` of a directory or a missing path | `HeadObject`, `ListObjectsV2` |
+| listing, shallow or recursive | `ListObjectsV2` per 1000 keys |
+| upload, `writeFile()` | `HeadObject`, `ListObjectsV2`, `PutObject` |
+| copy, `copyFile()` | `HeadObject`, `HeadObject`, `ListObjectsV2`, `HeadObject`, `CopyObject` |
+| move or rename of a file, `move()` | `HeadObject`, `HeadObject`, `ListObjectsV2`, `HeadObject`, `CopyObject`, `DeleteObject` |
+
+  Moving a file out of its folder, deleting a file and deleting a folder below the root add one `PutObject` (the parent's marker); deleting a folder is one listing plus one `DeleteObjects` per 1000 keys.
+
+### FTP (`FtpFilesystem`)
+
+- Package: `league/flysystem-ftp` `^3`, which needs `ext-ftp` (built with OpenSSL for FTPS). Configuration: see "FTP" above; set `'timestampsOnUnixListingsEnabled' => true`, otherwise listings carry no times and the API `list` action asks for each item separately (`SIZE` and `MDTM`).
+- Failed uploads: ext-ftp raises a PHP warning before the adapter reports the failure; the module holds such warnings back while it calls the adapter and drops them when the adapter reports the failure, so the request ends in the module's own error answer instead of a `yii\base\ErrorException`. A warning without a following failure reaches the application's error handler unchanged.
+- Deviations: `Storage::lastModified()` of a directory returns `null` (`MDTM` answers for files only; listings do carry directory times); listing times have minute precision and the year is guessed from the `ls` format, while `lastModified()` of a file has second precision. `fs sync` onto a directory behaves as on S3 (see above).
+- Listing a file path returns an empty listing on every server (ProFTPD answers with an entry carrying the absolute server path, which the module drops).
+- Server settings: ProFTPD with TLS 1.3 enabled and its default `TLSOptions` requires TLS session reuse on data connections, which PHP's ext-ftp provides only for the first data connection; every later transfer fails. Use `TLSProtocol TLSv1.2` or `TLSOptions NoSessionReuseRequired` (see `tests/adapters/RESULTS.md`, item 20). Passive mode must be reachable from the application; `ignorePassiveAddress` (default `true`) connects to the control host.
+
 ## Removed API
 
 - The Flysystem plugins in `hrzg\filefly\plugins` (`AccessPlugin`, `SelfHealKit`, `GrantAccess`, `SetAccess`, `RemoveAccess`, `GetPermissions`, `UpdatePermission`, `RecursiveIterator`): Flysystem 3 has no plugins. Use `FileManager::access()`, an `AccessManager` with the methods `check()`, `grantAccess()`, `setAccess()`, `removeAccess()`, `getPermissions()`, `updatePermission()` and `isEmpty()`.

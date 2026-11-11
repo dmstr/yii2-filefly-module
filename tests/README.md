@@ -28,6 +28,8 @@ docker run --rm --entrypoint sh --user "$(id -u):$(id -g)" \
 
 Tested with PHP 8.5.1 (macOS) and 8.4 (Linux, `dmstr/phd5-app:5.11.3`), Composer 2.11.2, PHPUnit 9.6.38, yiisoft/yii2 2.0.55, league/flysystem 3.36.0, league/flysystem-local 3.35.3, league/mime-type-detection 1.17.0, creocoder/yii2-flysystem 2.0.0, dmstr/yii2-active-record-permissions 1.3.2, dmstr/yii2-web 1.1.3.
 
+The default run excludes `tests/adapters`: the adapter suite there runs the storage contract, the HTTP API and the console command against real S3 and FTP servers in Docker and has its own configuration and command, see `./adapters/README.md`.
+
 Every test in `tests/api/` runs in its own PHP process (see "Process isolation" below); one isolated test takes roughly 0.05 to 0.1 s. Tests in `tests/console/` share one process (see "Console harness").
 
 `tests/bootstrap.php` masks no diagnostics: a deprecation from any code (the module or a dependency) that an isolated process prints to stderr fails the test.
