@@ -168,6 +168,22 @@ class AccessManager extends BaseObject
     }
 
     /**
+     * Whether the path is taken by a row of a different exact path: a row the database considers
+     * equal to $path (case, accents, trailing spaces under the MariaDB/MySQL collations) whose
+     * stored path is not byte for byte $path. Creating actions refuse such a target like an
+     * existing one. See HashmapService::hasConflictingRow().
+     *
+     * @param string $path
+     * @param string|null $ownPath the path of the item that is being moved to $path: its own row does not count
+     *
+     * @return bool
+     */
+    public function hasConflictingRow($path, $ownPath = null)
+    {
+        return $this->hashmap()->hasConflictingRow($path, $ownPath);
+    }
+
+    /**
      * Whether no hashmap row exists beneath the path (false if the path itself has no row)
      *
      * @param string $path

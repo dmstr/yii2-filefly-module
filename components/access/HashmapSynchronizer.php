@@ -99,6 +99,9 @@ class HashmapSynchronizer extends HashmapService
      * - `setAccess($oldPath, $newPath)`: the row of $oldPath and the rows below it are moved to
      *   $newPath (see updateRecursive()). If $oldPath has no row, nothing is moved and a row is
      *   created for $oldPath as in the first form (unchanged from earlier versions).
+     * - Rows are matched byte for byte. A row of another path that the database considers equal to
+     *   the path to be written (hasConflictingRow()) is never changed: the first form creates no
+     *   row, the second form moves nothing; both return false.
      *
      * @param string $oldItemPath
      * @param string|null $newItemPath
@@ -120,7 +123,14 @@ class HashmapSynchronizer extends HashmapService
             return $this->saveNewItemHash(new FileflyHashmap(), $oldItemPath);
         }
 
-        return $this->updateRecursive($oldHash, $oldHash->path, static::normalizePath($newItemPath));
+        $newItemPath = static::normalizePath($newItemPath);
+        // the row of another item that the database considers equal to the new path is not overwritten
+        if ($this->hasConflictingRow($newItemPath, $oldHash->path)) {
+            \Yii::warning('Not moving the row of [' . $oldItemPath . '], [' . $newItemPath . '] collides with the row of another path', __CLASS__ . '::setAccess');
+            return false;
+        }
+
+        return $this->updateRecursive($oldHash, $oldHash->path, $newItemPath);
     }
 
     /**
@@ -211,6 +221,13 @@ class HashmapSynchronizer extends HashmapService
         $hash = $this->findHash($path);
 
         if ($hash === null) {
+            // the path has no row of its own, but the database considers it equal to the path of
+            // another item's row: no row can be inserted next to it, and that row is not taken over
+            if ($this->hasConflictingRow($path)) {
+                \Yii::warning("Not repairing '$path', it collides with the row of another path", __METHOD__);
+                return false;
+            }
+
             \Yii::info("Repairing '$path'", __METHOD__);
 
             $defaultPermissions = FileflyHashmap::accessDefaults();
@@ -250,6 +267,12 @@ class HashmapSynchronizer extends HashmapService
      */
     private function saveNewItemHash(FileflyHashmap $hash, $path)
     {
+        // a new row next to a row the database considers equal: not inserted (see hasConflictingRow())
+        if ($hash->getIsNewRecord() && $this->hasConflictingRow($path)) {
+            \Yii::warning('Not creating a row for [' . $path . '], it collides with the row of another path', __CLASS__ . '::setAccess');
+            return false;
+        }
+
         list($type, $size) = $this->readTypeAndSize($path, __CLASS__ . '::setAccess');
 
         $defaultPermissions = FileflyHashmap::accessDefaults();

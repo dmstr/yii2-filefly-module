@@ -184,6 +184,15 @@ class ApiController extends WebController
 
                 $destPath = $newPath . '/' . basename($oldPath);
 
+                // a target the hashmap already holds under a name the database considers equal is
+                // refused like an existing one
+                if ($accessManager->hasConflictingRow($destPath, $oldPath)) {
+                    Yii::warning("Target '$destPath' collides with the hashmap row of another path", __METHOD__);
+                    $errorMessage = 'file_already_exists';
+                    $success = false;
+                    break;
+                }
+
                 try {
                     $moved = $storage->move($oldPath, $destPath);
                 } catch (ItemExistsException $e) {
@@ -268,6 +277,15 @@ class ApiController extends WebController
                     $filename = $newPath . '/' . $newFilename;
                 }
 
+                // a target the hashmap already holds under a name the database considers equal is
+                // refused like an existing one
+                if ($accessManager->hasConflictingRow($filename)) {
+                    Yii::warning("Target '$filename' collides with the hashmap row of another path", __METHOD__);
+                    $errorMessage = 'file_already_exists';
+                    $success = false;
+                    break;
+                }
+
                 // copy file
                 try {
                     $copied = $storage->copyFile($oldPath, $filename);
@@ -323,8 +341,9 @@ class ApiController extends WebController
             $errorMessage = 'nopermission';
         } else {
             $this->trigger(FileEvent::EVENT_BEFORE_CREATE_FOLDER, new FileEvent(['filename' => $newPath]));
-            if ($storage->exists($newPath)) {
-                // nothing was created, so no hashmap row is created or changed either
+            if ($accessManager->hasConflictingRow($newPath) || $storage->exists($newPath)) {
+                // nothing was created, so no hashmap row is created or changed either; a name the
+                // database considers equal to the path of another row counts as existing
                 $errorMessage = 'exists';
             } else {
                 if ($storage->createDirectory($newPath)) {
@@ -377,13 +396,20 @@ class ApiController extends WebController
                 $errorMessage = 'file_not_found';
             }
             $this->trigger(FileEvent::EVENT_BEFORE_RENAME, new FileEvent(['filename' => $item]));
-            try {
-                $moved = $storage->move($item, $newItemPath);
-            } catch (ItemExistsException $e) {
-                // nothing is overwritten
-                Yii::warning($e->getMessage(), __METHOD__);
+            if ($accessManager->hasConflictingRow($newItemPath, $item)) {
+                // a name the database considers equal to the path of another row counts as existing
+                Yii::warning("Target '$newItemPath' collides with the hashmap row of another path", __METHOD__);
                 $errorMessage = 'file_already_exists';
                 $moved = null;
+            } else {
+                try {
+                    $moved = $storage->move($item, $newItemPath);
+                } catch (ItemExistsException $e) {
+                    // nothing is overwritten
+                    Yii::warning($e->getMessage(), __METHOD__);
+                    $errorMessage = 'file_already_exists';
+                    $moved = null;
+                }
             }
             if ($moved !== null) {
                 if ($moved) {
@@ -461,6 +487,14 @@ class ApiController extends WebController
                 if ($contentError !== null) {
                     Yii::warning("Upload of '{$file['name']}' rejected: $contentError", __METHOD__);
                     $errorMessage = $contentError;
+                    // continue with other uploads
+                    continue;
+                }
+
+                // a name the database considers equal to the path of another row counts as existing
+                if ($accessManager->hasConflictingRow($fullPath)) {
+                    Yii::warning("Upload of '$fullPath' collides with the hashmap row of another path", __METHOD__);
+                    $errorMessage = 'file_already_exists';
                     // continue with other uploads
                     continue;
                 }

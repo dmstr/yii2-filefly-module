@@ -44,7 +44,11 @@ abstract class HashmapService extends BaseObject
     }
 
     /**
-     * The hashmap row of this component with exactly this path
+     * The hashmap row of this component with exactly this path, compared byte by byte.
+     *
+     * A row the database merely considers equal (under a case-, accent- or trailing-space-insensitive
+     * collation, as the MariaDB/MySQL collations of the migrated table are) belongs to a different
+     * item and is never returned; see hasConflictingRow().
      *
      * @param string $path
      *
@@ -52,12 +56,56 @@ abstract class HashmapService extends BaseObject
      */
     protected function findHash($path)
     {
-        /** @var FileflyHashmap|null $hash */
-        $hash = FileflyHashmap::find()
+        foreach ($this->findHashCandidates($path) as $hash) {
+            if ((string)$hash->path === (string)$path) {
+                return $hash;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether the path is taken by a row of a different exact path: a row the database considers
+     * equal to $path (`path = :path`) whose stored path is not byte for byte $path. Such a row
+     * belongs to another item; a row for $path could not be inserted next to it (unique key on
+     * `component`, `path`), and it must not be taken over.
+     *
+     * Always false on databases that compare byte-wise (sqlite, PostgreSQL).
+     *
+     * @param string $path the path a row would be created for or moved to (normalized like setAccess())
+     * @param string|null $ownPath the path of the item that is being moved to $path: its own row does not count
+     *
+     * @return bool
+     */
+    public function hasConflictingRow($path, $ownPath = null)
+    {
+        $path = static::normalizePath($path);
+        $ownPath = $ownPath === null ? null : static::normalizePath($ownPath);
+        foreach ($this->findHashCandidates($path) as $hash) {
+            $candidate = (string)$hash->path;
+            if ($candidate !== $path && $candidate !== $ownPath) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The rows of this component the database considers equal to $path; the only query by path
+     * equality. Callers decide on exact equality themselves (findHash(), hasConflictingRow()).
+     *
+     * @param string $path
+     *
+     * @return FileflyHashmap[]
+     */
+    private function findHashCandidates($path)
+    {
+        /** @var FileflyHashmap[] $hashes */
+        $hashes = FileflyHashmap::find()
             ->andWhere(['component' => $this->component])
             ->andWhere(['path' => $path])
-            ->one();
-        return $hash;
+            ->all();
+        return $hashes;
     }
 
     /**
