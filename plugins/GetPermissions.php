@@ -9,14 +9,11 @@
 
 namespace hrzg\filefly\plugins;
 
-use hrzg\filefly\models\FileflyHashmap;
-use hrzg\filefly\Module;
-use League\Flysystem\PluginInterface;
-
 /**
  * Class GetPermissions
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
+ * @deprecated since 1.9, removed in 2.0: use \hrzg\filefly\components\AccessManager::getPermissions() (FileManager::access())
  */
 class GetPermissions extends AccessPlugin
 {
@@ -30,68 +27,14 @@ class GetPermissions extends AccessPlugin
 
     /**
      * Build permissions array for multi selects in permission modal
-     * // TODO optimize iterations!?
      *
      * @param $path
      *
-     * @return bool
+     * @return array|false
+     * @see \hrzg\filefly\components\AccessManager::getPermissions()
      */
     public function handle($path)
     {
-        $this->permissions['read']   = null;
-        $this->permissions['update'] = null;
-        $this->permissions['delete'] = null;
-
-        /** @var $hash \hrzg\filefly\models\FileflyHashmap */
-        $query = FileflyHashmap::find();
-        $query->andWhere(['component' => $this->component]);
-        $query->andWhere(['path' => $path]);
-        $hash = $query->one();
-
-        if ($hash === null) {
-            return false;
-        } else {
-            $userAuthItems = array_keys(FileflyHashmap::getUsersAuthItems());
-
-            // READ ACCESS
-            $posRead = 0;
-            foreach ($userAuthItems as $authItem) {
-                $selected = false;
-                foreach ($hash->authItemStringToArray(Module::ACCESS_READ) as $readItem) {
-                    if ($authItem === $readItem) {
-                        $selected = true;
-                    }
-                    $this->permissions['read'][$posRead] = ['role' => $authItem, 'selected' => $selected];
-                }
-                $posRead++;
-            }
-
-            // UPDATE ACCESS
-            $posUpdate = 0;
-            foreach ($userAuthItems as $authItem) {
-                $selected = false;
-                foreach ($hash->authItemStringToArray(Module::ACCESS_UPDATE) as $updateItem) {
-                    if ($authItem === $updateItem) {
-                        $selected = true;
-                    }
-                    $this->permissions['update'][$posUpdate] = ['role' => $authItem, 'selected' => $selected];
-                }
-                $posUpdate++;
-            }
-
-            // DELETE ACCESS
-            $posDelete = 0;
-            foreach ($userAuthItems as $authItem) {
-                $selected = false;
-                foreach ($hash->authItemStringToArray(Module::ACCESS_DELETE) as $deleteItem) {
-                    if ($authItem === $deleteItem) {
-                        $selected = true;
-                    }
-                    $this->permissions['delete'][$posDelete] = ['role' => $authItem, 'selected' => $selected];
-                }
-                $posDelete++;
-            }
-        }
-        return $this->permissions;
+        return $this->getAccessManager()->getPermissions($path);
     }
 }

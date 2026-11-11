@@ -9,12 +9,11 @@
 
 namespace hrzg\filefly\plugins;
 
-use hrzg\filefly\models\FileflyHashmap;
-
 /**
  * Class RemoveAccess
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
+ * @deprecated since 1.9, removed in 2.0: use \hrzg\filefly\components\AccessManager::removeAccess() (FileManager::access())
  */
 class RemoveAccess extends AccessPlugin
 {
@@ -33,44 +32,10 @@ class RemoveAccess extends AccessPlugin
      * @param bool $recursive
      *
      * @return bool
+     * @see \hrzg\filefly\components\AccessManager::removeAccess()
      */
     public function handle($itemPath = null, $recursive = false)
     {
-        // remove all hashmap entries beneath $itemPath
-        if ($recursive) {
-            $items = FileflyHashmap::find()
-                ->andWhere(['component' => $this->component])
-                ->andWhere(['like', 'path', $itemPath . '/%', false])
-                ->all();
-
-            if (empty($items)) {
-                \Yii::info('Could not find items beneath [' . $itemPath . '] in hash table!', __METHOD__);
-            } else {
-                foreach ($items as $item) {
-                    /** @var $item FileflyHashmap */
-                    if (!$item->delete()) {
-                        \Yii::error('Could not delete item [' . $item->path . '] in hash table!', __METHOD__);
-                        return false;
-                    }
-                }
-            }
-        }
-
-        /** @var $item FileflyHashmap */
-        $item = FileflyHashmap::find()
-            ->andWhere(['component' => $this->component])
-            ->andWhere(['path' => $itemPath])
-            ->one();
-
-        if (empty($item)) {
-            \Yii::error('Could not find item [' . $itemPath . '] in hash table!', __METHOD__);
-            return false;
-        } else {
-            if (!$item->delete()) {
-                \Yii::error('Could not delete item [' . $item->path . '] in hash table!', __METHOD__);
-                return false;
-            }
-        }
-        return true;
+        return $this->getAccessManager()->removeAccess($itemPath, $recursive);
     }
 }

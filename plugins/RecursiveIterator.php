@@ -9,13 +9,11 @@
 
 namespace hrzg\filefly\plugins;
 
-use hrzg\filefly\models\FileflyHashmap;
-use League\Flysystem\PluginInterface;
-
 /**
  * Class RecursiveIterator
  * @package hrzg\filefly\plugins
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
+ * @deprecated since 1.9, removed in 2.0: use \hrzg\filefly\components\AccessManager::isEmpty() (FileManager::access())
  */
 class RecursiveIterator extends AccessPlugin
 {
@@ -30,39 +28,13 @@ class RecursiveIterator extends AccessPlugin
     /**
      * Check sub items from path
      *
-     * Query result 1 means no sub items found
-     *
      * @param string $path
      *
      * @return bool
+     * @see \hrzg\filefly\components\AccessManager::isEmpty()
      */
     public function handle($path)
     {
-        /** @var FileflyHashmap $item */
-        $item = FileflyHashmap::find()
-            ->andWhere(['component' => $this->component])
-            ->andWhere(['path' => $path])
-            ->one();
-
-        if (empty($item)) {
-            \Yii::info('Path [' . $path . '] not found!', __METHOD__);
-            return false;
-        }
-
-        // find hashmap items beneath this path
-        $find = $item->path . '/%';
-
-        $items = FileflyHashmap::find()
-            ->andWhere(['component' => $this->component])
-            ->andWhere(['like', 'path', $find, false])
-            ->all();
-
-        // if no items found => dir is empty
-        if (empty($items)) {
-            return true;
-        }
-
-        \Yii::info('Path [' . $path . '] is not empty!', __METHOD__);
-        return false;
+        return $this->getAccessManager()->isEmpty($path);
     }
 }
