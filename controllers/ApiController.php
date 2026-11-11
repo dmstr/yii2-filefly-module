@@ -245,7 +245,7 @@ class ApiController extends WebController
                 }
 
                 // copy file
-                $copied = $storage->copy($oldPath, $filename);
+                $copied = $storage->copyFile($oldPath, $filename);
                 if (!$copied) {
                     $errorMessage = 'copyfailed';
                 } else {
@@ -427,7 +427,7 @@ class ApiController extends WebController
 
                     if (in_array(mime_content_type($file['tmp_name']), $acceptedMimeTypes,
                             false) || empty($acceptedMimeTypes)) {
-                        $uploaded = $storage->writeStream(
+                        $uploaded = $storage->writeFile(
                             $fullPath,
                             $stream,
                             mime_content_type($file['tmp_name'])
@@ -495,7 +495,7 @@ class ApiController extends WebController
 
         $parentFolderAccess = $accessManager->grantAccess($path, FileManager::ACCESS_READ);
         if ($parentFolderAccess) {
-            foreach ($storage->listContents($path) as $item) {
+            foreach ($storage->listItems($path) as $item) {
 
                 // ensure hashmap entry
                 $accessManager->check($item->getPath(), $this->module->repair);
@@ -503,10 +503,10 @@ class ApiController extends WebController
                 // check direct access
                 $access = $accessManager->grantAccess($item->getPath(), FileManager::ACCESS_READ, $this->module->repair);
                 if ($access) {
-                    $size = $item->getSize() !== null ? $item->getSize() : 0;
+                    $size = $item->getFileSize() !== null ? $item->getFileSize() : 0;
 
-                    if (!empty($item->getTimestamp())) {
-                        $time = $item->getTimestamp();
+                    if (!empty($item->getLastModified())) {
+                        $time = $item->getLastModified();
                     } else {
                         $time = $storage->lastModified($item->getPath()) ?: time();
                     }
@@ -564,9 +564,9 @@ class ApiController extends WebController
 
                 $removed = $storage->deleteDirectory($path);
             } elseif ($itemType === 'file') {
-                $removed = $storage->delete($path);
+                $removed = $storage->deleteFile($path);
             } else {
-                // any other type got a directory handler from the Flysystem 1 handler API, whose delete() is deleteDir()
+                // any other type got a directory handler from the Flysystem 1 handler API, which deleted it as directory
                 $removed = $storage->deleteDirectory($path);
             }
 
@@ -629,7 +629,7 @@ class ApiController extends WebController
             // many adapters (S3 among them) report no mime type with the metadata; instead of a
             // further request it is derived from the file extension
             $mimeType = $metadata->getMimeType() ?? (Storage::mimeTypeByFileName($filePath) ?: 'application/octet-stream');
-            $size = $metadata->getSize() ?? 0;
+            $size = $metadata->getFileSize() ?? 0;
 
             $this->getDeliveryPolicy()->apply(Yii::$app->response, $filePath, $mimeType);
 
@@ -691,7 +691,7 @@ class ApiController extends WebController
             // many adapters (S3 among them) report no mime type with the metadata; instead of a
             // further request it is derived from the file extension
             $mimeType = $metadata->getMimeType() ?? (Storage::mimeTypeByFileName($filePath) ?: 'application/octet-stream');
-            $size = $metadata->getSize() ?? 0;
+            $size = $metadata->getFileSize() ?? 0;
 
             $forceAttachment = $this->getDeliveryPolicy()->apply(Yii::$app->response, $filePath, $mimeType);
 

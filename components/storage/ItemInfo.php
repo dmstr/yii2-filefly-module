@@ -63,7 +63,7 @@ class ItemInfo
      *
      * @return int|null
      */
-    public function getSize()
+    public function getFileSize()
     {
         return $this->size;
     }

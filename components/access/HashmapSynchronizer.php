@@ -289,7 +289,7 @@ class HashmapSynchronizer extends HashmapService
         try {
             $meta = $this->fetchMetadata($path);
             $type = $meta !== null ? $meta->getType() : null;
-            $size = $meta !== null ? $meta->getSize() : null;
+            $size = $meta !== null ? $meta->getFileSize() : null;
         } catch (ItemNotFoundException $e) {
             \Yii::error($e->getMessage(), $logCategory);
             $type = null;
@@ -318,6 +318,6 @@ class HashmapSynchronizer extends HashmapService
      */
     private function listAllContents()
     {
-        return $this->storage->listContents('/', true);
+        return $this->storage->listItems('/', true);
     }
 }

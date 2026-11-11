@@ -82,15 +82,15 @@ class FsController extends \yii\console\Controller
         $this->manager->mount($this->parseScheme($uri));
 
         try {
-            $contents = $this->manager->listContents($uri, $this->recursive);
+            $contents = $this->manager->listItems($uri, $this->recursive);
             foreach ($contents as $file) {
                 if ($this->long) {
 
 
                     $line = sprintf("%s  %s\t%s\t%s",
                         substr($file->getType(), 0, 1),
-                        str_pad($file->getSize() ?? 'n/a', 10, " "),
-                        str_pad($file->getTimestamp() ?? 'n/a', 10, " "),
+                        str_pad($file->getFileSize() ?? 'n/a', 10, " "),
+                        str_pad($file->getLastModified() ?? 'n/a', 10, " "),
                         $file->getPath());
                     $this->stdout("{$line}\n");
                 } else {
@@ -141,7 +141,7 @@ class FsController extends \yii\console\Controller
         $this->manager->mount($this->parseScheme($src));
         $this->manager->mount($this->parseScheme($dest));
 
-        $success = $this->manager->copy($src, $dest);
+        $success = $this->manager->copyFile($src, $dest);
 
         if (!$success) {
             $this->stderr('Copy failed');
@@ -185,7 +185,7 @@ class FsController extends \yii\console\Controller
     {
         if ($this->confirm("Do you want delete the file '$uri' ?")) {
             $this->manager->mount($this->parseScheme($uri));
-            $success = $this->manager->delete($uri);
+            $success = $this->manager->deleteFile($uri);
             if (!$success) {
                 $this->stderr('Deletion failed');
                 return ExitCode::UNSPECIFIED_ERROR;
@@ -233,7 +233,7 @@ class FsController extends \yii\console\Controller
         $this->manager->mount($this->parseScheme($dest));
 
         $srcScheme = $manager->schemeOf($src);
-        $contents = $manager->listContents($src, $this->recursive);
+        $contents = $manager->listItems($src, $this->recursive);
 
         if (!$this->confirm('Sync ' . count($contents) . ' files(s)?')) {
             return ExitCode::OK;
@@ -256,7 +256,7 @@ class FsController extends \yii\console\Controller
             }
 
             if ($update) {
-                $manager->copy($srcUrl, $destUrl);
+                $manager->copyFile($srcUrl, $destUrl);
                 $this->stdout("+");
             } else {
                 $this->stdout('.');

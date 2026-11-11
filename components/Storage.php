@@ -60,8 +60,8 @@ use yii\base\BaseObject;
  * ## Links (local adapter)
  *
  * With the default `linkHandling` (DISALLOW_LINKS) a symlink as last path segment makes
- * itemInfo(), fileStat() and listContents() throw StorageException; with SKIP_LINKS
- * itemInfo()/fileStat() return `null` for it and listContents() leaves it out. A type `link` is
+ * itemInfo(), fileStat() and listItems() throw StorageException; with SKIP_LINKS
+ * itemInfo()/fileStat() return `null` for it and listItems() leaves it out. A type `link` is
  * never reported. Links inside a path are followed by the operating system.
  *
  * ## Requests
@@ -224,7 +224,7 @@ class Storage extends BaseObject
      * @throws InvalidPathException
      * @throws StorageException
      */
-    public function readStream($path)
+    public function openFile($path)
     {
         $path = $this->normalizePath($path);
         $stream = $this->call(function () use ($path) {
@@ -249,7 +249,7 @@ class Storage extends BaseObject
      * @throws InvalidPathException
      * @throws StorageException
      */
-    public function listContents($path, $recursive = false)
+    public function listItems($path, $recursive = false)
     {
         $path = $this->normalizePath($path);
         $entries = $this->call(function () use ($path, $recursive) {
@@ -314,7 +314,7 @@ class Storage extends BaseObject
      * @throws InvalidPathException
      * @throws StorageException
      */
-    public function delete($path)
+    public function deleteFile($path)
     {
         $path = $this->normalizePath($path);
         return $this->call(function () use ($path) {
@@ -388,7 +388,7 @@ class Storage extends BaseObject
      * @throws InvalidPathException
      * @throws StorageException
      */
-    public function copy($from, $to)
+    public function copyFile($from, $to)
     {
         $from = $this->normalizePath($from);
         $to = $this->normalizePath($to);
@@ -415,7 +415,7 @@ class Storage extends BaseObject
      * @throws InvalidPathException
      * @throws StorageException
      */
-    public function writeStream($path, $stream, $mimeType = null)
+    public function writeFile($path, $stream, $mimeType = null)
     {
         $path = $this->normalizePath($path);
         $config = $mimeType === null ? [] : ['mimetype' => $mimeType];

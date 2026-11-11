@@ -14,13 +14,13 @@ use hrzg\filefly\components\storage\StorageItem;
  *
  * - a URI without `://` (or starting with it) and an unmounted scheme are refused with
  *   \InvalidArgumentException before any filesystem request
- * - copy() always streams: it opens the source for reading (Storage::readStream(), missing source
- *   → ItemNotFoundException), then writes a new file at the target (Storage::writeStream()), also
+ * - copyFile() always streams: it opens the source for reading (Storage::openFile(), missing source
+ *   → ItemNotFoundException), then writes a new file at the target (Storage::writeFile()), also
  *   within one filesystem. So the copy gets the current time as modification time, an existing
  *   target is refused with ItemExistsException after the source was opened, and a directory as
  *   source leaves an empty file at the target before the write fails on reading the stream
- * - move() is Storage::move() within one filesystem; across filesystems it is copy() followed by
- *   delete() of the source, the latter only if the copy reported success
+ * - move() is Storage::move() within one filesystem; across filesystems it is copyFile() followed by
+ *   deleteFile() of the source, the latter only if the copy reported success
  *
  * @link http://www.diemeisterei.de/
  * @copyright Copyright (c) 2017 diemeisterei GmbH, Stuttgart
@@ -77,7 +77,7 @@ class FsManager
         $this->mount($this->parseScheme($dest));
 
         $srcScheme = $manager->schemeOf($src);
-        $contents = $manager->listContents($src, $recursive);
+        $contents = $manager->listItems($src, $recursive);
         \Yii::trace($this->traceable($contents, $srcScheme), __METHOD__);
         foreach ($contents as $entry) {
             $update = false;
@@ -96,7 +96,7 @@ class FsManager
             }
 
             if ($update) {
-                $manager->copy($srcUrl, $destUrl);
+                $manager->copyFile($srcUrl, $destUrl);
                 \Yii::trace("copied file $srcUrl to $destUrl");
                 #$this->stdout($srcUrl."\n");
             } else {
@@ -120,17 +120,17 @@ class FsManager
     }
 
     /**
-     * Storage::listContents() on the filesystem of the URI
+     * Storage::listItems() on the filesystem of the URI
      *
      * @param string $uri
      * @param bool $recursive
      *
      * @return StorageItem[] paths relative to the root of that filesystem
      */
-    public function listContents($uri, $recursive = false)
+    public function listItems($uri, $recursive = false)
     {
         list($storage, $path) = $this->resolve($uri);
-        return $storage->listContents($path, $recursive);
+        return $storage->listItems($path, $recursive);
     }
 
     /**
@@ -173,16 +173,16 @@ class FsManager
     }
 
     /**
-     * Storage::delete() on the filesystem of the URI
+     * Storage::deleteFile() on the filesystem of the URI
      *
      * @param string $uri
      *
      * @return bool
      */
-    public function delete($uri)
+    public function deleteFile($uri)
     {
         list($storage, $path) = $this->resolve($uri);
-        return $storage->delete($path);
+        return $storage->deleteFile($path);
     }
 
     /**
@@ -207,11 +207,11 @@ class FsManager
      *
      * @return bool `false` if the source could not be opened or the write reported failure
      */
-    public function copy($from, $to)
+    public function copyFile($from, $to)
     {
         list($fromStorage, $fromPath) = $this->resolve($from);
 
-        $buffer = $fromStorage->readStream($fromPath);
+        $buffer = $fromStorage->openFile($fromPath);
 
         if ($buffer === null) {
             return false;
@@ -219,7 +219,7 @@ class FsManager
 
         list($toStorage, $toPath) = $this->resolve($to);
 
-        $result = $toStorage->writeStream($toPath, $buffer);
+        $result = $toStorage->writeFile($toPath, $buffer);
 
         if (is_resource($buffer)) {
             fclose($buffer);
@@ -229,7 +229,7 @@ class FsManager
     }
 
     /**
-     * Move a file or directory: Storage::move() within one filesystem, copy() plus delete() of
+     * Move a file or directory: Storage::move() within one filesystem, copyFile() plus deleteFile() of
      * the source across filesystems.
      *
      * @param string $from
@@ -246,10 +246,10 @@ class FsManager
             return $this->storage($schemeFrom)->move($pathFrom, $pathTo);
         }
 
-        $copied = $this->copy($from, $to);
+        $copied = $this->copyFile($from, $to);
 
         if ($copied) {
-            return $this->delete($from);
+            return $this->deleteFile($from);
         }
 
         return false;

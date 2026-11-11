@@ -11,9 +11,9 @@
 namespace hrzg\filefly\components\storage;
 
 /**
- * One entry of a listing (Storage::listContents()), in the module's fixed shape.
+ * One entry of a listing (Storage::listItems()), in the module's fixed shape.
  *
- * Built only by Storage::listContents(). The name parts are derived from `path` alone:
+ * Built only by Storage::listItems(). The name parts are derived from `path` alone:
  *
  * - `path`: relative to the storage root, no leading or trailing slash (`d/a.txt`)
  * - `dirname`: `path` without its last segment, `''` for items directly in the root (`d`)
@@ -27,7 +27,7 @@ namespace hrzg\filefly\components\storage;
  *
  * Values reported by the adapter, `null` when it does not report them:
  *
- * - `type`: `file`, `dir`, or another type of the adapter (see Storage::listContents())
+ * - `type`: `file`, `dir`, or another type of the adapter (see Storage::listItems())
  * - `size`: bytes; the local adapter reports it for files only
  * - `timestamp`: last modification as unix time; the local adapter reports it for every item,
  *   other adapters may omit it (emulated directories)
@@ -132,7 +132,7 @@ class StorageItem
     /**
      * @return int|null
      */
-    public function getSize()
+    public function getFileSize()
     {
         return $this->size;
     }
@@ -140,7 +140,7 @@ class StorageItem
     /**
      * @return int|null
      */
-    public function getTimestamp()
+    public function getLastModified()
     {
         return $this->timestamp;
     }
