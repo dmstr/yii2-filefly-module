@@ -84,11 +84,11 @@ class FileManager extends Component
     public static function storage()
     {
         $fsComponent = self::currentFilesystemComponent();
-        $fileSystem = \Yii::$app->{$fsComponent};
+        $storage = self::createStorage($fsComponent);
 
         self::disableHashmapAccessTrait();
 
-        return new Storage(['filesystem' => $fileSystem]);
+        return $storage;
     }
 
     /**
@@ -110,7 +110,7 @@ class FileManager extends Component
 
         return new AccessManager([
             'component' => $fsComponent,
-            'filesystem' => \Yii::$app->{$fsComponent},
+            'storage' => self::createStorage($fsComponent),
         ]);
     }
 
@@ -128,6 +128,16 @@ class FileManager extends Component
     {
         $currentModule = \Yii::$app->controller->module->id;
         return \Yii::$app->getModule($currentModule)->filesystem;
+    }
+
+    /**
+     * @param string $fsComponent yii component name of the filesystem
+     *
+     * @return Storage
+     */
+    private static function createStorage($fsComponent)
+    {
+        return new Storage(['filesystem' => \Yii::$app->{$fsComponent}]);
     }
 
     private static function disableHashmapAccessTrait()

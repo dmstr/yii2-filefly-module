@@ -11,6 +11,7 @@ namespace hrzg\filefly\plugins;
 
 use hrzg\filefly\components\access\HashmapService;
 use hrzg\filefly\components\AccessManager;
+use hrzg\filefly\components\Storage;
 use League\Flysystem\FilesystemInterface;
 use League\Flysystem\PluginInterface;
 use yii\base\Component;
@@ -69,7 +70,7 @@ abstract class AccessPlugin extends Component implements PluginInterface
     {
         $this->filesystem = $filesystem;
         if ($this->_accessManager !== null) {
-            $this->_accessManager->setFilesystem($filesystem);
+            $this->_accessManager->setStorage(new Storage(['filesystem' => $filesystem]));
         }
     }
 
@@ -83,7 +84,7 @@ abstract class AccessPlugin extends Component implements PluginInterface
         if ($this->_accessManager === null) {
             $this->_accessManager = new AccessManager(['component' => $this->component]);
             if ($this->filesystem !== null) {
-                $this->_accessManager->setFilesystem($this->filesystem);
+                $this->_accessManager->setStorage(new Storage(['filesystem' => $this->filesystem]));
             }
         }
         return $this->_accessManager;
