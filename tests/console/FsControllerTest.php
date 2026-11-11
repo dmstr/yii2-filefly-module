@@ -32,6 +32,22 @@ class FsControllerTest extends ConsoleTestCase
         $this->assertNotNull($result->exception);
     }
 
+    /**
+     * The command failed, the two outcomes are told apart by the result itself: on macOS the stream copy of a
+     * directory raises a PHP notice that the harness turns into an exception (no exit code, no output), on Linux
+     * no notice is raised and the action returns exit code 1 with $stderr.
+     */
+    private function assertFailedOrThrew(ConsoleResult $result, string $stderr): void
+    {
+        if ($result->exception !== null) {
+            $this->assertNull($result->exitCode, 'threw and returned an exit code');
+            $this->assertSame('', $result->stdout);
+            $this->assertSame('', $result->stderr);
+            return;
+        }
+        $this->assertFailed($result, $stderr);
+    }
+
     private function assertOk(ConsoleResult $result, string $stdout = '', string $stderr = ''): void
     {
         $this->assertNull($result->exception, 'unexpected exception');
@@ -512,15 +528,16 @@ class FsControllerTest extends ConsoleTestCase
         $this->assertTree('b', []);
     }
 
-    public function testCpOfDirectoryThrowsAndLeavesAnEmptyFileAtTheTarget(): void
+    public function testCpOfDirectoryFailsAndLeavesAnEmptyFileAtTheTarget(): void
     {
         // NOTE: current behaviour, looks unintended: directories cannot be copied, but before the error
-        // an empty FILE named like the directory is created at the target
+        // an empty FILE named like the directory is created at the target. The failure differs by OS:
+        // macOS throws (PHP notice turned into an exception), Linux returns exit code 1 with `Copy failed`
         $this->seedFile('a', 'd/y.txt', 'yy');
 
         $result = $this->runFs('cp', ['a://d', 'b://d']);
 
-        $this->assertThrew($result);
+        $this->assertFailedOrThrew($result, 'Copy failed');
         $this->assertTree('a', ['d' => self::DIR, 'd/y.txt' => 'yy']);
         $this->assertTree('b', ['d' => '']);
     }
@@ -614,14 +631,15 @@ class FsControllerTest extends ConsoleTestCase
         $this->assertTree('b', []);
     }
 
-    public function testMvOfDirectoryThrowsKeepsSourceAndLeavesAnEmptyFileAtTheTarget(): void
+    public function testMvOfDirectoryFailsKeepsSourceAndLeavesAnEmptyFileAtTheTarget(): void
     {
-        // NOTE: current behaviour, looks unintended: same as cp, an empty FILE is left at the target
+        // NOTE: current behaviour, looks unintended: same as cp, an empty FILE is left at the target;
+        // macOS throws (PHP notice turned into an exception), Linux returns exit code 1 with `Move failed`
         $this->seedFile('a', 'd/y.txt', 'yy');
 
         $result = $this->runFs('mv', ['a://d', 'b://dd']);
 
-        $this->assertThrew($result);
+        $this->assertFailedOrThrew($result, 'Move failed');
         $this->assertTree('a', ['d' => self::DIR, 'd/y.txt' => 'yy']);
         $this->assertTree('b', ['dd' => '']);
     }
