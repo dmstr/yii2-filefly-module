@@ -652,7 +652,12 @@ class ApiController extends WebController
         } catch (NotFoundHttpException $e) {
             throw $e;
         } catch (Exception $e) {
-            throw new NotFoundHttpException($e->getMessage());
+            // The adapter's message carries the absolute storage path; HttpException messages are
+            // shown to the end user, so only the requested path goes into the response.
+            Yii::warning($e->getMessage(), __METHOD__);
+            throw new NotFoundHttpException(Yii::t('filefly', 'File not found at path: {path}', [
+                'path' => $path
+            ]));
         }
         $this->trigger(FileEvent::EVENT_AFTER_DOWNLOAD, new FileEvent(['filename' => $path]));
         Yii::$app->end();
