@@ -130,6 +130,19 @@ class AccessManager extends BaseObject
     }
 
     /**
+     * Whether the current user may read and change the permissions of the item at $path: its owner,
+     * RBAC `Admin` or `FileflyAdmin`. See PermissionResolver::canManagePermissions().
+     *
+     * @param string $path
+     *
+     * @return bool
+     */
+    public function canManagePermissions($path)
+    {
+        return $this->permissions()->canManagePermissions($path);
+    }
+
+    /**
      * Permissions of a path for the permission modal
      *
      * @param string $path

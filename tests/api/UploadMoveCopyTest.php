@@ -1238,7 +1238,7 @@ class UploadMoveCopyTest extends ApiTestCase
         ], $this->rows());
     }
 
-    public function testMoveAsUserMovesFileWithoutAnyRightOnTheSourceWhenTargetIsWritable(): void
+    public function testMoveAsUserWithoutAnyRightOnTheSourceIsDeniedEvenWhenTargetIsWritable(): void
     {
         $this->actingAsFileflyUser(7);
         $this->seedFolder('/d', ['access_owner' => '9']);
@@ -1252,13 +1252,12 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/d', 'items' => ['/locked/f.txt']]);
 
-        // NOTE: current behaviour, looks unintended: only the target is permission checked, never the source
-        $this->assertResult(true, '', $response);
-        $this->assertSame(['/d' => null, '/d/f.txt' => 'F', '/locked' => null], $this->disk());
+        $this->assertResult(false, 'nopermission', $response);
+        $this->assertSame(['/d' => null, '/locked' => null, '/locked/f.txt' => 'F'], $this->disk());
         $this->assertSame([
             '/d' => $this->dirRow('9'),
-            '/d/f.txt' => $this->fileRow(1, '9', 'Nobody', 'Nobody', 'Nobody'),
             '/locked' => $this->dirRow('9', '*', 'Nobody', 'Nobody'),
+            '/locked/f.txt' => $this->fileRow(1, '9', 'Nobody', 'Nobody', 'Nobody'),
         ], $this->rows());
     }
 

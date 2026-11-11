@@ -403,7 +403,8 @@ class SelfHealTest extends ApiTestCase
         ]]);
         $this->actAsApiUser();
         $this->seedFile('/s.txt', 's');
-        $this->seedRow('/s.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret', 1);
+        // the acting user may read the source (copy checks read access on it)
+        $this->seedRow('/s.txt', 'file', self::OTHER_ID, 'RoleA', 'Secret', 'Secret', 1);
         $this->seedDir('/d');
         $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', 'RoleA', 'Secret');
 
@@ -526,7 +527,8 @@ class SelfHealTest extends ApiTestCase
     {
         $this->actAsApiUser();
         $this->seedFile('/a/x.txt', 'x');
-        $this->seedRow('/a', 'dir', self::OTHER_ID, 'RoleA', 'Secret', 'Secret');
+        // the acting user may update the source (move checks update access on it)
+        $this->seedRow('/a', 'dir', self::OTHER_ID, 'RoleA', 'RoleA', 'Secret');
         $this->seedRow('/a/x.txt', 'file', '5', '', 'RoleB', 'Secret', 1);
         $this->seedDir('/d');
         $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
@@ -537,7 +539,7 @@ class SelfHealTest extends ApiTestCase
         $this->assertFileOnDisk('/d/a/x.txt', 'x');
         $this->assertNotOnDisk('/a');
         $this->assertSame(['/d', '/d/a', '/d/a/x.txt'], $this->rowPaths());
-        $this->assertAccess('/d/a', 'dir', self::OTHER_ID, 'RoleA', 'Secret', 'Secret');
+        $this->assertAccess('/d/a', 'dir', self::OTHER_ID, 'RoleA', 'RoleA', 'Secret');
         $this->assertAccess('/d/a/x.txt', 'file', '5', '', 'RoleB', 'Secret');
     }
 

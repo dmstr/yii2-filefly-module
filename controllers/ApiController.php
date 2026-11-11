@@ -169,6 +169,13 @@ class ApiController extends WebController
                 $this->trigger(FileEvent::EVENT_BEFORE_MOVE, new FileEvent(['filename' => $oldPath]));
                 $accessManager->check($oldPath, $this->module->repair);
 
+                // moving changes the item like a rename does; the items moved before stay moved
+                if (!$accessManager->grantAccess($oldPath, FileManager::ACCESS_UPDATE)) {
+                    $errorMessage = 'nopermission';
+                    $success = false;
+                    break;
+                }
+
                 $itemType = $this->getItemType($storage, $oldPath);
                 if ($itemType !== 'file' && $itemType !== 'dir') {
                     $errorMessage = 'notfound';
@@ -241,6 +248,15 @@ class ApiController extends WebController
                 $this->trigger(FileEvent::EVENT_BEFORE_COPY, new FileEvent(['filename' => $oldPath]));
                 // ensure hashmap entry
                 $accessManager->check($oldPath, $this->module->repair);
+
+                // the copy belongs to the copier, so reading the source must be allowed; the items
+                // copied before stay copied
+                if (!$accessManager->grantAccess($oldPath, FileManager::ACCESS_READ)) {
+                    $errorMessage = 'nopermission';
+                    $success = false;
+                    break;
+                }
+
                 if ($this->getItemType($storage, $oldPath) !== 'file') {
                     return false;
                 }
@@ -350,6 +366,8 @@ class ApiController extends WebController
         $accessManager->check($item, $this->module->repair);
 
         if (!$accessManager->grantAccess($item, FileManager::ACCESS_UPDATE)) {
+            $errorMessage = 'permission_edit_denied';
+        } elseif (!$this->canRenameInto($accessManager, $item, $newItemPath)) {
             $errorMessage = 'permission_edit_denied';
         } elseif (($itemType = $this->getItemType($storage, $item)) === 'file' && ($validationError = $this->module->getUploadValidator()->validateFileName(basename($newItemPath))) !== null) {
             $errorMessage = $validationError;
@@ -753,6 +771,14 @@ class ApiController extends WebController
     public function actionResolvePermissions($path)
     {
         $accessManager = FileManager::access();
+
+        // only the owner and admins may see the permissions; a denial answers like a missing row
+        if (!$accessManager->canManagePermissions($path)) {
+            return $this->asJson([
+                'auth' => false
+            ]);
+        }
+
         return $this->asJson([
             'auth' => $accessManager->getPermissions($path)
         ]);
@@ -767,6 +793,21 @@ class ApiController extends WebController
     {
         $accessManager = FileManager::access();
         $item = json_decode($item, true);
+
+        // only the owner and admins may change permissions; checked before the self-heal, so a denied
+        // call creates no row
+        if (!$accessManager->canManagePermissions($path)) {
+            $errorMessage = 'permission_update_denied';
+            $this->trigger(FileEvent::EVENT_CHANGE_PERMISSION_ERROR, new FileEvent([
+                'errorMessage' => $errorMessage
+            ]));
+            return $this->asJson([
+                'result' => [
+                    'success' => false,
+                    'error' => FileManager::translate($errorMessage)
+                ]
+            ]);
+        }
 
         // ensure hashmap entry
         $accessManager->check($path, $this->module->repair);
@@ -855,6 +896,27 @@ class ApiController extends WebController
         return $this->asJson($result);
     }
 
+
+    /**
+     * Whether `rename` may put the item into the folder of $newItemPath: always if that is the
+     * item's current folder, otherwise the user needs update access on the destination folder
+     * (checked like createFolder checks its parent: without self-heal, a folder without row inherits).
+     *
+     * @param \hrzg\filefly\components\AccessManager $accessManager
+     * @param string $item
+     * @param string $newItemPath
+     *
+     * @return bool
+     */
+    private function canRenameInto($accessManager, $item, $newItemPath)
+    {
+        $currentFolder = dirname('/' . trim((string)$item, '/'));
+        $destinationFolder = dirname('/' . trim((string)$newItemPath, '/'));
+        if ($currentFolder === $destinationFolder) {
+            return true;
+        }
+        return (bool)$accessManager->grantAccess($destinationFolder, FileManager::ACCESS_UPDATE);
+    }
 
     /**
      * Type of an existing item as the Flysystem 1 handler API reported it with

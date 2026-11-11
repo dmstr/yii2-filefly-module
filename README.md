@@ -150,6 +150,8 @@ The Flysystem plugins in `hrzg\filefly\plugins` and the magic methods of the sam
 
 Permission checks will ever come after file or folder operation
 
+Rights needed per action (besides the route permission and, for POST requests, the role `FileflyDefault`): `list` and `search` read access (`stream` and `download` check no item access); `upload` and `createFolder` update access on the target folder; `rename` update access on the item and, when the item goes to another folder, on that folder; `move` update access on the target folder and on each item; `copy` update access on the target folder and read access on each item; `remove` delete access on each item. `changePermissions` and `resolvePermissions` are allowed only for the owner of the item (`access_owner` of its own record), users with the RBAC role `Admin` and users with `FileflyAdmin` assigned directly; the permissions of `/` are managed by admins only.
+
 **grantAccess**
 ```
 Granted or deny permission
