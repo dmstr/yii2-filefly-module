@@ -1,0 +1,81 @@
+<!-- file generated with AI assistance: Claude Code - [2026-11-11 21:00:00 UTC] -->
+
+# Adapter test stack and behaviour probe
+
+Local S3 and FTP servers plus a standalone PHP probe that records how the Flysystem 3 adapters behave through `creocoder/yii2-flysystem` 2.0 (fork tag `2.0.0-beta1.1`). It prepares the Flysystem 3 migration of this module and is independent of the module's own tests: the probe has its own `./probe/composer.json`, and its dependencies are installed inside the runner image, never into this checkout (a `vendor/` below `tests/` would contain `*Test.php` files that the root PHPUnit run would pick up). Nothing in this directory ends in `Test.php`.
+
+The result is `./RESULTS.md` (findings and the full matrix) and `./results.json` (the same data, machine-readable).
+
+## Commands
+
+All commands run in this directory (`tests/adapters`).
+
+```bash
+# start the servers (S3 x2, FTP x4), wait until healthy
+docker compose up -d --wait --build
+
+# run the probe against everything, regenerate ./RESULTS.md and ./results.json
+docker compose run --rm --build probe
+
+# tear everything down: containers, network, volumes
+docker compose --profile probe down --volumes --remove-orphans
+```
+
+`docker compose run --rm probe` alone also starts the servers. One full run takes about one minute. A filtered run prints JSON to stdout and leaves the result files alone:
+
+```bash
+docker compose run --rm probe sh -c \
+    'composer dump-autoload -q && php run-probe.php --backend=s3-rustfs --scenario=s3req.'
+```
+
+The built images (`filefly-adapters/ftp:local`, `filefly-adapters/probe:local`) stay as build cache; `docker compose --profile probe down --rmi all` removes them together with the pulled server images.
+
+## Services
+
+| Service | Image | Purpose |
+| --- | --- | --- |
+| `garage` | `dxflrs/garage:v2.5.0` | S3 server, single node, bucket and key created at start (`--single-node --default-bucket`) |
+| `rustfs` | `rustfs/rustfs:1.0.5` | second S3 server; the probe creates the bucket |
+| `vsftpd` | `filefly-adapters/ftp:local` (Alpine 3.24.4, vsftpd 3.0.5) | FTP and explicit FTPS on port 21 |
+| `proftpd` | same image, ProFTPD 1.3.9e with mod_tls | FTP and explicit FTPS (TLS 1.2) on port 21 |
+| `proftpd-tls13` | same image, ProFTPD with TLS 1.3 enabled | shows the TLS 1.3 session reuse failure, see `./RESULTS.md` |
+| `pureftpd` | same image, Pure-FTPd 1.0.54 built from source | FTP and explicit FTPS on port 21 |
+| `probe` (profile `probe`) | `filefly-adapters/probe:local` (`php:8.4.27-cli-alpine3.24` plus `ext-ftp` with SSL, Composer 2.11.2) | runs `./probe/run-probe.php` |
+
+Why these images (checked 2026-11-11):
+
+- Garage (Deuxfleurs, AGPL-3.0, v2.5.0 of 2026-10-24, commits this week, multi-arch incl. arm64) keeps keys in a flat key space like AWS, so "file and directory of the same name" and "file below a file" behave as on AWS. It does not implement object ACLs (`GetObjectAcl`/`PutObjectAcl` answer 501), which breaks Flysystem's `copy`/`move`/`visibility` with default options; that is why a second S3 server runs.
+- RustFS (Apache-2.0, 1.0.5 of 2026-11-10, arm64 and amd64) answers the ACL calls and is already used in other company stacks.
+- Not chosen: MinIO (no community Docker images since October 2025, repository archived in February 2026), LocalStack (the 2026 images require an auth token), Versity S3 Gateway (maps keys onto a POSIX tree, so it would show file system semantics instead of S3 semantics), Adobe S3Mock (a mock, not a server).
+- FTP: no maintained multi-arch vsftpd/ProFTPD/Pure-FTPd image with FTPS exists on Docker Hub (`fauria/vsftpd` last pushed 2023 and amd64 only, `stilliard/pure-ftpd` amd64 only, `delfer/alpine-ftp-server` last pushed March 2025), so one small image is built on the official `alpine:3.24.4` with the distribution packages. Pure-FTPd is compiled from the checksummed release tarball because Alpine builds it with `--with-minimal`, which drops `NOOP`, `STAT`, `FEAT` and more. vsftpd runs inetd-style under `tcpsvd`, because its standalone listener died with SIGSEGV after FTPS sessions.
+- Runner: official `php:8.4.27-cli-alpine3.24`; `ext-ftp` is built with `--with-ftp-ssl`, the image does not ship it.
+
+Credentials are test-only and defined once in `./test-credentials.env`; every service reads that file. The FTPS certificate is self-signed, generated at every container start and never stored.
+
+Server state lives on tmpfs, so every `up` starts empty and `down` leaves nothing behind.
+
+## Ports and FTP passive mode
+
+No fixed host ports are used, so the stack cannot collide with other projects.
+
+- The probe runs inside the compose network and talks to `garage:3900`, `rustfs:9000`, `vsftpd:21`, `proftpd:21`, `proftpd-tls13:21` and `pureftpd:21` by service name.
+- FTP is not published at all. Passive mode therefore needs no published passive ports and no advertised external address: each daemon offers ports 30000-30009 on its container address, which the probe reaches directly. This works the same on Docker Desktop for macOS and on Linux, because no NAT sits between client and server. In addition `creocoder\flysystem\FtpFilesystem` defaults to `ignorePassiveAddress => true`, so the client connects to the control host even if a daemon advertised another address.
+- The S3 APIs are published on ephemeral ports of `127.0.0.1` for ad-hoc use from the host, for example with the AWS CLI:
+
+```bash
+docker compose port garage 3900
+docker compose port rustfs 9000
+```
+
+## Layout
+
+- `./compose.yaml`: the stack
+- `./test-credentials.env`: all test credentials
+- `./garage/garage.toml`: Garage config
+- `./ftp/`: FTP image (`Dockerfile`, `entrypoint.sh`, `vsftpd.conf`, `proftpd.conf`)
+- `./runner/Dockerfile`: PHP runner
+- `./probe/`: the probe (`run-probe.php`, `src/`, `migration-notes.md` with the hand-written section that heads `./RESULTS.md`)
+
+## Adding a scenario
+
+Scenarios live in `./probe/src/Scenarios.php`: one `Scenario` per matrix row, each running in its own directory below a per-run, per-backend directory. A scenario only records observations (`label => text`); it asserts nothing. Exceptions are recorded with class and shortened message, and PHP warnings that are not silenced with `@` are listed, because a Yii application turns them into an `ErrorException`.

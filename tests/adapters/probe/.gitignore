@@ -1,0 +1,7 @@
+# file generated with AI assistance: Claude Code - [2026-11-11 21:00:00 UTC]
+# The runner image installs dependencies outside the checkout
+# (COMPOSER_VENDOR_DIR, see ../runner/Dockerfile). These entries only catch a
+# manual `composer install` here: vendor/ below tests/ would contain *Test.php
+# files that the module's root PHPUnit run would pick up. Delete it again.
+/vendor/
+composer.lock
