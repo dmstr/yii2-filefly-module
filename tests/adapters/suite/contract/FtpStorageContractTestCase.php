@@ -5,26 +5,19 @@ namespace hrzg\filefly\tests\adapters\suite\contract;
 
 use hrzg\filefly\components\Storage;
 use hrzg\filefly\components\storage\StorageException;
-use hrzg\filefly\tests\adapters\suite\support\Backends;
-use League\Flysystem\FilesystemOperator;
+use hrzg\filefly\tests\adapters\suite\support\TestRoot;
 use League\Flysystem\UnableToWriteFile;
 
 /**
- * The storage contract on an FTP daemon, plain FTP or explicit FTPS. Each test gets the root
- * `/filefly-contract/<unique>` below the FTP user's home, created and removed through a second
- * component rooted at the home.
+ * The storage contract on an FTP daemon, plain FTP or explicit FTPS. Each test gets its own
+ * root directory (TestRoot::ftp()).
  */
 abstract class FtpStorageContractTestCase extends StorageContractTestCase
 {
     /**
-     * @var FilesystemOperator|null operator rooted at the FTP user's home
+     * @var TestRoot|null
      */
-    private $home;
-
-    /**
-     * @var string|null test root relative to the home
-     */
-    private $relativeRoot;
+    private $root;
 
     /**
      * Compose service name of the daemon
@@ -43,19 +36,16 @@ abstract class FtpStorageContractTestCase extends StorageContractTestCase
 
     protected function createTestRoot(): array
     {
-        Backends::requireStack();
-        $this->home = \Yii::createObject(Backends::ftp($this->host(), $this->ssl(), '/'))->getFilesystem();
-        $this->relativeRoot = ltrim(Backends::FTP_BASE_ROOT, '/') . '/' . Backends::uniqueName('c');
-        $this->home->createDirectory($this->relativeRoot);
-        return Backends::ftp($this->host(), $this->ssl(), '/' . $this->relativeRoot);
+        $this->root = TestRoot::ftp($this->host(), $this->ssl());
+        return $this->root->config;
     }
 
     protected function removeTestRoot(): void
     {
-        if ($this->home !== null && $this->relativeRoot !== null && strpos($this->relativeRoot, ltrim(Backends::FTP_BASE_ROOT, '/') . '/c-') === 0) {
-            $this->home->deleteDirectory($this->relativeRoot);
+        if ($this->root !== null) {
+            $this->root->remove();
         }
-        $this->home = null;
+        $this->root = null;
     }
 
     // ------------------------------------------------------------------

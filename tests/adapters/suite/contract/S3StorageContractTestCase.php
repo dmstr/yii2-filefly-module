@@ -10,15 +10,14 @@ use hrzg\filefly\components\storage\ItemExistsException;
 use hrzg\filefly\components\storage\StorageException;
 use hrzg\filefly\tests\adapters\suite\support\Backends;
 use hrzg\filefly\tests\adapters\suite\support\CountingAwsS3Filesystem;
+use hrzg\filefly\tests\adapters\suite\support\TestRoot;
 
 /**
  * The storage contract on an S3 server, plus what only S3 has: raw object keys (directory
  * markers, implicit directories), the requests per facade method (pinned), and the isolation of
  * the component's `prefix`.
  *
- * Each test gets the prefix `filefly-contract/<unique>`; tearDown() deletes every key that starts
- * with it (also the sibling keys `<unique>.txt`, `<unique>-outside/...` the isolation test
- * seeds outside the prefix).
+ * Each test gets its own prefix (TestRoot::s3()).
  */
 abstract class S3StorageContractTestCase extends StorageContractTestCase
 {
@@ -33,6 +32,11 @@ abstract class S3StorageContractTestCase extends StorageContractTestCase
     private $client;
 
     /**
+     * @var TestRoot|null
+     */
+    private $root;
+
+    /**
      * Endpoint of the server inside the compose network
      */
     abstract protected function endpoint(): string;
@@ -44,22 +48,18 @@ abstract class S3StorageContractTestCase extends StorageContractTestCase
 
     protected function createTestRoot(): array
     {
-        Backends::requireStack();
-        $this->prefix = Backends::S3_BASE_PREFIX . '/' . Backends::uniqueName('c');
-        $config = Backends::s3($this->endpoint(), $this->prefix);
-        /** @var CountingAwsS3Filesystem $component */
-        $component = \Yii::createObject($config);
-        $this->client = $component->getClient();
-        Backends::ensureBucket($this->client, Backends::env('S3_BUCKET'));
-        return $config;
+        $this->root = TestRoot::s3($this->endpoint());
+        $this->prefix = $this->root->prefix;
+        $this->client = $this->root->client;
+        return $this->root->config;
     }
 
     protected function removeTestRoot(): void
     {
-        if ($this->client !== null && $this->prefix !== null && strpos($this->prefix, Backends::S3_BASE_PREFIX . '/c-') === 0) {
-            // the unique name without slash: the test prefix and the siblings seeded outside it
-            $this->client->deleteMatchingObjects(Backends::env('S3_BUCKET'), $this->prefix);
+        if ($this->root !== null) {
+            $this->root->remove();
         }
+        $this->root = null;
         $this->client = null;
     }
 

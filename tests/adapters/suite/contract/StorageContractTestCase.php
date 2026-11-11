@@ -12,8 +12,8 @@ use hrzg\filefly\components\storage\ItemNotFoundException;
 use hrzg\filefly\components\storage\StorageException;
 use hrzg\filefly\components\storage\StorageItem;
 use hrzg\filefly\tests\adapters\suite\support\CountingOperator;
+use hrzg\filefly\tests\adapters\suite\support\RawTree;
 use League\Flysystem\FilesystemOperator;
-use League\Flysystem\StorageAttributes;
 use PHPUnit\Framework\TestCase;
 use Yii;
 use yii\di\Container;
@@ -24,10 +24,7 @@ use yii\di\Container;
  * prefix per test) and names its documented deviations (see Deviation).
  *
  * Seeding and inspection go through the Flysystem operator of the component itself (`raw`), never
- * through the facade under test. tree() is the complete content of the test root: files as
- * `path => content`, directories as `path/ => null`, where a directory is every directory entry
- * of a deep raw listing plus every parent of an entry (so an S3 prefix with objects below it is a
- * directory, and a file and a directory of the same name show up as two keys).
+ * through the facade under test; tree() is the complete content of the test root (RawTree).
  */
 abstract class StorageContractTestCase extends TestCase
 {
@@ -145,21 +142,7 @@ abstract class StorageContractTestCase extends TestCase
      */
     protected function tree(): array
     {
-        $tree = [];
-        /** @var StorageAttributes $attributes */
-        foreach ($this->raw->listContents('', true) as $attributes) {
-            $path = trim($attributes->path(), '/');
-            if ($attributes->isDir()) {
-                $tree[$path . '/'] = null;
-            } else {
-                $tree[$path] = $this->raw->read($path);
-            }
-            for ($parent = dirname($path); $parent !== '.' && $parent !== ''; $parent = dirname($parent)) {
-                $tree[$parent . '/'] = null;
-            }
-        }
-        ksort($tree, SORT_STRING);
-        return $tree;
+        return RawTree::of($this->raw);
     }
 
     protected function assertTree(array $expected, string $message = ''): void
