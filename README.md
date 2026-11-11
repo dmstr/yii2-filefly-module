@@ -146,7 +146,7 @@ So if inherited `access_*` permissions should be used, set defaultPermissions to
 
 Access checks and the hashmap maintenance are done by `hrzg\filefly\components\AccessManager`; `FileManager::access()` returns one for the filesystem of the current module, with the methods `check()`, `grantAccess()`, `setAccess()`, `removeAccess()`, `getPermissions()`, `updatePermission()` and `isEmpty()`.
 
-The Flysystem plugins in `hrzg\filefly\plugins` and the magic methods of the same names on `FileManager::fileSystem()` are deprecated since 1.9; they delegate to `AccessManager` and are removed in 2.0 together with Flysystem 1.
+The Flysystem plugins in `hrzg\filefly\plugins` and `FileManager::fileSystem()` with its magic methods of the same names were deprecated in 1.9 and are removed in 2.0: use `FileManager::access()` for permissions and the hashmap and `FileManager::storage()` for files.
 
 Permission checks will ever come after file or folder operation
 

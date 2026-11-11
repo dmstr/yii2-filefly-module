@@ -17,7 +17,7 @@ use yii\base\BaseObject;
 /**
  * Access control and hashmap maintenance for the items of one filesystem component.
  *
- * Replaces the Flysystem plugins in `hrzg\filefly\plugins`. Obtain an instance for the current
+ * Replaced the Flysystem plugins of 1.x (removed in 2.0). Obtain an instance for the current
  * module with FileManager::access(). An instance caches access decisions (grantAccess()), so it
  * should not outlive one request.
  *
