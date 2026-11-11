@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- file generated with AI assistance: Claude Code - [2026-11-12 16:00:00 UTC] -->
+<!--
+  Adapter suite: the storage contract, the HTTP API and the console command against the local
+  adapter and the S3 and FTP servers of ./compose.yaml. Not part of the default run (the root
+  phpunit.xml.dist excludes tests/adapters). Run it with the compose service suite, see
+  ./README.md; outside the stack only the local backend runs, the others are skipped.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.6/phpunit.xsd"
+         bootstrap="../bootstrap.php"
+         cacheResult="false"
+         colors="true">
+    <testsuites>
+        <testsuite name="adapters">
+            <directory>./suite</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

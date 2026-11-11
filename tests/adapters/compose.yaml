@@ -1,7 +1,8 @@
 # file generated with AI assistance: Claude Code - [2026-11-11 21:00:00 UTC]
 # Adapter test stack for the Flysystem 3 migration of filefly: two
 # S3-compatible servers, three FTP daemons (each plain FTP and explicit
-# FTPS on port 21) and the PHP probe that runs inside this network.
+# FTPS on port 21), the PHP probe and the module's adapter suite, which both
+# run inside this network.
 #
 # No fixed host ports: FTP is only reachable inside the compose network (the
 # probe runs there, so passive mode needs no published ports and no
@@ -94,4 +95,29 @@ services:
       vsftpd: {condition: service_healthy}
       proftpd: {condition: service_healthy}
       proftpd-tls13: {condition: service_healthy}
+      pureftpd: {condition: service_healthy}
+
+  # The module's adapter suite (./phpunit.xml): the storage contract, the
+  # HTTP API and the console command against the local adapter and every
+  # server above except proftpd-tls13 (known server-side failure, see
+  # ./README.md). The module checkout is mounted read-only with its vendor/
+  # (composer install on the host, require-dev has the S3 and FTP adapters).
+  suite:
+    build:
+      context: .
+      dockerfile: runner/Dockerfile
+    image: filefly-adapters/probe:local
+    env_file: ./test-credentials.env
+    environment:
+      FILEFLY_ADAPTER_STACK: "1"
+    volumes:
+      - ../..:/module:ro
+    working_dir: /module
+    command: ["php", "vendor/bin/phpunit", "-c", "tests/adapters/phpunit.xml"]
+    profiles: ["suite"]
+    depends_on:
+      garage: {condition: service_healthy}
+      rustfs: {condition: service_healthy}
+      vsftpd: {condition: service_healthy}
+      proftpd: {condition: service_healthy}
       pureftpd: {condition: service_healthy}
