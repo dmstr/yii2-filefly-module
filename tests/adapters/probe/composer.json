@@ -10,7 +10,7 @@
         "league/flysystem": "^3.35.3",
         "league/flysystem-aws-s3-v3": "^3",
         "league/flysystem-ftp": "^3",
-        "creocoder/yii2-flysystem": "^2.0@beta",
+        "creocoder/yii2-flysystem": "^2.0",
         "yiisoft/yii2": "~2.0.53"
     },
     "autoload": {
@@ -19,11 +19,6 @@
         }
     },
     "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/dmstr-forks/yii2-flysystem.git",
-            "no-api": true
-        },
         {
             "type": "composer",
             "url": "https://asset-packagist.org"
