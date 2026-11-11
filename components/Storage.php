@@ -45,7 +45,9 @@ use yii\base\BaseObject;
  *   never counts as existing (exists('/') is false).
  * - ItemExistsException: a write, copy or move would replace an existing file or directory.
  *   Every writing method refuses to replace anything; source and target stay unchanged. (The
- *   existence check and the write are two requests, not atomic.)
+ *   existence check and the write are two requests, not atomic.) The one exception is
+ *   replaceFile(), the only operation allowed to replace an existing FILE; it still refuses a
+ *   directory.
  * - StorageException: any other failure the filesystem library reports (for example a link that
  *   the adapter is configured to refuse).
  * - `false` return value: the adapter performed the operation and reported failure.
@@ -421,6 +423,48 @@ class Storage extends BaseObject
         $config = $mimeType === null ? [] : ['mimetype' => $mimeType];
         return $this->call(function () use ($path, $stream, $config) {
             return $this->filesystem->writeStream($path, $stream, $config);
+        });
+    }
+
+    /**
+     * Write a file from a stream, replacing the content of an existing FILE at the path: the only
+     * operation of this class that may replace anything. Without an item at the path it behaves
+     * like writeFile() (missing parent directories are created). The stream is rewound first if it
+     * is seekable and is not closed. The replaced file gets the current time as modification time
+     * (local adapter).
+     *
+     * A directory at the path (also the root) is never replaced or deleted: the call is refused
+     * with ItemExistsException and nothing changes.
+     *
+     * Requests: an existence check, for an existing item one metadata request, then the write.
+     * Like the other writes this is not atomic.
+     *
+     * @param string $path
+     * @param resource $stream
+     * @param string|false|null $mimeType see writeFile()
+     *
+     * @return bool `false` if the adapter reports failure
+     * @throws ItemExistsException if a directory (or anything else that is not a file) is at the path
+     * @throws \InvalidArgumentException if $stream is no stream resource
+     * @throws InvalidPathException
+     * @throws StorageException
+     */
+    public function replaceFile($path, $stream, $mimeType = null)
+    {
+        $path = $this->normalizePath($path);
+        if ($path === '') {
+            throw new ItemExistsException('The root directory can not be replaced by a file.');
+        }
+        $config = $mimeType === null ? [] : ['mimetype' => $mimeType];
+        return $this->call(function () use ($path, $stream, $config) {
+            if (!$this->filesystem->has($path)) {
+                return $this->filesystem->writeStream($path, $stream, $config);
+            }
+            $metadata = $this->filesystem->getMetadata($path);
+            if (!is_array($metadata) || !isset($metadata['type']) || $metadata['type'] !== 'file') {
+                throw new ItemExistsException('Only a file can be replaced, not the item at path: ' . $path);
+            }
+            return $this->filesystem->updateStream($path, $stream, $config);
         });
     }
 

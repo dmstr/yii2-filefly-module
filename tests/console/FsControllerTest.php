@@ -888,35 +888,61 @@ class FsControllerTest extends ConsoleTestCase
     /**
      * @dataProvider syncViaProvider
      */
-    public function testSyncDoesNotUpdateFileWhenTargetIsOlderButThrows(string $via): void
+    public function testSyncReplacesFileWhenTargetIsOlder(string $via): void
     {
-        // NOTE: current behaviour, looks unintended: a source newer than the target is detected as "update",
-        // but the update is a plain copy onto an existing file, which throws. The target keeps its old content,
-        // so the documented update never happens.
         $this->seedFile('a', 'x.txt', 'newer source', self::NEW);
-        $this->seedFile('b', 'x.txt', 'older target', self::OLD);
+        $this->seedFile('b', 'x.txt', 'older target with longer content', self::OLD);
 
         $result = $this->sync($via, 'a://', 'b://');
 
-        $this->assertNotNull($result->exception);
-        $this->assertTree('b', ['x.txt' => 'older target']);
+        $this->assertNull($result->exception);
+        // the whole content is replaced (no rest of the longer old content), the source stays as it is
+        $this->assertTree('b', ['x.txt' => 'newer source']);
         $this->assertTree('a', ['x.txt' => 'newer source']);
-        $this->assertSame(self::OLD, $this->mtime('b', 'x.txt'));
+        $this->assertSame(self::NEW, $this->mtime('a', 'x.txt'));
+        // like a copy, the replaced file gets the current time, so a second run skips it
+        $this->assertGreaterThan(self::NEW, $this->mtime('b', 'x.txt'));
     }
 
     /**
      * @dataProvider syncViaProvider
      */
-    public function testSyncOneSecondNewerSourceIsAlreadyDetectedAsUpdate(string $via): void
+    public function testSyncReplacesOlderTargetsAndContinuesWithTheFollowingFiles(string $via): void
     {
-        // NOTE: see testSyncDoesNotUpdateFileWhenTargetIsOlderButThrows
+        $this->seedFile('a', 'a.txt', 'source a', self::NEW);
+        $this->seedFile('b', 'a.txt', 'target a', self::OLD);
+        $this->seedFile('a', 'b.txt', 'source b', self::OLD);
+        $this->seedFile('a', 'c.txt', 'source c', self::OLD);
+        $this->seedFile('b', 'c.txt', 'target c', self::NEW);
+        $this->seedFile('a', 'd/e.txt', 'source e', self::NEW);
+        $this->seedFile('b', 'd/e.txt', 'target e', self::OLD);
+        $this->seedFile('b', 'd/only-target.txt', 'mine', self::OLD);
+
+        $result = $this->sync($via, 'a://', 'b://', true);
+
+        $this->assertNull($result->exception);
+        $this->assertTree('b', [
+            'a.txt' => 'source a',
+            'b.txt' => 'source b',
+            'c.txt' => 'target c',
+            'd' => self::DIR,
+            'd/e.txt' => 'source e',
+            'd/only-target.txt' => 'mine',
+        ]);
+    }
+
+    /**
+     * @dataProvider syncViaProvider
+     */
+    public function testSyncOneSecondNewerSourceAlreadyReplacesTheTarget(string $via): void
+    {
         $this->seedFile('a', 'x.txt', 'source', self::MID + 1);
         $this->seedFile('b', 'x.txt', 'target', self::MID);
 
         $result = $this->sync($via, 'a://', 'b://');
 
-        $this->assertNotNull($result->exception);
-        $this->assertTree('b', ['x.txt' => 'target']);
+        $this->assertNull($result->exception);
+        $this->assertTree('b', ['x.txt' => 'source']);
     }
 
     /**
@@ -1478,16 +1504,34 @@ class FsControllerTest extends ConsoleTestCase
         $this->assertTree('b', ['d' => self::DIR, 'd/y.txt' => 'yy']);
     }
 
-    public function testSyncActionThrowsForOlderTargetAndPrintsNoDone(): void
+    public function testSyncActionPrintsPlusForReplacedOlderTargetAndDone(): void
     {
         $this->seedFile('a', 'x.txt', 'newer source', self::NEW);
         $this->seedFile('b', 'x.txt', 'older target', self::OLD);
 
         $result = $this->runFs('sync', ['a://', 'b://']);
 
-        $this->assertThrew($result);
-        $this->assertStringNotContainsString('Done.', $result->stdout);
+        $this->assertOk($result, "+\nDone.\n");
+        $this->assertTree('b', ['x.txt' => 'newer source']);
+    }
+
+    public function testSyncActionPrintsOneTokenPerFileForNewReplacedAndSkippedFiles(): void
+    {
+        $this->seedFile('a', 'new.txt', 'new', self::OLD);
+        $this->seedFile('a', 'older.txt', 'source', self::NEW);
+        $this->seedFile('b', 'older.txt', 'target', self::OLD);
+        $this->seedFile('a', 'newer.txt', 'source', self::OLD);
+        $this->seedFile('b', 'newer.txt', 'target', self::NEW);
+
+        $result = $this->runFs('sync', ['a://', 'b://']);
+
+        // the order of entries is the order of the adapter, so the output is compared as a multiset of tokens
+        $this->assertSame(0, $result->exitCode);
         $this->assertSame('', $result->stderr);
+        $this->assertSame("\nDone.\n", substr($result->stdout, -7));
+        $tokens = str_split(substr($result->stdout, 0, -7));
+        sort($tokens);
+        $this->assertSame(['+', '+', '.'], $tokens);
     }
 
     public function testSyncActionWithUnknownSchemeThrowsAndPrintsNothing(): void
