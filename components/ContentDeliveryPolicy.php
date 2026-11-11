@@ -9,7 +9,6 @@
 
 namespace hrzg\filefly\components;
 
-use League\Flysystem\Util\MimeType;
 use yii\base\BaseObject;
 use yii\web\Response;
 
@@ -83,7 +82,7 @@ class ContentDeliveryPolicy extends BaseObject
     {
         $candidates = array_filter([
             $mimeType,
-            MimeType::detectByFilename((string)$path),
+            Storage::mimeTypeByFileName((string)$path),
         ]);
 
         foreach ($candidates as $candidate) {
