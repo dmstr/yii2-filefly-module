@@ -252,6 +252,18 @@ abstract class S3StorageContractTestCase extends StorageContractTestCase
         }));
     }
 
+    public function testRequestsOfLastModified(): void
+    {
+        $this->seedFile('d/x.txt', 'X');
+
+        $this->assertSame(['HeadObject', 'HeadObject'], $this->requests(function () {
+            $this->storage->lastModified('d/x.txt');
+        }), 'file: type check, then the time');
+        $this->assertSame(['HeadObject', 'ListObjectsV2'], $this->requests(function () {
+            $this->assertNull($this->storage->lastModified('d'));
+        }), 'directory: the type check only, a prefix has no time');
+    }
+
     /**
      * @dataProvider refusedPathProvider
      */
