@@ -18,6 +18,14 @@ vendor/bin/phpunit tests/api
 vendor/bin/phpunit tests/console
 ```
 
+The suite is to be run on Linux as well as on macOS, because production runs on Linux and some behaviour differs by OS (see "Error handler and PHP diagnostics"). With Docker, from the repository root, as a non-root user so that `chmod`-based tests behave (replace `<image>` with a PHP 8.4 or 8.5 image that has `pdo_sqlite` and `intl`, for example the phd5 app image; the host-installed `vendor/` is pure PHP and works in the container, `--cache-result-file` keeps the cache file out of the repository):
+
+```bash
+docker run --rm --entrypoint sh --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp/h -e TMPDIR=/tmp -v "$PWD":/work -w /work <image> \
+  -c 'vendor/bin/phpunit --cache-result-file=/tmp/phpunit.cache'
+```
+
 Tested with PHP 8.5.1, Composer 2.9.2, PHPUnit 9.6.38, yiisoft/yii2 2.0.55, league/flysystem 1.1.10, creocoder/yii2-flysystem 1.2.0, dmstr/yii2-active-record-permissions 1.3.2, dmstr/yii2-web 1.1.3.
 
 Every test in `tests/api/` runs in its own PHP process (see "Process isolation" below); one isolated test takes roughly 0.05 to 0.1 s. Tests in `tests/console/` share one process (see "Console harness").
@@ -159,6 +167,7 @@ Dependencies not declared by the module:
 Error handler and PHP diagnostics:
 
 - [unverified] `tests/bootstrap.php` sets `YII_ENABLE_ERROR_HANDLER=false`, so Yii does not replace PHPUnit's handlers. A PHP warning or notice then becomes an exception through PHPUnit (HTTP 500 in the harness), while a deprecation is only printed and fails the isolated test process (PHPUnit 9.6 does not convert deprecations by default, `phpunit.xml` does not change that). No test pins the default path directly; the tests that need production-like handling (`resolvePermissions` with a NULL column, `changePermissions` without `item` or `path`) use the private `PermissionsTest::apiPostWithYiiErrorHandler()`, which installs a handler like Yii's that turns every reported error into an `ErrorException`.
+- [verified] `cp` and `mv` of a directory in the console differ by OS: copying a directory through a stream raises the PHP notice `Read of 8192 bytes failed with errno=21 Is a directory` on macOS, which the harness turns into an exception (exit code `null`, no output), while Linux raises no notice, the copy returns false and the action ends with exit code 1 and the output `Copy failed` / `Move failed`. Both leave an empty file named like the directory at the target and keep the source. `FsControllerTest::testCpOfDirectoryFailsAndLeavesAnEmptyFileAtTheTarget` and `testMvOfDirectoryFailsKeepsSourceAndLeavesAnEmptyFileAtTheTarget` accept exactly these two outcomes.
 
 Deliberately not pinned (environment dependent):
 

@@ -13,14 +13,14 @@ use Exception;
 use hrzg\filefly\components\ContentDeliveryPolicy;
 use hrzg\filefly\components\ContentValidator;
 use hrzg\filefly\components\FileManager;
+use hrzg\filefly\components\Storage;
+use hrzg\filefly\components\storage\InvalidPathException;
+use hrzg\filefly\components\storage\ItemExistsException;
+use hrzg\filefly\components\storage\ItemNotFoundException;
 use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
 use hrzg\filefly\Module as Filefly;
-use League\Flysystem\FileExistsException;
-use League\Flysystem\FileNotFoundException;
-use League\Flysystem\Util;
-use League\Flysystem\Util\MimeType;
 use Yii;
 use yii\di\Instance;
 use yii\filters\AccessControl;
@@ -153,7 +153,7 @@ class ApiController extends WebController
     public function actionMove($newPath, $items)
     {
         $paths = json_decode($items, true);
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $success = false;
         $errorMessage = '';
@@ -169,7 +169,7 @@ class ApiController extends WebController
                 $this->trigger(FileEvent::EVENT_BEFORE_MOVE, new FileEvent(['filename' => $oldPath]));
                 $accessManager->check($oldPath, $this->module->repair);
 
-                $itemType = $this->getItemType($fileSystem, $oldPath);
+                $itemType = $this->getItemType($storage, $oldPath);
                 if ($itemType !== 'file' && $itemType !== 'dir') {
                     $errorMessage = 'notfound';
                     break;
@@ -177,7 +177,7 @@ class ApiController extends WebController
 
                 $destPath = $newPath . '/' . basename($oldPath);
 
-                $moved = $fileSystem->rename($oldPath, $destPath);
+                $moved = $storage->move($oldPath, $destPath);
                 if ($moved === false) {
                     $errorMessage = 'movefailed';
                     break;
@@ -217,7 +217,7 @@ class ApiController extends WebController
     public function actionCopy($items, $newPath, $newFilename = null)
     {
         $paths = json_decode($items, true);
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $success = false;
         $errorMessage = '';
@@ -233,7 +233,7 @@ class ApiController extends WebController
                 $this->trigger(FileEvent::EVENT_BEFORE_COPY, new FileEvent(['filename' => $oldPath]));
                 // ensure hashmap entry
                 $accessManager->check($oldPath, $this->module->repair);
-                if ($this->getItemType($fileSystem, $oldPath) !== 'file') {
+                if ($this->getItemType($storage, $oldPath) !== 'file') {
                     return false;
                 }
 
@@ -245,7 +245,7 @@ class ApiController extends WebController
                 }
 
                 // copy file
-                $copied = $fileSystem->copy($oldPath, $filename);
+                $copied = $storage->copyFile($oldPath, $filename);
                 if (!$copied) {
                     $errorMessage = 'copyfailed';
                 } else {
@@ -282,7 +282,7 @@ class ApiController extends WebController
      */
     public function actionCreateFolder($newPath)
     {
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $success = false;
         $errorMessage = '';
@@ -290,10 +290,10 @@ class ApiController extends WebController
             $errorMessage = 'nopermission';
         } else {
             $this->trigger(FileEvent::EVENT_BEFORE_CREATE_FOLDER, new FileEvent(['filename' => $newPath]));
-            if ($fileSystem->has($newPath)) {
+            if ($storage->exists($newPath)) {
                 $errorMessage = 'exists';
             } else {
-                if ($fileSystem->createDir($newPath)) {
+                if ($storage->createDirectory($newPath)) {
                     $success = true;
                 }
             }
@@ -325,7 +325,7 @@ class ApiController extends WebController
      */
     public function actionRename($item, $newItemPath)
     {
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $success = false;
         $errorMessage = '';
@@ -333,7 +333,7 @@ class ApiController extends WebController
 
         if (!$accessManager->grantAccess($item, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'permission_edit_denied';
-        } elseif (($itemType = $this->getItemType($fileSystem, $item)) === 'file' && ($validationError = $this->module->getUploadValidator()->validateFileName(basename($newItemPath))) !== null) {
+        } elseif (($itemType = $this->getItemType($storage, $item)) === 'file' && ($validationError = $this->module->getUploadValidator()->validateFileName(basename($newItemPath))) !== null) {
             $errorMessage = $validationError;
         } else {
 
@@ -341,7 +341,7 @@ class ApiController extends WebController
                 $errorMessage = 'file_not_found';
             }
             $this->trigger(FileEvent::EVENT_BEFORE_RENAME, new FileEvent(['filename' => $item]));
-            if ($fileSystem->rename($item, $newItemPath)) {
+            if ($storage->move($item, $newItemPath)) {
                 $success = true;
                 $accessManager->setAccess($item, $newItemPath);
             } else {
@@ -377,7 +377,7 @@ class ApiController extends WebController
 
         $path = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $path = ltrim($path, DIRECTORY_SEPARATOR);
         $success = false;
@@ -427,19 +427,18 @@ class ApiController extends WebController
 
                     if (in_array(mime_content_type($file['tmp_name']), $acceptedMimeTypes,
                             false) || empty($acceptedMimeTypes)) {
-                        $uploaded = $fileSystem->writeStream(
+                        $uploaded = $storage->writeFile(
                             $fullPath,
                             $stream,
-                            [
-                                'mimetype' => mime_content_type($file['tmp_name']),
-                            ]);
+                            mime_content_type($file['tmp_name'])
+                        );
                     } else {
                         Yii::error('MIME Type not allowed', __METHOD__);
                         $errorMessage = 'file_type_not_allowed';
                         // continue with other uploads
                         continue;
                     }
-                } catch (FileExistsException $e) {
+                } catch (ItemExistsException $e) {
                     Yii::error($e->getMessage(), __METHOD__);
                     $errorMessage = 'file_already_exists';
                     // continue with other uploads
@@ -489,44 +488,42 @@ class ApiController extends WebController
     public function actionList($path)
     {
         $files = [];
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
 
         $accessManager->check($path, false);
 
         $parentFolderAccess = $accessManager->grantAccess($path, FileManager::ACCESS_READ);
         if ($parentFolderAccess) {
-            foreach ($fileSystem->listContents($path) as $item) {
+            foreach ($storage->listItems($path) as $item) {
 
                 // ensure hashmap entry
-                $accessManager->check($item['path'], $this->module->repair);
+                $accessManager->check($item->getPath(), $this->module->repair);
 
                 // check direct access
-                $access = $accessManager->grantAccess($item['path'], FileManager::ACCESS_READ, $this->module->repair);
+                $access = $accessManager->grantAccess($item->getPath(), FileManager::ACCESS_READ, $this->module->repair);
                 if ($access) {
-                    if (array_key_exists('size', $item)) {
-                        $size = array_key_exists('size', $item) ? $item['size'] : 0;
+                    $size = $item->getFileSize() !== null ? $item->getFileSize() : 0;
+
+                    if (!empty($item->getLastModified())) {
+                        $time = $item->getLastModified();
                     } else {
-                        $size = 0;
+                        $time = $storage->lastModified($item->getPath()) ?: time();
                     }
 
-                    if (array_key_exists('timestamp', $item) && !empty($item['timestamp'])) {
-                        $time = $item['timestamp'];
-                    } else {
-                        $time = $fileSystem->getTimestamp($item['path']) ?: time();
-                    }
-
+                    // the callbacks receive the item as array (documented in StorageItem::toArray())
+                    $itemArray = $item->toArray();
                     $files[] = [
-                        'name' => $item['basename'],
-                        'dirname' => $item['dirname'],
-                        'path' => $item['path'],
-                        'urls' => $this->getItemUrls($item),
-                        'thumbnail' => $this->getItemThumbnail($item),
-                        'preview' => $this->getItemPreview($item),
+                        'name' => $item->getBasename(),
+                        'dirname' => $item->getDirname(),
+                        'path' => $item->getPath(),
+                        'urls' => $this->getItemUrls($itemArray),
+                        'thumbnail' => $this->getItemThumbnail($itemArray),
+                        'preview' => $this->getItemPreview($itemArray),
                         'size' => $size,
                         'date' => date('Y-m-d H:i:s', $time),
-                        'type' => $item['type'],
-                        'extension' => $item['extension'] ?? $this->getItemExtensionFromPath($item),
+                        'type' => $item->getType(),
+                        'extension' => $item->getExtension() ?? $this->getItemExtensionFromPath($itemArray),
                     ];
                 }
             }
@@ -545,7 +542,7 @@ class ApiController extends WebController
     public function actionRemove($items)
     {
         $paths = json_decode($items, true);
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $anyDeniedPerm = false;
         $success = false;
@@ -559,18 +556,18 @@ class ApiController extends WebController
                 continue;
             }
 
-            $itemType = $this->getItemType($fileSystem, $path);
+            $itemType = $this->getItemType($storage, $path);
             if ($itemType === 'dir') {
                 if (!$this->module->deleteRecursive && $accessManager->isEmpty($path) === false) {
                     $errorMessage = 'permission_delete_denied';
                 }
 
-                $removed = $fileSystem->deleteDir($path);
+                $removed = $storage->deleteDirectory($path);
             } elseif ($itemType === 'file') {
-                $removed = $fileSystem->delete($path);
+                $removed = $storage->deleteFile($path);
             } else {
-                // any other type got a directory handler from the Flysystem 1 handler API, whose delete() is deleteDir()
-                $removed = $fileSystem->deleteDir($path);
+                // any other type got a directory handler from the Flysystem 1 handler API, which deleted it as directory
+                $removed = $storage->deleteDirectory($path);
             }
 
             if ($removed === false) {
@@ -616,25 +613,23 @@ class ApiController extends WebController
      */
     public function actionDownload($path)
     {
-        $fileSystem = FileManager::fileSystem();
-        $adapter = $fileSystem->getAdapter();
-        $filePath = $this->normalizeAdapterPath($path);
+        $storage = FileManager::storage();
+        $filePath = $this->normalizeDeliveryPath($storage, $path);
 
         try {
-            // Ein einziger getMetadata()-Call statt separater isFile()/getMimetype()/getSize()-Aufrufe
-            $metadata = $adapter->getMetadata($filePath);
+            // one metadata request instead of separate existence, mime type and size requests
+            $metadata = $storage->fileStat($filePath);
 
-            if ($metadata === false || $metadata['type'] !== 'file') {
+            if ($metadata === null || $metadata->getType() !== 'file') {
                 throw new NotFoundHttpException(Yii::t('filefly', 'File not found at path: {path}', [
                     'path' => $path
                 ]));
             }
 
-            // getMetadata() liefert bei vielen Adaptern (u.a. S3) kein 'mimetype'.
-            // Statt eines weiteren HEAD-Requests (getMimetype()) leiten wir den Typ
-            // anhand der Dateiendung ab - kostet keinen zusätzlichen S3-Request.
-            $mimeType = $metadata['mimetype'] ?? (MimeType::detectByFilename($filePath) ?: 'application/octet-stream');
-            $size = $metadata['size'] ?? 0;
+            // many adapters (S3 among them) report no mime type with the metadata; instead of a
+            // further request it is derived from the file extension
+            $mimeType = $metadata->getMimeType() ?? (Storage::mimeTypeByFileName($filePath) ?: 'application/octet-stream');
+            $size = $metadata->getFileSize() ?? 0;
 
             $this->getDeliveryPolicy()->apply(Yii::$app->response, $filePath, $mimeType);
 
@@ -645,15 +640,13 @@ class ApiController extends WebController
             $headers->add('Content-Transfer-Encoding', 'binary');
             $headers->add('Connection', 'Keep-Alive');
 
-            // Adapter->readStream() liefert ein Array ['type' => ..., 'stream' => resource],
-            // NICHT direkt die Stream-Resource (anders als die Filesystem-Fassade).
-            $streamResult = $adapter->readStream($filePath);
-            if ($streamResult === false || !isset($streamResult['stream'])) {
+            // one read request, without a further existence check
+            $stream = $storage->fileStream($filePath);
+            if ($stream === null) {
                 throw new NotFoundHttpException(Yii::t('filefly', 'File not found at path: {path}', [
                     'path' => $path
                 ]));
             }
-            $stream = $streamResult['stream'];
 
             $this->trigger(FileEvent::EVENT_BEFORE_DOWNLOAD, new FileEvent(['filename' => $path]));
             $response->sendStreamAsFile(
@@ -684,23 +677,21 @@ class ApiController extends WebController
      */
     public function actionStream($path)
     {
-        $fileSystem = FileManager::fileSystem();
-        $adapter = $fileSystem->getAdapter();
-        $filePath = $this->normalizeAdapterPath($path);
+        $storage = FileManager::storage();
+        $filePath = $this->normalizeDeliveryPath($storage, $path);
 
         try {
-            // Ein einziger getMetadata()-Call statt separater isFile()/getMimetype()/getSize()-Aufrufe
-            $metadata = $adapter->getMetadata($filePath);
+            // one metadata request instead of separate existence, mime type and size requests
+            $metadata = $storage->fileStat($filePath);
 
-            if ($metadata === false || $metadata['type'] !== 'file') {
+            if ($metadata === null || $metadata->getType() !== 'file') {
                 throw new NotFoundHttpException();
             }
 
-            // getMetadata() liefert bei vielen Adaptern (u.a. S3) kein 'mimetype'.
-            // Statt eines weiteren HEAD-Requests (getMimetype()) leiten wir den Typ
-            // anhand der Dateiendung ab - kostet keinen zusätzlichen S3-Request.
-            $mimeType = $metadata['mimetype'] ?? (MimeType::detectByFilename($filePath) ?: 'application/octet-stream');
-            $size = $metadata['size'] ?? 0;
+            // many adapters (S3 among them) report no mime type with the metadata; instead of a
+            // further request it is derived from the file extension
+            $mimeType = $metadata->getMimeType() ?? (Storage::mimeTypeByFileName($filePath) ?: 'application/octet-stream');
+            $size = $metadata->getFileSize() ?? 0;
 
             $forceAttachment = $this->getDeliveryPolicy()->apply(Yii::$app->response, $filePath, $mimeType);
 
@@ -711,13 +702,11 @@ class ApiController extends WebController
             $headers->add('Expires', gmdate('D, d M Y H:i:s', time() + $offset) . ' GMT');
             $headers->add('Cache-Control', 'public');
 
-            // Adapter->readStream() liefert ein Array ['type' => ..., 'stream' => resource],
-            // NICHT direkt die Stream-Resource (anders als die Filesystem-Fassade).
-            $streamResult = $adapter->readStream($filePath);
-            if ($streamResult === false || !isset($streamResult['stream'])) {
+            // one read request, without a further existence check
+            $stream = $storage->fileStream($filePath);
+            if ($stream === null) {
                 throw new NotFoundHttpException();
             }
-            $stream = $streamResult['stream'];
 
             Yii::$app->response->sendStreamAsFile(
                 $stream,
@@ -823,7 +812,7 @@ class ApiController extends WebController
                 $item['thumbnail'] = $this->getItemThumbnail($item);
                 $item['mime'] = '';
                 $result[] = $item;
-            } catch (FileNotFoundException $e) {
+            } catch (ItemNotFoundException $e) {
                 \Yii::warning($e->getMessage(), __METHOD__);
                 continue;
             }
@@ -841,19 +830,19 @@ class ApiController extends WebController
 
     /**
      * Type of an existing item as the Flysystem 1 handler API reported it with
-     * `$fileSystem->get($path)->getType()`: the `type` of its metadata (`file`, `dir` or whatever
-     * else the adapter reports), or `dir` if the adapter returns no metadata.
+     * `$fileSystem->get($path)->getType()`: the type in its item info (`file`, `dir` or whatever
+     * else the adapter reports), or `dir` if the storage returns no item info.
      *
-     * @param \creocoder\flysystem\Filesystem $fileSystem
+     * @param Storage $storage
      * @param string $path
      *
-     * @return string
-     * @throws FileNotFoundException if the path does not exist (also for the root)
+     * @return string|null
+     * @throws ItemNotFoundException if the path does not exist (also for the root)
      */
-    private function getItemType($fileSystem, $path)
+    private function getItemType(Storage $storage, $path)
     {
-        $metadata = $fileSystem->getMetadata($path);
-        return $metadata ? $metadata['type'] : 'dir';
+        $info = $storage->itemInfo($path);
+        return $info !== null ? $info->getType() : 'dir';
     }
 
     private function getItemThumbnail(array $item)
@@ -884,25 +873,24 @@ class ApiController extends WebController
     }
 
     /**
-     * Normalises a requested path exactly like the Flysystem facade does before it delegates to the
-     * adapter (backslashes become `/`, empty and `.` segments are dropped, `..` is resolved, control
-     * characters are rejected).
+     * Normalises a requested path with Storage::normalizePath() (backslashes become `/`, empty and
+     * `.` segments are dropped, `..` is resolved, control characters are rejected).
      *
-     * stream and download call the adapter directly to save requests, which bypasses that
-     * normalisation; without it `..` segments would reach the adapter and leave the storage root.
-     * A path that leaves the root or contains control characters is answered like a missing file,
-     * without echoing the path.
+     * stream and download use the normalised path for the file name, the mime type and the
+     * delivery policy. A path that leaves the root or contains control characters is answered
+     * like a missing file, without echoing the path.
      *
+     * @param Storage $storage
      * @param string $path
      *
      * @return string path relative to the storage root, without leading or trailing slash
      * @throws NotFoundHttpException
      */
-    private function normalizeAdapterPath($path)
+    private function normalizeDeliveryPath(Storage $storage, $path)
     {
         try {
-            return Util::normalizePath($path);
-        } catch (\LogicException $e) {
+            return $storage->normalizePath($path);
+        } catch (InvalidPathException $e) {
             throw new NotFoundHttpException();
         }
     }

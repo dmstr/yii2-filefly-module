@@ -23,7 +23,7 @@ use yii\base\BaseObject;
  *
  * --- PUBLIC PROPERTIES ---
  *
- * @property \League\Flysystem\FilesystemInterface|\creocoder\flysystem\Filesystem $filesystem
+ * @property Storage $storage
  */
 class AccessManager extends BaseObject
 {
@@ -34,9 +34,9 @@ class AccessManager extends BaseObject
     public $component;
 
     /**
-     * @var \League\Flysystem\FilesystemInterface|\creocoder\flysystem\Filesystem|null
+     * @var Storage|null
      */
-    private $_filesystem;
+    private $_storage;
 
     /**
      * @var PermissionResolver|null
@@ -49,25 +49,26 @@ class AccessManager extends BaseObject
     private $_hashmap;
 
     /**
-     * The filesystem the hashmap rows belong to; defaults to the application component `$component`
+     * The storage of the filesystem the hashmap rows belong to; defaults to the storage of the
+     * application component `$component`, created on first use
      *
-     * @return \League\Flysystem\FilesystemInterface|\creocoder\flysystem\Filesystem
+     * @return Storage
      */
-    public function getFilesystem()
+    public function getStorage()
     {
-        if ($this->_filesystem === null) {
-            $this->_filesystem = \Yii::$app->get($this->component);
+        if ($this->_storage === null) {
+            $this->_storage = new Storage(['filesystem' => \Yii::$app->get($this->component)]);
         }
-        return $this->_filesystem;
+        return $this->_storage;
     }
 
     /**
-     * @param \League\Flysystem\FilesystemInterface|\creocoder\flysystem\Filesystem $filesystem
+     * @param Storage $storage
      */
-    public function setFilesystem($filesystem)
+    public function setStorage(Storage $storage)
     {
-        $this->_filesystem = $filesystem;
-        // the synchronizer is stateless; the access cache of the resolver does not depend on the filesystem
+        $this->_storage = $storage;
+        // the synchronizer is stateless; the access cache of the resolver does not depend on the storage
         $this->_hashmap = null;
     }
 
@@ -181,7 +182,7 @@ class AccessManager extends BaseObject
         if ($this->_hashmap === null) {
             $this->_hashmap = new HashmapSynchronizer([
                 'component' => $this->component,
-                'filesystem' => $this->getFilesystem(),
+                'storage' => $this->getStorage(),
             ]);
         }
         return $this->_hashmap;

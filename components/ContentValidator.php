@@ -12,7 +12,6 @@ namespace hrzg\filefly\components;
 use enshrined\svgSanitize\Sanitizer;
 use finfo;
 use hrzg\filefly\events\UploadValidationEvent;
-use League\Flysystem\Util\MimeType;
 use yii\base\Component;
 use yii\base\InvalidConfigException;
 
@@ -240,7 +239,7 @@ class ContentValidator extends Component
     public function matchesExtension($mimeType, $fileName)
     {
         $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        $expected = MimeType::getExtensionToMimeTypeMap()[$extension] ?? null;
+        $expected = Storage::mimeTypeByExtension($extension);
 
         // nothing to compare with
         if ($expected === null || $expected === 'application/octet-stream') {

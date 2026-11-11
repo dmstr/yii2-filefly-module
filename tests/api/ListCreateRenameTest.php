@@ -128,6 +128,76 @@ class ListCreateRenameTest extends ApiTestCase
         return $paths;
     }
 
+    /** @var array[] callback name => items received, in call order */
+    private static $callbackItems = [];
+
+    /**
+     * Sets the three module callbacks to record the `$item` array they receive (static property, because the
+     * callbacks run inside the module of the request); they return fixed values.
+     */
+    private function recordCallbackItems(): void
+    {
+        self::$callbackItems = ['url' => [], 'thumbnail' => [], 'preview' => []];
+        $this->configureModule([
+            'urlCallback' => static function ($item) {
+                self::$callbackItems['url'][] = $item;
+                return ['u'];
+            },
+            'thumbnailCallback' => static function ($item) {
+                self::$callbackItems['thumbnail'][] = $item;
+                return 't';
+            },
+            'previewCallback' => static function ($item) {
+                self::$callbackItems['preview'][] = $item;
+                return 'p';
+            },
+        ]);
+    }
+
+    /**
+     * Items received by one callback, keyed by their `path`
+     */
+    private function receivedBy(string $callback): array
+    {
+        $byPath = [];
+        foreach (self::$callbackItems[$callback] as $item) {
+            $this->assertArrayNotHasKey($item['path'], $byPath, "$callback called twice for " . $item['path']);
+            $byPath[$item['path']] = $item;
+        }
+        ksort($byPath, SORT_STRING);
+        return $byPath;
+    }
+
+    /**
+     * The array the list callbacks receive for a path: exact key set and order; `timestamp` has to be an integer
+     * equal to the mtime of the item on disk, `size` is left out for directories, `extension` if the name has no dot.
+     */
+    private function expectedCallbackItem(string $path, string $type, ?int $size, ?string $extension): array
+    {
+        clearstatcache();
+        $item = [
+            'type' => $type,
+            'path' => $path,
+            'timestamp' => filemtime($this->diskPath($path)),
+            'size' => $size,
+            'dirname' => dirname($path) === '.' ? '' : dirname($path),
+            'basename' => basename($path),
+            'extension' => $extension,
+            'filename' => pathinfo($path, PATHINFO_FILENAME),
+        ];
+        return array_filter($item, static function ($value) {
+            return $value !== null;
+        });
+    }
+
+    private function assertCallbackItems(array $expected, array $actual): void
+    {
+        foreach ($actual as $item) {
+            $this->assertIsInt($item['timestamp']);
+        }
+        $this->assertSame($expected, $actual);
+    }
+
     private function seedSearchFixtures(): void
     {
         $this->seedFile('/docs/report.txt', '1');
@@ -391,6 +461,70 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertSame(['u:a.txt'], $items[0]['urls']);
         $this->assertSame('t:a.txt', $items[0]['thumbnail']);
         $this->assertSame('p:a.txt', $items[0]['preview']);
+    }
+
+    public function testListItemOfDirectoryWithDotInNameHasTheTextAfterTheLastDotAsExtension(): void
+    {
+        // NOTE: current behaviour, looks unintended: a directory named like a file gets an extension in `list`,
+        // while directories without a dot (and every directory in `search`) have the empty extension
+        $this->actingAsAdmin();
+        $this->seedDir('/x.d');
+        $this->seedDir('/archive.tar');
+        $this->seedDir('/plain');
+        $this->seedFile('/f.txt', 'hello');
+
+        $items = $this->listResult($this->apiPost('list', ['path' => '/']));
+
+        $this->assertCount(4, $items);
+        $this->assertListItem($this->item('archive.tar', '', 'dir', 0, 'tar'), $items[0]);
+        $this->assertListItem($this->item('f.txt', '', 'file', 5, 'txt'), $items[1]);
+        $this->assertListItem($this->item('plain', '', 'dir', 0, ''), $items[2]);
+        $this->assertListItem($this->item('x.d', '', 'dir', 0, 'd'), $items[3]);
+    }
+
+    public function testListItemOfNestedDirectoryWithDotInNameKeepsDirnameAndHasExtension(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedDir('/sub/x.d');
+
+        $items = $this->listResult($this->apiPost('list', ['path' => '/sub']));
+
+        $this->assertCount(1, $items);
+        $this->assertListItem($this->item('x.d', 'sub', 'dir', 0, 'd'), $items[0]);
+    }
+
+    public function testListPassesExactItemArrayToUrlThumbnailAndPreviewCallbacks(): void
+    {
+        $this->actingAsAdmin();
+        $this->recordCallbackItems();
+        $this->seedFile('/root.txt', 'abcd');
+        $this->seedFile('/noext', 'abcde');
+        $this->seedDir('/x.d');
+        $this->seedDir('/plain');
+        $this->seedFile('/sub/inner.txt', 'abc');
+
+        $this->listResult($this->apiPost('list', ['path' => '/']));
+        $this->listResult($this->apiPost('list', ['path' => '/sub']));
+
+        $expected = [
+            'noext' => $this->expectedCallbackItem('noext', 'file', 5, null),
+            'plain' => $this->expectedCallbackItem('plain', 'dir', null, null),
+            'root.txt' => $this->expectedCallbackItem('root.txt', 'file', 4, 'txt'),
+            'sub' => $this->expectedCallbackItem('sub', 'dir', null, null),
+            'sub/inner.txt' => $this->expectedCallbackItem('sub/inner.txt', 'file', 3, 'txt'),
+            'x.d' => $this->expectedCallbackItem('x.d', 'dir', null, 'd'),
+        ];
+        // the literal shape of the three kinds of items, the timestamp is the mtime on disk
+        $this->assertSame(
+            ['type', 'path', 'timestamp', 'size', 'dirname', 'basename', 'extension', 'filename'],
+            array_keys($expected['sub/inner.txt'])
+        );
+        $this->assertSame(['type' => 'file', 'path' => 'sub/inner.txt', 'size' => 3, 'dirname' => 'sub', 'basename' => 'inner.txt', 'extension' => 'txt', 'filename' => 'inner'], array_diff_key($expected['sub/inner.txt'], ['timestamp' => 0]));
+        $this->assertSame(['type' => 'file', 'path' => 'noext', 'size' => 5, 'dirname' => '', 'basename' => 'noext', 'filename' => 'noext'], array_diff_key($expected['noext'], ['timestamp' => 0]));
+        $this->assertSame(['type' => 'dir', 'path' => 'x.d', 'dirname' => '', 'basename' => 'x.d', 'extension' => 'd', 'filename' => 'x'], array_diff_key($expected['x.d'], ['timestamp' => 0]));
+        foreach (['url', 'thumbnail', 'preview'] as $callback) {
+            $this->assertCallbackItems($expected, $this->receivedBy($callback));
+        }
     }
 
     public function testListAsPlainUserHidesItemsWithoutReadAccessAndRepairsRowsWithDefaultOwner(): void
@@ -1129,6 +1263,66 @@ class ListCreateRenameTest extends ApiTestCase
 
         $this->assertStatus(200, $response);
         $this->assertSame('PDF', $response->json()[0]['extension']);
+    }
+
+    public function testSearchWithOnlyFilesOffReturnsDirectoriesWithEmptyExtensionAlsoWithDotInName(): void
+    {
+        // NOTE: current behaviour, looks unintended: unlike `list`, `search` never sets an extension for directories
+        $this->actingAsAdmin();
+        $this->seedDir('/x.d');
+        $this->seedDir('/archive.tar');
+        $this->seedDir('/plain');
+        $this->seedFile('/x.txt', '1');
+        foreach (['/x.d', '/archive.tar', '/plain'] as $path) {
+            $this->seedHashmapRow($path, 'dir');
+        }
+        $this->seedHashmapRow('/x.txt', 'file');
+
+        $response = $this->apiGet('search', ['q' => 'a', 'only_files' => 0]);
+        $this->assertStatus(200, $response);
+        $hits = $response->json();
+        usort($hits, static function ($a, $b) {
+            return strcmp($a['path'], $b['path']);
+        });
+        $this->assertSame([
+            ['path' => '/archive.tar', 'type' => 'dir', 'extension' => '', 'id' => '/archive.tar', 'thumbnail' => '', 'mime' => ''],
+            ['path' => '/plain', 'type' => 'dir', 'extension' => '', 'id' => '/plain', 'thumbnail' => '', 'mime' => ''],
+        ], $hits);
+
+        $response = $this->apiGet('search', ['q' => 'x.', 'only_files' => 0]);
+        $this->assertStatus(200, $response);
+        $hits = $response->json();
+        usort($hits, static function ($a, $b) {
+            return strcmp($a['path'], $b['path']);
+        });
+        $this->assertSame([
+            ['path' => '/x.d', 'type' => 'dir', 'extension' => '', 'id' => '/x.d', 'thumbnail' => '', 'mime' => ''],
+            ['path' => '/x.txt', 'type' => 'file', 'extension' => 'txt', 'id' => '/x.txt', 'thumbnail' => '', 'mime' => ''],
+        ], $hits);
+    }
+
+    public function testSearchPassesOnlyPathTypeExtensionAndIdToTheThumbnailCallback(): void
+    {
+        // the url and preview callbacks are not called by `search`
+        $this->actingAsAdmin();
+        $this->recordCallbackItems();
+        $this->seedFile('/sub/inner.txt', 'abc');
+        $this->seedFile('/noext', 'abcde');
+        $this->seedDir('/x.d');
+        foreach (['/sub/inner.txt' => 'file', '/noext' => 'file', '/x.d' => 'dir'] as $path => $type) {
+            $this->seedHashmapRow($path, $type);
+        }
+
+        $response = $this->apiGet('search', ['q' => '', 'only_files' => 0]);
+
+        $this->assertStatus(200, $response);
+        $this->assertSame([], self::$callbackItems['url']);
+        $this->assertSame([], self::$callbackItems['preview']);
+        $this->assertSame([
+            '/noext' => ['path' => '/noext', 'type' => 'file', 'extension' => '', 'id' => '/noext'],
+            '/sub/inner.txt' => ['path' => '/sub/inner.txt', 'type' => 'file', 'extension' => 'txt', 'id' => '/sub/inner.txt'],
+            '/x.d' => ['path' => '/x.d', 'type' => 'dir', 'extension' => '', 'id' => '/x.d'],
+        ], $this->receivedBy('thumbnail'));
     }
 
     public function testSearchWithoutMatchReturnsEmptyList(): void

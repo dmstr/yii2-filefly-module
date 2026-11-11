@@ -10,9 +10,12 @@
 
 namespace hrzg\filefly\components\access;
 
+use hrzg\filefly\components\Storage;
+use hrzg\filefly\components\storage\ItemInfo;
+use hrzg\filefly\components\storage\ItemNotFoundException;
+use hrzg\filefly\components\storage\StorageItem;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
-use League\Flysystem\FileNotFoundException;
 
 /**
  * Keeps the hashmap rows in line with the files: creates rows (self-heal, new items), moves them
@@ -25,10 +28,10 @@ use League\Flysystem\FileNotFoundException;
 class HashmapSynchronizer extends HashmapService
 {
     /**
-     * The filesystem the rows belong to (Flysystem 1 filesystem or the yii component wrapping it)
-     * @var \League\Flysystem\FilesystemInterface|\creocoder\flysystem\Filesystem
+     * The storage of the filesystem the rows belong to
+     * @var Storage
      */
-    public $filesystem;
+    public $storage;
 
     /**
      * Path form used by self-heal: exactly one leading and no trailing slash.
@@ -67,7 +70,7 @@ class HashmapSynchronizer extends HashmapService
                     // try to find in filesystem by hash map path
                     try {
                         $this->fetchMetadata($hash->path);
-                    } catch (FileNotFoundException $e) {
+                    } catch (ItemNotFoundException $e) {
                         \Yii::info($e->getMessage(), __METHOD__);
                         $hash->delete();
                     }
@@ -75,7 +78,7 @@ class HashmapSynchronizer extends HashmapService
 
                 // add missing hashes
                 foreach ($this->listAllContents() as $item) {
-                    $this->ensureHash($item['path']);
+                    $this->ensureHash($item->getPath());
                 }
             } else {
                 // ensure single hash
@@ -285,9 +288,9 @@ class HashmapSynchronizer extends HashmapService
     {
         try {
             $meta = $this->fetchMetadata($path);
-            $type = (isset($meta['type'])) ? $meta['type'] : null;
-            $size = (isset($meta['size'])) ? $meta['size'] : null;
-        } catch (FileNotFoundException $e) {
+            $type = $meta !== null ? $meta->getType() : null;
+            $size = $meta !== null ? $meta->getFileSize() : null;
+        } catch (ItemNotFoundException $e) {
             \Yii::error($e->getMessage(), $logCategory);
             $type = null;
             $size = null;
@@ -296,25 +299,25 @@ class HashmapSynchronizer extends HashmapService
     }
 
     /**
-     * Filesystem read: metadata of an existing path.
+     * Filesystem read: item info of an existing path.
      *
      * @param string $path
      *
-     * @return array|false
-     * @throws FileNotFoundException if the path does not exist
+     * @return ItemInfo|null
+     * @throws ItemNotFoundException if the path does not exist
      */
     private function fetchMetadata($path)
     {
-        return $this->filesystem->getMetadata($path);
+        return $this->storage->itemInfo($path);
     }
 
     /**
      * Filesystem read: every file and directory, recursively from the root.
      *
-     * @return array[] listing entries, each with at least `path`
+     * @return StorageItem[]
      */
     private function listAllContents()
     {
-        return $this->filesystem->listContents('/', true);
+        return $this->storage->listItems('/', true);
     }
 }

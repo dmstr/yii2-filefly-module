@@ -47,6 +47,8 @@ class FileManager extends Component
      * Side effect: switches the access trait and its flash messages off for FileflyHashmap globally.
      *
      * @return Filesystem
+     * @deprecated since 1.9, removed in 2.0 with Flysystem 1: the module itself uses storage() for
+     *             files and access() for permissions; this method is kept for code outside the module
      */
     public static function fileSystem()
     {
@@ -69,6 +71,27 @@ class FileManager extends Component
     }
 
     /**
+     * The storage facade for the filesystem of the current module: the only way the module reads
+     * and writes files.
+     *
+     * Returns a new instance on every call; it holds no state besides the filesystem component.
+     *
+     * Side effect: switches the access trait and its flash messages off for FileflyHashmap globally,
+     * like fileSystem() and access(). Unlike fileSystem() it registers no plugins on the component.
+     *
+     * @return Storage
+     */
+    public static function storage()
+    {
+        $fsComponent = self::currentFilesystemComponent();
+        $storage = self::createStorage($fsComponent);
+
+        self::disableHashmapAccessTrait();
+
+        return $storage;
+    }
+
+    /**
      * Access control and hashmap maintenance for the filesystem of the current module.
      *
      * Returns a new instance on every call, so access decisions are cached per call site (one
@@ -87,7 +110,7 @@ class FileManager extends Component
 
         return new AccessManager([
             'component' => $fsComponent,
-            'filesystem' => \Yii::$app->{$fsComponent},
+            'storage' => self::createStorage($fsComponent),
         ]);
     }
 
@@ -105,6 +128,16 @@ class FileManager extends Component
     {
         $currentModule = \Yii::$app->controller->module->id;
         return \Yii::$app->getModule($currentModule)->filesystem;
+    }
+
+    /**
+     * @param string $fsComponent yii component name of the filesystem
+     *
+     * @return Storage
+     */
+    private static function createStorage($fsComponent)
+    {
+        return new Storage(['filesystem' => \Yii::$app->{$fsComponent}]);
     }
 
     private static function disableHashmapAccessTrait()
