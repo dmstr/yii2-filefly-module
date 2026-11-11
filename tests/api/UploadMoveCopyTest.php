@@ -384,18 +384,48 @@ class UploadMoveCopyTest extends ApiTestCase
         $this->assertSame(['/my-file.txt' => $this->fileRow(8)], $this->rows());
     }
 
-    public function testUploadOntoStaleHashmapRowOfMissingFileRewritesTheRowPathToRoot(): void
+    public function testUploadOntoStaleHashmapRowOfMissingFileRenewsTheRowForTheNewFile(): void
     {
         $this->actingAsAdmin();
-        $this->seedHashmapRow('/u.txt', 'file', ['access_owner' => '9', 'access_read' => 'ORPH'], 99);
+        $this->seedHashmapRow('/u.txt', 'dir', ['access_owner' => '9', 'access_read' => 'ORPH'], 99);
 
         $response = $this->apiUpload('/', ['u.txt' => 'new']);
 
-        // NOTE: current behaviour, looks unintended: the file is written, but instead of a fresh row the stale
-        // row of the same path is kept and its path is rewritten to `/` (SetAccess without new path)
+        // the stale row now describes the uploaded file, as if no row had existed
         $this->assertUploadSucceeded(['u.txt'], $response);
         $this->assertSame(['/u.txt' => 'new'], $this->disk());
-        $this->assertSame(['/' => $this->fileRow(99, '9', 'ORPH')], $this->rows());
+        $this->assertSame(['/u.txt' => $this->fileRow(3)], $this->rows());
+    }
+
+    public function testUploadAsUserOntoStaleRowRenewsItWithUserAsOwnerAndDefaultsAndKeepsOtherRows(): void
+    {
+        $this->actingAsFileflyUser(7);
+        $this->configureModule(['defaultPermissions' => [
+            'access_owner' => '1',
+            'access_read' => 'RoleR',
+            'access_update' => '*',
+            'access_delete' => 'RoleD',
+        ]]);
+        $this->seedFolder('/d', ['access_owner' => '9', 'access_update' => '*']);
+        $this->seedHashmapRow('/d/u.txt', 'file', [
+            'access_owner' => '9',
+            'access_read' => 'ORPH',
+            'access_update' => 'ORPH',
+            'access_delete' => 'ORPH',
+        ], 99);
+        $this->seedHashmapRow('/d/u.txt.bak', 'file', ['access_owner' => '9', 'access_read' => 'ORPH'], 99);
+        $this->seedHashmapRow('/d/u.txt/x', 'file', ['access_owner' => '9', 'access_read' => 'ORPH'], 99);
+
+        $response = $this->apiUpload('/d', ['u.txt' => 'new']);
+
+        $this->assertUploadSucceeded(['d/u.txt'], $response);
+        $this->assertSame(['/d' => null, '/d/u.txt' => 'new'], $this->disk());
+        $this->assertSame([
+            '/d' => $this->dirRow('9', 'RoleR', '*', 'RoleD'),
+            '/d/u.txt' => $this->fileRow(3, '7', 'RoleR', '*', 'RoleD'),
+            '/d/u.txt.bak' => $this->fileRow(99, '9', 'ORPH', '*', 'RoleD'),
+            '/d/u.txt/x' => $this->fileRow(99, '9', 'ORPH', '*', 'RoleD'),
+        ], $this->rows());
     }
 
     // ------------------------------------------------------------------
@@ -1347,22 +1377,47 @@ class UploadMoveCopyTest extends ApiTestCase
         $this->assertSame(['/t' => null], $this->disk());
     }
 
-    public function testCopyOntoStaleHashmapRowOfMissingTargetRewritesTheRowPathToRoot(): void
+    public function testCopyOntoStaleHashmapRowOfMissingTargetRenewsTheRowForTheCopy(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'A');
         $this->seedFolder('/e');
-        $this->seedHashmapRow('/e/a.txt', 'file', ['access_owner' => '9', 'access_read' => 'ORPH'], 99);
+        $this->seedHashmapRow('/e/a.txt', 'dir', ['access_owner' => '9', 'access_read' => 'ORPH'], 99);
+        $this->seedHashmapRow('/e/a.txt.bak', 'file', ['access_owner' => '9', 'access_read' => 'ORPH'], 99);
 
         $response = $this->apiPost('copy', ['newPath' => '/e', 'items' => ['/a.txt']]);
 
-        // NOTE: current behaviour, looks unintended: same SetAccess effect as for upload, the stale row moves to `/`
+        // the stale row now describes the copy, as if no row had existed; the other rows stay
         $this->assertResult(true, '', $response);
         $this->assertSame(['/a.txt' => 'A', '/e' => null, '/e/a.txt' => 'A'], $this->disk());
         $this->assertSame([
-            '/' => $this->fileRow(99, '9', 'ORPH'),
             '/a.txt' => $this->fileRow(1),
             '/e' => $this->dirRow(),
+            '/e/a.txt' => $this->fileRow(1),
+            '/e/a.txt.bak' => $this->fileRow(99, '9', 'ORPH'),
+        ], $this->rows());
+    }
+
+    public function testCopyWithNewFilenameAsUserOntoStaleRowRenewsItWithUserAsOwner(): void
+    {
+        $this->actingAsFileflyUser(7);
+        $this->seedItem('/a.txt', 'AB', ['access_owner' => '7']);
+        $this->seedFolder('/e', ['access_owner' => '9']);
+        $this->seedHashmapRow('/e/z.txt', 'file', [
+            'access_owner' => '9',
+            'access_read' => 'ORPH',
+            'access_update' => 'ORPH',
+            'access_delete' => 'ORPH',
+        ], 99);
+
+        $response = $this->apiPost('copy', ['newPath' => '/e', 'items' => ['/a.txt'], 'newFilename' => 'z.txt']);
+
+        $this->assertResult(true, '', $response);
+        $this->assertSame(['/a.txt' => 'AB', '/e' => null, '/e/z.txt' => 'AB'], $this->disk());
+        $this->assertSame([
+            '/a.txt' => $this->fileRow(2, '7'),
+            '/e' => $this->dirRow('9'),
+            '/e/z.txt' => $this->fileRow(2, '7'),
         ], $this->rows());
     }
 

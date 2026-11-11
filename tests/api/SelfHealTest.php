@@ -423,24 +423,23 @@ class SelfHealTest extends ApiTestCase
         $this->assertAccess('/d', 'dir', self::OTHER_ID, 'Secret', 'RoleA', 'Secret');
     }
 
-    public function testCreateFolderOnExistingIndexedDirectoryRewritesItsRowsToRoot(): void
+    public function testCreateFolderOnExistingIndexedDirectoryKeepsAllRows(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/d/x.txt', 'x');
         $this->seedRow('/d', 'dir', self::OTHER_ID, '*', '*', '*');
-        $this->seedRow('/d/x.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
+        $this->seedRow('/d/x.txt', 'file', self::OTHER_ID, 'RoleA', '*', '*', 1);
         $this->seedFile('/docs.txt', 'o');
         $this->seedRow('/docs.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
 
         $response = $this->apiPost('createFolder', ['newPath' => '/d']);
 
-        // NOTE: current behaviour, looks unintended: on 'exists' createFolder still calls setAccess($path)
-        // without new path, which "renames" the row of /d and the rows below it by replacing '/d' with '/';
-        // the sibling /docs.txt keeps its row
         $this->assertSame(['success' => false, 'error' => 'exists'], $response->json()['result']);
         $this->assertFileOnDisk('/d/x.txt', 'x');
-        $this->assertSame(['/', '/docs.txt', '/x.txt'], $this->rowPaths());
-        $this->assertAccess('/', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->assertSame(['/d', '/d/x.txt', '/docs.txt'], $this->rowPaths());
+        $this->assertAccess('/d', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->assertAccess('/d/x.txt', 'file', self::OTHER_ID, 'RoleA', '*', '*');
+        $this->assertAccess('/docs.txt', 'file', self::OTHER_ID, '*', '*', '*');
     }
 
     // ------------------------------------------------------------------

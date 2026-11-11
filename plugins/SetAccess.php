@@ -26,10 +26,11 @@ class SetAccess extends AccessPlugin
     }
 
     /**
-     * The full path strings of the file or directory to be set or updated
+     * Create or renew the row of a new item ($oldItemPath alone), or move the rows of a renamed or
+     * moved item to $newItemPath
      *
      * @param string $oldItemPath
-     * @param string $newItemPath
+     * @param string|null $newItemPath
      *
      * @return bool
      * @see \hrzg\filefly\components\AccessManager::setAccess()

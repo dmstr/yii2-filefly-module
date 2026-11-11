@@ -101,10 +101,13 @@ class AccessManager extends BaseObject
     }
 
     /**
-     * Create the row of a new item ($oldItemPath), or move the rows of a renamed item to $newItemPath
+     * `setAccess($path)`: create or renew the row of a newly created item (acting user as owner,
+     * access columns from the defaults; an existing row of exactly this path is overwritten, no
+     * other row changes). `setAccess($oldPath, $newPath)`: move the row of a renamed or moved item
+     * and the rows below it. See HashmapSynchronizer::setAccess().
      *
      * @param string $oldItemPath
-     * @param string $newItemPath
+     * @param string|null $newItemPath
      *
      * @return bool
      */

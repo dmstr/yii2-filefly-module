@@ -601,7 +601,7 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertRows(['/a/b/c' => $this->row('dir', null, (string)self::ADMIN_ID)]);
     }
 
-    public function testCreateFolderThatExistsAsDirectoryReportsExistsAndMovesItsRowToRoot(): void
+    public function testCreateFolderThatExistsAsDirectoryReportsExistsAndKeepsItsRow(): void
     {
         $this->actingAsAdmin();
         $this->seedDirViaApi('/d');
@@ -610,12 +610,10 @@ class ListCreateRenameTest extends ApiTestCase
 
         $this->assertResult(false, 'exists', $response);
         $this->assertDisk(['/d' => null]);
-        // NOTE: current behaviour, looks unintended: setAccess() runs also on failure with an empty new path,
-        // so the existing row of /d is renamed to "/" (and its former owner is kept)
-        $this->assertRows(['/' => $this->row('dir', null, (string)self::ADMIN_ID)]);
+        $this->assertRows(['/d' => $this->row('dir', null, (string)self::ADMIN_ID)]);
     }
 
-    public function testCreateFolderThatExistsAsDirectoryWithoutRowCreatesRowForExistingDirectory(): void
+    public function testCreateFolderThatExistsAsDirectoryWithoutRowCreatesNoRow(): void
     {
         $this->actingAsAdmin();
         $this->seedDir('/d');
@@ -624,10 +622,24 @@ class ListCreateRenameTest extends ApiTestCase
 
         $this->assertResult(false, 'exists', $response);
         $this->assertDisk(['/d' => null]);
-        $this->assertRows(['/d' => $this->row('dir', null, (string)self::ADMIN_ID)]);
+        // a refused create has no side effect on the hashmap; rows for existing items come from self-heal
+        $this->assertRows([]);
     }
 
-    public function testCreateFolderOverExistingFileReportsExistsAndKeepsFileContent(): void
+    public function testCreateFolderAsPlainUserOverExistingDirectoryWithoutRowDoesNotMakeTheUserItsOwner(): void
+    {
+        $this->actingAsFileflyUser(5);
+        $this->seedDir('/pub/d');
+        $this->seedHashmapRow('/pub', 'dir', ['access_owner' => '9']);
+
+        $response = $this->apiPost('createFolder', ['newPath' => '/pub/d']);
+
+        $this->assertResult(false, 'exists', $response);
+        $this->assertDisk(['/pub' => null, '/pub/d' => null]);
+        $this->assertRows(['/pub' => $this->row('dir', null, '9')]);
+    }
+
+    public function testCreateFolderOverExistingFileReportsExistsAndCreatesNoRow(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/f', 'content');
@@ -636,22 +648,20 @@ class ListCreateRenameTest extends ApiTestCase
 
         $this->assertResult(false, 'exists', $response);
         $this->assertDisk(['/f' => 'content']);
-        // NOTE: current behaviour, looks unintended: a failed create adds a row (type file) for the existing file
-        $this->assertRows(['/f' => $this->row('file', '7', (string)self::ADMIN_ID)]);
+        $this->assertRows([]);
     }
 
-    public function testCreateFolderOverExistingFileWithRowMovesRowToRoot(): void
+    public function testCreateFolderOverExistingFileWithRowKeepsTheRow(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/f', 'xx');
-        $this->seedHashmapRow('/f', 'file', [], 2);
+        $this->seedHashmapRow('/f', 'file', ['access_owner' => '7'], 2);
 
         $response = $this->apiPost('createFolder', ['newPath' => '/f']);
 
         $this->assertResult(false, 'exists', $response);
         $this->assertDisk(['/f' => 'xx']);
-        // NOTE: current behaviour, looks unintended: the row of the file is renamed to "/"
-        $this->assertRows(['/' => $this->row('file', '2')]);
+        $this->assertRows(['/f' => $this->row('file', '2', '7')]);
     }
 
     public function testCreateFolderDoesNotSlugOrNormaliseNames(): void

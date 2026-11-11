@@ -291,13 +291,14 @@ class ApiController extends WebController
         } else {
             $this->trigger(FileEvent::EVENT_BEFORE_CREATE_FOLDER, new FileEvent(['filename' => $newPath]));
             if ($storage->exists($newPath)) {
+                // nothing was created, so no hashmap row is created or changed either
                 $errorMessage = 'exists';
             } else {
                 if ($storage->createDirectory($newPath)) {
                     $success = true;
                 }
+                $accessManager->setAccess($newPath);
             }
-            $accessManager->setAccess($newPath);
             $this->trigger(FileEvent::EVENT_AFTER_CREATE_FOLDER, new FileEvent(['filename' => $newPath]));
         }
 

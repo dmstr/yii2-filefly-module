@@ -89,51 +89,38 @@ class HashmapSynchronizer extends HashmapService
     }
 
     /**
-     * The full path strings of the file or directory to be set or updated
+     * Create or renew the row of a new item, or move the rows of a renamed or moved item.
      *
-     * Without a row for $oldItemPath a new row is created for $oldItemPath (upload / create),
-     * otherwise the row of $oldItemPath and the rows below it are moved to $newItemPath (see
-     * updateRecursive()).
+     * - `setAccess($path)` (no new path, or `''`): the item at $path was just created (upload,
+     *   copy, createFolder). Its row gets the type and size of the item, the acting user as owner
+     *   and the access columns from the module's `defaultPermissions`. A row that already exists
+     *   with exactly this path (a stale row whose item was gone) is overwritten the same way, as if
+     *   it had not existed. No other row is touched; this form never renames anything.
+     * - `setAccess($oldPath, $newPath)`: the row of $oldPath and the rows below it are moved to
+     *   $newPath (see updateRecursive()). If $oldPath has no row, nothing is moved and a row is
+     *   created for $oldPath as in the first form (unchanged from earlier versions).
      *
      * @param string $oldItemPath
-     * @param string $newItemPath
+     * @param string|null $newItemPath
      *
      * @return bool
      */
     public function setAccess($oldItemPath = null, $newItemPath = null)
     {
         $oldItemPath = static::normalizePath($oldItemPath);
-        $newItemPath = static::normalizePath($newItemPath);
-
         $oldHash = $this->findHash($oldItemPath);
 
         // upload / create
-        if (empty($oldHash)) {
-
-            list($type, $size) = $this->readTypeAndSize($oldItemPath, __METHOD__);
-
-            $defaultPermissions = FileflyHashmap::accessDefaults();
-            $newHash = new FileflyHashmap(
-                [
-                    'component'    => $this->component,
-                    'type'         => $type,
-                    'path'         => $oldItemPath,
-                    'size'         => $size,
-                    'access_owner' => \Yii::$app->user->id,
-                    Module::ACCESS_READ   => $defaultPermissions[Module::ACCESS_READ],
-                    Module::ACCESS_UPDATE => $defaultPermissions[Module::ACCESS_UPDATE],
-                    Module::ACCESS_DELETE => $defaultPermissions[Module::ACCESS_DELETE],
-                ]
-            );
-            if (!$newHash->save()) {
-                \Yii::error('Could not save new item [' . $oldItemPath . '] to hash table!', __METHOD__);
-                return false;
-            }
-        } else {
-            return $this->updateRecursive($oldHash, $oldHash->path, $newItemPath);
+        if ($newItemPath === null || $newItemPath === '') {
+            return $this->saveNewItemHash($oldHash !== null ? $oldHash : new FileflyHashmap(), $oldItemPath);
         }
 
-        return true;
+        // rename / move of an item without row
+        if ($oldHash === null) {
+            return $this->saveNewItemHash(new FileflyHashmap(), $oldItemPath);
+        }
+
+        return $this->updateRecursive($oldHash, $oldHash->path, static::normalizePath($newItemPath));
     }
 
     /**
@@ -247,6 +234,39 @@ class HashmapSynchronizer extends HashmapService
                 \Yii::error('filefly hash could not been repaired for path ' . $path, __METHOD__);
                 return false;
             }
+        }
+        return true;
+    }
+
+    /**
+     * Fill a row for the item at $path as for a newly created item and save it: type and size of
+     * the item (both `null` if it does not exist), the acting user as owner, the access columns
+     * from the module's `defaultPermissions`.
+     *
+     * @param FileflyHashmap $hash a new row, or the existing row with exactly this path
+     * @param string $path
+     *
+     * @return bool
+     */
+    private function saveNewItemHash(FileflyHashmap $hash, $path)
+    {
+        list($type, $size) = $this->readTypeAndSize($path, __CLASS__ . '::setAccess');
+
+        $defaultPermissions = FileflyHashmap::accessDefaults();
+        $hash->setAttributes([
+            'component'           => $this->component,
+            'type'                => $type,
+            'path'                => $path,
+            'size'                => $size,
+            Module::ACCESS_OWNER  => \Yii::$app->user->id,
+            Module::ACCESS_READ   => $defaultPermissions[Module::ACCESS_READ],
+            Module::ACCESS_UPDATE => $defaultPermissions[Module::ACCESS_UPDATE],
+            Module::ACCESS_DELETE => $defaultPermissions[Module::ACCESS_DELETE],
+        ], false);
+
+        if (!$hash->save()) {
+            \Yii::error('Could not save new item [' . $path . '] to hash table!', __CLASS__ . '::setAccess');
+            return false;
         }
         return true;
     }
