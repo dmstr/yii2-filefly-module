@@ -61,17 +61,30 @@ abstract class HashmapService extends BaseObject
     }
 
     /**
-     * All hashmap rows of this component whose path matches the given LIKE pattern (no escaping)
+     * All hashmap rows of this component whose path starts with $prefix, compared byte by byte.
      *
-     * @param string $pattern
+     * The query only narrows the candidates: Yii escapes the LIKE wildcards (`%`, `_`, `\`) for the
+     * current database driver, but the condition matches anywhere in the path and, under many MySQL
+     * collations, case-insensitively. The exact, case-sensitive prefix test is done here.
+     *
+     * @param string $prefix
      *
      * @return FileflyHashmap[]
      */
-    protected function findHashesLike($pattern)
+    protected function findHashesWithPrefix($prefix)
     {
-        return FileflyHashmap::find()
+        $prefix = (string)$prefix;
+        /** @var FileflyHashmap[] $candidates */
+        $candidates = FileflyHashmap::find()
             ->andWhere(['component' => $this->component])
-            ->andWhere(['like', 'path', $pattern, false])
+            ->andWhere(['like', 'path', $prefix])
             ->all();
+        $hashes = [];
+        foreach ($candidates as $hash) {
+            if (strncmp((string)$hash->path, $prefix, strlen($prefix)) === 0) {
+                $hashes[] = $hash;
+            }
+        }
+        return $hashes;
     }
 }

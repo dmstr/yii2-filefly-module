@@ -169,6 +169,8 @@ Create or update permission
 - Multi create and update option
 ```
 
+Moving the records of a renamed or moved item (`setAccess($oldPath, $newPath)`) rewrites exactly the record of `$oldPath` and the records below `$oldPath/`, and replaces only the leading `$oldPath`; records that merely share the prefix (`/dd` for `/d`, `/a.txt.bak` for `/a.txt`) are not touched. `removeAccess()` and `isEmpty()` select the records below an item the same way. `%` and `_` in paths are matched literally.
+
 **removeAccess**
 ```
 Remove permission

@@ -859,28 +859,79 @@ class ListCreateRenameTest extends ApiTestCase
         ]);
     }
 
-    public function testRenameDirectoryAlsoRewritesRowsOfSiblingsWithSamePrefix(): void
+    public function testRenameDirectoryKeepsRowsOfSiblingsWithSamePrefix(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/d/x.txt', 'X');
         $this->seedFile('/dd/z.txt', 'Z');
         $this->seedHashmapRow('/d', 'dir');
         $this->seedHashmapRow('/d/x.txt', 'file');
-        $this->seedHashmapRow('/dd', 'dir');
-        $this->seedHashmapRow('/dd/z.txt', 'file');
+        $this->seedHashmapRow('/dd', 'dir', ['access_owner' => '7']);
+        $this->seedHashmapRow('/dd/z.txt', 'file', ['access_owner' => '7']);
 
         $response = $this->apiPost('rename', ['item' => '/d', 'newItemPath' => '/e']);
 
         $this->assertResult(true, '', $response);
         // the unrelated directory /dd keeps its place on disk
         $this->assertDisk(['/e' => null, '/e/x.txt' => 'X', '/dd' => null, '/dd/z.txt' => 'Z']);
-        // NOTE: current behaviour, looks unintended: the rows of /dd and /dd/z.txt match the prefix "/d" and are
-        // rewritten to /ed and /ed/z.txt, so they no longer match the files on disk
+        // only the item's own row and the rows below "/d/" move; /dd and /dd/z.txt merely share the prefix "/d"
         $this->assertRows([
             '/e' => $this->row('dir'),
             '/e/x.txt' => $this->row('file'),
-            '/ed' => $this->row('dir'),
-            '/ed/z.txt' => $this->row('file'),
+            '/dd' => $this->row('dir', null, '7'),
+            '/dd/z.txt' => $this->row('file', null, '7'),
+        ]);
+    }
+
+    public function testRenameDirectoryWithLikeWildcardsInNameKeepsRowsOfSiblingsMatchingTheWildcards(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedFile('/a_%/x.txt', 'X');
+        $this->seedFile('/abc/a_%/y.txt', 'Y');
+        $this->seedHashmapRow('/a_%', 'dir');
+        $this->seedHashmapRow('/a_%/x.txt', 'file');
+        $this->seedHashmapRow('/abc', 'dir', ['access_owner' => '7']);
+        $this->seedHashmapRow('/abc/a_%', 'dir', ['access_owner' => '7']);
+        $this->seedHashmapRow('/abc/a_%/y.txt', 'file', ['access_owner' => '7']);
+
+        $response = $this->apiPost('rename', ['item' => '/a_%', 'newItemPath' => '/e']);
+
+        $this->assertResult(true, '', $response);
+        $this->assertDisk([
+            '/abc' => null,
+            '/abc/a_%' => null,
+            '/abc/a_%/y.txt' => 'Y',
+            '/e' => null,
+            '/e/x.txt' => 'X',
+        ]);
+        // "_" and "%" in the old path are matched literally, not as LIKE wildcards
+        $this->assertRows([
+            '/abc' => $this->row('dir', null, '7'),
+            '/abc/a_%' => $this->row('dir', null, '7'),
+            '/abc/a_%/y.txt' => $this->row('file', null, '7'),
+            '/e' => $this->row('dir'),
+            '/e/x.txt' => $this->row('file'),
+        ]);
+    }
+
+    public function testRenameDirectoryKeepsRowsWhosePathDiffersOnlyInCase(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedFile('/d/x.txt', 'X');
+        $this->seedHashmapRow('/d', 'dir');
+        $this->seedHashmapRow('/d/x.txt', 'file');
+        // rows only: on a case-insensitive host filesystem /D and /d would be the same directory
+        $this->seedHashmapRow('/D/y.txt', 'file', ['access_owner' => '7']);
+
+        $response = $this->apiPost('rename', ['item' => '/d', 'newItemPath' => '/e']);
+
+        $this->assertResult(true, '', $response);
+        $this->assertDisk(['/e' => null, '/e/x.txt' => 'X']);
+        // the prefix is compared case-sensitively, whatever the collation of the database does with LIKE
+        $this->assertRows([
+            '/D/y.txt' => $this->row('file', null, '7'),
+            '/e' => $this->row('dir'),
+            '/e/x.txt' => $this->row('file'),
         ]);
     }
 
@@ -1091,21 +1142,20 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertRows(['/new/dir/a.txt' => $this->row('file')]);
     }
 
-    public function testRenameFileRewritesRowOfSiblingWithSamePrefix(): void
+    public function testRenameFileKeepsRowOfSiblingWithSamePrefix(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'A');
         $this->seedFile('/a.txt.bak', 'B');
         $this->seedHashmapRow('/a.txt', 'file');
-        $this->seedHashmapRow('/a.txt.bak', 'file');
+        $this->seedHashmapRow('/a.txt.bak', 'file', ['access_owner' => '7']);
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/c.txt']);
 
         $this->assertResult(true, '', $response);
         $this->assertDisk(['/c.txt' => 'A', '/a.txt.bak' => 'B']);
-        // NOTE: current behaviour, looks unintended: the prefix match "/a.txt%" also rewrites the row of
-        // "/a.txt.bak" to "/c.txt.bak" although the file stays on disk
-        $this->assertRows(['/c.txt' => $this->row('file'), '/c.txt.bak' => $this->row('file')]);
+        // the row of "/a.txt.bak" stays where its file is
+        $this->assertRows(['/a.txt.bak' => $this->row('file', null, '7'), '/c.txt' => $this->row('file')]);
     }
 
     public function testRenameFileToDeniedExtensionIsRejectedByNameValidator(): void

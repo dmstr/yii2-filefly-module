@@ -748,7 +748,7 @@ class UploadMoveCopyTest extends ApiTestCase
         $this->assertSame(['/t' => $this->dirRow(), '/t/d' => $this->dirRow()], $this->rows());
     }
 
-    public function testMoveFileRenamesRowOfSiblingWithSamePathPrefixWithoutMovingItOnDisk(): void
+    public function testMoveFileKeepsRowOfSiblingWithSamePathPrefix(): void
     {
         $this->actingAsAdmin();
         $this->seedFolder('/t');
@@ -757,18 +757,17 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/a.txt']]);
 
-        // NOTE: current behaviour, looks unintended: SetAccess matches rows with `LIKE '/a.txt%'`, so the row of
-        // /a.txt.bak moves to /t/a.txt.bak while the file stays at /a.txt.bak
+        // the row of /a.txt.bak stays where its file is
         $this->assertResult(true, '', $response);
         $this->assertSame(['/a.txt.bak' => 'BAK', '/t' => null, '/t/a.txt' => 'A'], $this->disk());
         $this->assertSame([
+            '/a.txt.bak' => $this->fileRow(3, '8'),
             '/t' => $this->dirRow(),
             '/t/a.txt' => $this->fileRow(1),
-            '/t/a.txt.bak' => $this->fileRow(3, '8'),
         ], $this->rows());
     }
 
-    public function testMoveDirectoryRenamesRowsOfSiblingDirectoryWithSamePathPrefixWithoutMovingThemOnDisk(): void
+    public function testMoveDirectoryKeepsRowsOfSiblingDirectoryWithSamePathPrefix(): void
     {
         $this->actingAsAdmin();
         $this->seedFolder('/t');
@@ -778,14 +777,46 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/d']]);
 
-        // NOTE: current behaviour, looks unintended: rows of /dd and /dd/x.txt move to /t/dd..., disk stays at /dd...
+        // only the row of /d and the rows below "/d/" move
         $this->assertResult(true, '', $response);
         $this->assertSame(['/dd' => null, '/dd/x.txt' => 'X', '/t' => null, '/t/d' => null], $this->disk());
         $this->assertSame([
+            '/dd' => $this->dirRow('8'),
+            '/dd/x.txt' => $this->fileRow(1),
             '/t' => $this->dirRow(),
             '/t/d' => $this->dirRow(),
-            '/t/dd' => $this->dirRow('8'),
-            '/t/dd/x.txt' => $this->fileRow(1),
+        ], $this->rows());
+    }
+
+    public function testMoveDirectoryWithLikeWildcardInNameKeepsRowsOfPathsMatchingTheWildcard(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedFolder('/t');
+        $this->seedFolder('/d_');
+        $this->seedItem('/d_/x.txt', 'X');
+        $this->seedFolder('/dz', ['access_owner' => '8']);
+        $this->seedFolder('/dz/d_', ['access_owner' => '8']);
+        $this->seedItem('/dz/d_/y.txt', 'Y', ['access_owner' => '8']);
+
+        $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/d_']]);
+
+        // "_" is matched literally: /dz and the "/d_" inside its child paths are left alone
+        $this->assertResult(true, '', $response);
+        $this->assertSame([
+            '/dz' => null,
+            '/dz/d_' => null,
+            '/dz/d_/y.txt' => 'Y',
+            '/t' => null,
+            '/t/d_' => null,
+            '/t/d_/x.txt' => 'X',
+        ], $this->disk());
+        $this->assertSame([
+            '/dz' => $this->dirRow('8'),
+            '/dz/d_' => $this->dirRow('8'),
+            '/dz/d_/y.txt' => $this->fileRow(1, '8'),
+            '/t' => $this->dirRow(),
+            '/t/d_' => $this->dirRow(),
+            '/t/d_/x.txt' => $this->fileRow(1),
         ], $this->rows());
     }
 

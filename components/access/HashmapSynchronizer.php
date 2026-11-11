@@ -92,7 +92,8 @@ class HashmapSynchronizer extends HashmapService
      * The full path strings of the file or directory to be set or updated
      *
      * Without a row for $oldItemPath a new row is created for $oldItemPath (upload / create),
-     * otherwise every row matching `LIKE '<old>%'` is rewritten to $newItemPath.
+     * otherwise the row of $oldItemPath and the rows below it are moved to $newItemPath (see
+     * updateRecursive()).
      *
      * @param string $oldItemPath
      * @param string $newItemPath
@@ -129,7 +130,7 @@ class HashmapSynchronizer extends HashmapService
                 return false;
             }
         } else {
-            return $this->updateRecursive($oldHash->path, $newItemPath);
+            return $this->updateRecursive($oldHash, $oldHash->path, $newItemPath);
         }
 
         return true;
@@ -139,7 +140,7 @@ class HashmapSynchronizer extends HashmapService
      * The full path strings of the file or directory to be removed
      *
      * @param string $itemPath
-     * @param bool $recursive also remove all rows matching `LIKE '<path>/%'`
+     * @param bool $recursive also remove the rows below the item (paths starting with `<path>/`)
      *
      * @return bool
      */
@@ -147,7 +148,7 @@ class HashmapSynchronizer extends HashmapService
     {
         // remove all hashmap entries beneath $itemPath
         if ($recursive) {
-            $items = $this->findHashesLike($itemPath . '/%');
+            $items = $this->findHashesWithPrefix($itemPath . '/');
 
             if (empty($items)) {
                 \Yii::info('Could not find items beneath [' . $itemPath . '] in hash table!', __METHOD__);
@@ -193,7 +194,7 @@ class HashmapSynchronizer extends HashmapService
         }
 
         // find hashmap items beneath this path
-        $items = $this->findHashesLike($item->path . '/%');
+        $items = $this->findHashesWithPrefix($item->path . '/');
 
         // if no items found => dir is empty
         if (empty($items)) {
@@ -251,21 +252,23 @@ class HashmapSynchronizer extends HashmapService
     }
 
     /**
+     * Move the row of an item and the rows below it: the row with exactly $oldItemPath and every row
+     * whose path starts with `<old>/` get the leading $oldItemPath replaced by $newItemPath. Rows that
+     * merely share the prefix (`/dd` for `/d`, `/a.txt.bak` for `/a.txt`) and later occurrences of
+     * the old path inside a child path stay as they are.
+     *
+     * @param FileflyHashmap $itemHash the row with exactly $oldItemPath
      * @param string $oldItemPath
      * @param string $newItemPath
      *
-     * @return bool
+     * @return bool false as soon as one row could not be saved (the rows saved before stay moved)
      */
-    private function updateRecursive($oldItemPath, $newItemPath)
+    private function updateRecursive(FileflyHashmap $itemHash, $oldItemPath, $newItemPath)
     {
-        $items = $this->findHashesLike($oldItemPath . '%');
-
-        if ($items === null) {
-            return false;
-        }
+        $items = array_merge([$itemHash], $this->findHashesWithPrefix($oldItemPath . '/'));
 
         foreach ($items as $item) {
-            $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
+            $item->path = $newItemPath . substr($item->path, strlen($oldItemPath));
 
             if (!$item->save()) {
                 \Yii::error('Could not update item [' . $oldItemPath . '] to hash table!', __METHOD__);
