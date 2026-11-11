@@ -559,14 +559,18 @@ class ApiController extends WebController
                 continue;
             }
 
-            if ($fileSystem->get($path)->isDir()) {
+            $itemType = $this->getItemType($fileSystem, $path);
+            if ($itemType === 'dir') {
                 if (!$this->module->deleteRecursive && $accessManager->isEmpty($path) === false) {
                     $errorMessage = 'permission_delete_denied';
                 }
 
-                $removed = $fileSystem->get($path)->deleteDir($path);
+                $removed = $fileSystem->deleteDir($path);
+            } elseif ($itemType === 'file') {
+                $removed = $fileSystem->delete($path);
             } else {
-                $removed = $fileSystem->get($path)->delete($path);
+                // any other type got a directory handler from the Flysystem 1 handler API, whose delete() is deleteDir()
+                $removed = $fileSystem->deleteDir($path);
             }
 
             if ($removed === false) {
