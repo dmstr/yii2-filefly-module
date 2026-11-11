@@ -13,11 +13,11 @@ use Exception;
 use hrzg\filefly\components\ContentDeliveryPolicy;
 use hrzg\filefly\components\ContentValidator;
 use hrzg\filefly\components\FileManager;
+use hrzg\filefly\components\storage\ItemExistsException;
 use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
 use hrzg\filefly\Module as Filefly;
-use League\Flysystem\FileExistsException;
 use League\Flysystem\FileNotFoundException;
 use League\Flysystem\Util;
 use League\Flysystem\Util\MimeType;
@@ -282,7 +282,7 @@ class ApiController extends WebController
      */
     public function actionCreateFolder($newPath)
     {
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $success = false;
         $errorMessage = '';
@@ -290,10 +290,10 @@ class ApiController extends WebController
             $errorMessage = 'nopermission';
         } else {
             $this->trigger(FileEvent::EVENT_BEFORE_CREATE_FOLDER, new FileEvent(['filename' => $newPath]));
-            if ($fileSystem->has($newPath)) {
+            if ($storage->exists($newPath)) {
                 $errorMessage = 'exists';
             } else {
-                if ($fileSystem->createDir($newPath)) {
+                if ($storage->createDirectory($newPath)) {
                     $success = true;
                 }
             }
@@ -377,7 +377,7 @@ class ApiController extends WebController
 
         $path = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $path = ltrim($path, DIRECTORY_SEPARATOR);
         $success = false;
@@ -427,19 +427,18 @@ class ApiController extends WebController
 
                     if (in_array(mime_content_type($file['tmp_name']), $acceptedMimeTypes,
                             false) || empty($acceptedMimeTypes)) {
-                        $uploaded = $fileSystem->writeStream(
+                        $uploaded = $storage->writeStream(
                             $fullPath,
                             $stream,
-                            [
-                                'mimetype' => mime_content_type($file['tmp_name']),
-                            ]);
+                            mime_content_type($file['tmp_name'])
+                        );
                     } else {
                         Yii::error('MIME Type not allowed', __METHOD__);
                         $errorMessage = 'file_type_not_allowed';
                         // continue with other uploads
                         continue;
                     }
-                } catch (FileExistsException $e) {
+                } catch (ItemExistsException $e) {
                     Yii::error($e->getMessage(), __METHOD__);
                     $errorMessage = 'file_already_exists';
                     // continue with other uploads
@@ -489,44 +488,42 @@ class ApiController extends WebController
     public function actionList($path)
     {
         $files = [];
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
 
         $accessManager->check($path, false);
 
         $parentFolderAccess = $accessManager->grantAccess($path, FileManager::ACCESS_READ);
         if ($parentFolderAccess) {
-            foreach ($fileSystem->listContents($path) as $item) {
+            foreach ($storage->listContents($path) as $item) {
 
                 // ensure hashmap entry
-                $accessManager->check($item['path'], $this->module->repair);
+                $accessManager->check($item->getPath(), $this->module->repair);
 
                 // check direct access
-                $access = $accessManager->grantAccess($item['path'], FileManager::ACCESS_READ, $this->module->repair);
+                $access = $accessManager->grantAccess($item->getPath(), FileManager::ACCESS_READ, $this->module->repair);
                 if ($access) {
-                    if (array_key_exists('size', $item)) {
-                        $size = array_key_exists('size', $item) ? $item['size'] : 0;
+                    $size = $item->getSize() !== null ? $item->getSize() : 0;
+
+                    if (!empty($item->getTimestamp())) {
+                        $time = $item->getTimestamp();
                     } else {
-                        $size = 0;
+                        $time = $storage->lastModified($item->getPath()) ?: time();
                     }
 
-                    if (array_key_exists('timestamp', $item) && !empty($item['timestamp'])) {
-                        $time = $item['timestamp'];
-                    } else {
-                        $time = $fileSystem->getTimestamp($item['path']) ?: time();
-                    }
-
+                    // the callbacks receive the item as array (documented in StorageItem::toArray())
+                    $itemArray = $item->toArray();
                     $files[] = [
-                        'name' => $item['basename'],
-                        'dirname' => $item['dirname'],
-                        'path' => $item['path'],
-                        'urls' => $this->getItemUrls($item),
-                        'thumbnail' => $this->getItemThumbnail($item),
-                        'preview' => $this->getItemPreview($item),
+                        'name' => $item->getBasename(),
+                        'dirname' => $item->getDirname(),
+                        'path' => $item->getPath(),
+                        'urls' => $this->getItemUrls($itemArray),
+                        'thumbnail' => $this->getItemThumbnail($itemArray),
+                        'preview' => $this->getItemPreview($itemArray),
                         'size' => $size,
                         'date' => date('Y-m-d H:i:s', $time),
-                        'type' => $item['type'],
-                        'extension' => $item['extension'] ?? $this->getItemExtensionFromPath($item),
+                        'type' => $item->getType(),
+                        'extension' => $item->getExtension() ?? $this->getItemExtensionFromPath($itemArray),
                     ];
                 }
             }
