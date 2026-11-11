@@ -10,3 +10,6 @@ $loader = require dirname(__DIR__) . '/vendor/autoload.php';
 
 // the Yii class is not part of the composer autoloader
 require_once dirname($loader->findFile(\yii\BaseYii::class)) . '/Yii.php';
+
+// real database for the API harness (FILEFLY_TEST_DB_DSN): migrate once per run, in the parent process
+\hrzg\filefly\tests\support\TestDatabase::prepareForRun();

@@ -39,7 +39,7 @@ Every test in `tests/api/` runs in its own PHP process (see "Process isolation" 
 `hrzg\filefly\tests\support\ApiTestCase` boots per test a real `yii\web\Application` with:
 
 - module `filefly` (`hrzg\filefly\Module`, `filesystem => 'fsTest'`)
-- `db`: sqlite in memory, table `filefly_hashmap` created in its final migrated form (the migrations themselves use `alterColumn()`, which sqlite does not support); MySQL's `NOW()` (used by the model's `TimestampBehavior`) is registered as sqlite function
+- `db`: sqlite in memory, table `filefly_hashmap` created in its final migrated form (the migrations themselves use `alterColumn()`, which sqlite does not support); MySQL's `NOW()` (used by the model's `TimestampBehavior`) is registered as sqlite function. Optionally a real MariaDB, MySQL or PostgreSQL database with the schema from the real migrations, see "Real databases" below (`TestDatabase`)
 - `fsTest`: `creocoder\flysystem\LocalFilesystem` (creocoder/yii2-flysystem 2, Flysystem 3) rooted in a fresh temp directory (`$this->fsRoot`), with the default `linkHandling` (`DISALLOW_LINKS`) and `config => ['directory_visibility' => 'public']`, so that new directories get `0755` as with Flysystem 1 (creocoder's default is `0740`); this is the configuration `UPGRADE.md` recommends to applications, and it lives only in `filesystemComponentConfig()`
 - `authManager`: `yii\rbac\PhpManager`, filled by running the module's RBAC migrations (`FileflyAdmin`, `FileflyApi`, `FileflyDefault`, `FileflyPermissions`)
 - `user`: `dmstr\web\User` without session, root user `admin` (id 1) like in phd5
@@ -86,7 +86,7 @@ Hashmap:
 
 - `seedHashmapRow(string $path, string $type, array $access = [], ?int $size = null)`: row without model or access checks, access columns default to the module's `defaultPermissions`
 - `seedRow(string $path, string $type, ?string $owner, ?string $read, ?string $update, ?string $delete, ?int $size = null)`: `seedHashmapRow()` with the four access columns as positional arguments (`null` stays NULL)
-- `hashmapRow(string $path): ?array`, `hashmapRows(?string $prefix = null): array`: all values as strings (like MySQL)
+- `hashmapRow(string $path): ?array`, `hashmapRows(?string $prefix = null): array`: all values as strings (like MySQL), columns always in the order of the sqlite schema; the path match, the prefix filter and the ordering by path are done in PHP byte by byte, so the helpers report the same rows on every database (a case- or accent-insensitive collation does not make `hashmapRow('/D')` return the row of `/d`)
 - `rowPaths(): array`: paths of all hashmap rows, ordered by path
 - `assertHashmapRow(string $path, array $expected = [])` (subset of columns), `assertNoHashmapRow(string $path)`
 - `assertAccess(string $path, ?string $type, ?string $owner, ?string $read, ?string $update, ?string $delete)`: strict full-row assertion of `type` and the four access columns
@@ -204,4 +204,38 @@ Deliberately not pinned (environment dependent):
 
 Run only the console tests with `vendor/bin/phpunit tests/console`.
 
-Not exercised through the API: a `Guest` RBAC role (guests are tested without one), and the migrations themselves (the harness creates the final table schema directly).
+Not exercised through the API: a `Guest` RBAC role (guests are tested without one). The migrations run only in the real-database mode below; the default sqlite run creates the final table schema directly.
+
+## Real databases
+
+Without environment variables the API tests run on sqlite in memory, exactly as described above. With `FILEFLY_TEST_DB_DSN` set, `hrzg\filefly\tests\support\TestDatabase` switches the `db` component of `ApiTestCase` to that database:
+
+- once per PHPUnit run (`tests/bootstrap.php`, in the parent process; the isolated test processes inherit `FILEFLY_TEST_DB_PREPARED`) the table `filefly_hashmap` and the migration history table `migration` are dropped and all nine module migrations are applied with Yii's `migrate/up` (`MigrateController` with `migrationPath` `@hrzg/filefly/migrations`, the RBAC migrations against a throwaway `PhpManager`), so the table is the one an application gets
+- every test starts with `DELETE FROM filefly_hashmap`; measured per reset with a fresh connection: MariaDB 10.6 0.3 ms (TRUNCATE 0.8 ms), MySQL 8.4 0.4 ms (2.1 ms), PostgreSQL 16 0.4 ms (0.8 ms). A full run takes about 85 s on MariaDB/MySQL and 100 s on PostgreSQL against 75 to 80 s on sqlite
+- the RBAC setup per test is unchanged (`PhpManager` filled by the RBAC migrations)
+
+Variables: `FILEFLY_TEST_DB_DSN` (PDO DSN; the database must be a throwaway one, the run drops tables in it), `FILEFLY_TEST_DB_USER`, `FILEFLY_TEST_DB_PASSWORD`, `FILEFLY_TEST_DB_CHARSET` (connection charset, default `utf8mb4` for MySQL, `utf8` otherwise), `FILEFLY_TEST_DB_INIT_SQL` (statement run on every new connection, for example an SQL mode), `FILEFLY_TEST_DB_VERBOSE=1` (print the migration output).
+
+`./db/compose.yaml` (Compose project `filefly-db`) has throwaway servers with data on tmpfs, published only to ephemeral ports on 127.0.0.1: `mariadb106` (`mariadb:10.6.24`, the production line), `mariadb118` (`mariadb:11.8.5`, newest MariaDB LTS), `mysql84` (`mysql:8.4.7`), `postgres16` (`postgres:16.11`). The test-only credentials are in `./db/test-credentials.env`. `./db/run.sh` reads the published port and runs PHPUnit on the host:
+
+```bash
+docker compose -p filefly-db -f tests/db/compose.yaml up -d --wait mariadb106 postgres16
+./tests/db/run.sh mariadb106
+./tests/db/run.sh postgres16 tests/api
+FILEFLY_TEST_DB_INIT_SQL="SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_BACKSLASH_ESCAPES')" \
+  ./tests/db/run.sh mysql84 tests/api
+eval "$(./tests/db/run.sh --env postgres16)"   # only export the variables
+docker compose -p filefly-db -f tests/db/compose.yaml down --volumes --remove-orphans
+```
+
+Tests that pin sqlite or MySQL behaviour rather than a module guarantee (results of 2026-11-11, all servers above; everything else is green everywhere):
+
+- PostgreSQL: `search` is case-sensitive there (`LIKE`), so `ListCreateRenameTest::testSearchMatchesCaseInsensitivelyAndAlsoViaPost`, `testSearchOnlyFilesZeroMixesFilesAndDirectories`, `testSearchLimitZeroMeansNoLimit`, `testSearchBasePathRestrictsResultsToPathPrefix` and `testSearchBasePathDoesNotEscapeLikeWildcards` fail: their fixtures contain `/docs/Report-2.PDF`, which `q=report` matches only case-insensitively
+- MySQL 8.4 with `NO_BACKSLASH_ESCAPES`: Yii's backslash-escaped `LIKE` patterns match nothing, so `ListCreateRenameTest::testSearchEscapesPercentSignInQuery` and `testSearchTreatsUnderscoreInQueryLiterally` fail (MariaDB keeps the backslash as `LIKE` escape in that mode and passes)
+
+The suite seeds only paths that are distinct under every collation. Known differences it does not cover, found with temporary probes through this harness (Linux, case-sensitive filesystem) [verified]:
+
+- MariaDB/MySQL: the migrations convert the table to `utf8` (`utf8mb3`) with the server's default collation for it (`utf8mb3_general_ci` on MariaDB 10.6 and MySQL 8.4, `utf8mb3_uca1400_ai_ci` on MariaDB 11.8), which is case- and accent-insensitive and PAD SPACE. Paths that differ only in case, accents or trailing spaces (`/Docs` and `/docs`, `/a.txt` and `/ä.txt`, `/x` and `/x `) share one hashmap row: creating the second takes over the row of the first, and the first then inherits that row's owner and access columns
+- MariaDB/MySQL: a name with a 4-byte UTF-8 character (emoji) cannot be stored in the `utf8mb3` column; the request fails with HTTP 500 and the file stays on disk without row, and from then on every `list` of that folder fails with HTTP 500 (self-heal tries to store the row)
+- all databases: `path` is `varchar(255)`; the model's validator rejects longer paths, so an upload or rename that produces one reports success, but the new path gets no row (rename: child rows that would become too long stay under the old path)
+
