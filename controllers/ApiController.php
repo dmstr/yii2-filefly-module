@@ -177,7 +177,15 @@ class ApiController extends WebController
 
                 $destPath = $newPath . '/' . basename($oldPath);
 
-                $moved = $storage->move($oldPath, $destPath);
+                try {
+                    $moved = $storage->move($oldPath, $destPath);
+                } catch (ItemExistsException $e) {
+                    // nothing is overwritten; the items moved before stay moved
+                    Yii::warning($e->getMessage(), __METHOD__);
+                    $errorMessage = 'file_already_exists';
+                    $success = false;
+                    break;
+                }
                 if ($moved === false) {
                     $errorMessage = 'movefailed';
                     break;
@@ -245,7 +253,16 @@ class ApiController extends WebController
                 }
 
                 // copy file
-                $copied = $storage->copyFile($oldPath, $filename);
+                try {
+                    $copied = $storage->copyFile($oldPath, $filename);
+                } catch (ItemExistsException $e) {
+                    // nothing is overwritten and the row of the existing target stays as it is; the
+                    // items copied before stay copied
+                    Yii::warning($e->getMessage(), __METHOD__);
+                    $errorMessage = 'file_already_exists';
+                    $success = false;
+                    break;
+                }
                 if (!$copied) {
                     $errorMessage = 'copyfailed';
                 } else {
@@ -342,13 +359,23 @@ class ApiController extends WebController
                 $errorMessage = 'file_not_found';
             }
             $this->trigger(FileEvent::EVENT_BEFORE_RENAME, new FileEvent(['filename' => $item]));
-            if ($storage->move($item, $newItemPath)) {
-                $success = true;
-                $accessManager->setAccess($item, $newItemPath);
-            } else {
-                $errorMessage = 'renaming_failed';
+            try {
+                $moved = $storage->move($item, $newItemPath);
+            } catch (ItemExistsException $e) {
+                // nothing is overwritten
+                Yii::warning($e->getMessage(), __METHOD__);
+                $errorMessage = 'file_already_exists';
+                $moved = null;
             }
-            $this->trigger(FileEvent::EVENT_AFTER_RENAME, new FileEvent(['filename' => $newItemPath]));
+            if ($moved !== null) {
+                if ($moved) {
+                    $success = true;
+                    $accessManager->setAccess($item, $newItemPath);
+                } else {
+                    $errorMessage = 'renaming_failed';
+                }
+                $this->trigger(FileEvent::EVENT_AFTER_RENAME, new FileEvent(['filename' => $newItemPath]));
+            }
         }
 
         if ($success) {

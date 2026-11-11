@@ -3,10 +3,13 @@
 
 namespace hrzg\filefly\tests\support;
 
+use hrzg\filefly\controllers\ApiController;
+use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
 use PHPUnit\Framework\TestCase;
 use Yii;
+use yii\base\Event;
 use yii\base\ExitException;
 use yii\db\Query;
 use yii\di\Container;
@@ -122,6 +125,8 @@ abstract class ApiTestCase extends TestCase
         // FileManager::fileSystem() switches these off globally
         FileflyHashmap::$activeAccessTrait = true;
         FileflyHashmap::$enableFlashMessages = true;
+
+        Event::offAll();
 
         if (Yii::$app !== null && Yii::$app->has('db', true)) {
             Yii::$app->db->close();
@@ -886,6 +891,21 @@ abstract class ApiTestCase extends TestCase
         $names = array_column($response->json()['result'], 'name');
         sort($names);
         return $names;
+    }
+
+    /**
+     * Records [name, filename, errorMessage] of the given ApiController events into $log
+     * (class-level handlers, removed in tearDown())
+     *
+     * @param string[] $names event names (FileEvent::EVENT_*)
+     */
+    protected function recordEvents(array $names, array &$log): void
+    {
+        foreach ($names as $name) {
+            Event::on(ApiController::class, $name, static function (FileEvent $event) use (&$log, $name) {
+                $log[] = [$name, $event->filename, $event->errorMessage];
+            });
+        }
     }
 
     /**

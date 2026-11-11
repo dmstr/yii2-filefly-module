@@ -3,6 +3,7 @@
 
 namespace hrzg\filefly\tests\api;
 
+use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\tests\support\ApiResponse;
 use hrzg\filefly\tests\support\ApiTestCase;
 
@@ -929,7 +930,7 @@ class UploadMoveCopyTest extends ApiTestCase
     // move: collisions and impossible moves
     // ------------------------------------------------------------------
 
-    public function testMoveFileOntoExistingFileInTargetFailsWith500AndKeepsBothFiles(): void
+    public function testMoveFileOntoExistingFileInTargetAnswersFileAlreadyExistsAndKeepsBothFiles(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'SOURCE');
@@ -938,8 +939,8 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/a.txt']]);
 
-        // NOTE: current behaviour, looks unintended: an unhandled exception (HTTP 500) instead of the JSON error
-        $this->assertStatus(500, $response);
+        // nothing is overwritten, the refusal is the module's JSON error
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/a.txt' => 'SOURCE', '/t' => null, '/t/a.txt' => 'TARGET'], $this->disk());
         $this->assertSame([
             '/a.txt' => $this->fileRow(6),
@@ -948,7 +949,7 @@ class UploadMoveCopyTest extends ApiTestCase
         ], $this->rows());
     }
 
-    public function testMoveFileOntoExistingFileWithSameContentFailsWith500AndKeepsBothFiles(): void
+    public function testMoveFileOntoExistingFileWithSameContentAnswersFileAlreadyExistsAndKeepsBothFiles(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'SAME');
@@ -957,11 +958,11 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/a.txt']]);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/a.txt' => 'SAME', '/t' => null, '/t/a.txt' => 'SAME'], $this->disk());
     }
 
-    public function testMoveFileOntoExistingDirectoryWithSameNameFailsWith500AndKeepsBoth(): void
+    public function testMoveFileOntoExistingDirectoryWithSameNameAnswersFileAlreadyExistsAndKeepsBoth(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/x', 'XFILE');
@@ -971,7 +972,7 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/x']]);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/t' => null, '/t/x' => null, '/t/x/inside.txt' => 'I', '/x' => 'XFILE'], $this->disk());
         $this->assertSame([
             '/t' => $this->dirRow(),
@@ -981,7 +982,7 @@ class UploadMoveCopyTest extends ApiTestCase
         ], $this->rows());
     }
 
-    public function testMoveDirectoryOntoExistingDirectoryWithSameNameFailsWith500AndMergesNothing(): void
+    public function testMoveDirectoryOntoExistingDirectoryWithSameNameAnswersFileAlreadyExistsAndMergesNothing(): void
     {
         $this->actingAsAdmin();
         $this->seedFolder('/q');
@@ -992,7 +993,7 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/q']]);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame([
             '/q' => null,
             '/q/z.txt' => 'Z',
@@ -1009,7 +1010,7 @@ class UploadMoveCopyTest extends ApiTestCase
         ], $this->rows());
     }
 
-    public function testMoveDirectoryOntoExistingFileWithSameNameFailsWith500AndKeepsBoth(): void
+    public function testMoveDirectoryOntoExistingFileWithSameNameAnswersFileAlreadyExistsAndKeepsBoth(): void
     {
         $this->actingAsAdmin();
         $this->seedFolder('/q');
@@ -1019,11 +1020,11 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/q']]);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/q' => null, '/q/z.txt' => 'Z', '/t' => null, '/t/q' => 'FILE'], $this->disk());
     }
 
-    public function testMoveFileIntoItsOwnFolderFailsWith500AndKeepsFile(): void
+    public function testMoveFileIntoItsOwnFolderAnswersFileAlreadyExistsAndKeepsFile(): void
     {
         $this->actingAsAdmin();
         $this->seedFolder('/d');
@@ -1031,19 +1032,19 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/d', 'items' => ['/d/c.txt']]);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/d' => null, '/d/c.txt' => 'C'], $this->disk());
         $this->assertSame(['/d' => $this->dirRow(), '/d/c.txt' => $this->fileRow(1)], $this->rows());
     }
 
-    public function testMoveRootFileToRootFailsWith500AndKeepsFile(): void
+    public function testMoveRootFileToRootAnswersFileAlreadyExistsAndKeepsFile(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'AAA');
 
         $response = $this->apiPost('move', ['newPath' => '/', 'items' => ['/a.txt']]);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/a.txt' => 'AAA'], $this->disk());
         $this->assertSame(['/a.txt' => $this->fileRow(3)], $this->rows());
     }
@@ -1126,6 +1127,32 @@ class UploadMoveCopyTest extends ApiTestCase
         ], $this->rows());
     }
 
+    public function testMoveOntoExistingItemFiresErrorEventAndNoAfterEventForTheCollidingItem(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedItem('/a.txt', 'A');
+        $this->seedItem('/b.txt', 'B');
+        $this->seedFolder('/t');
+        $this->seedItem('/t/b.txt', 'T');
+        $log = [];
+        $this->recordEvents([
+            FileEvent::EVENT_BEFORE_MOVE,
+            FileEvent::EVENT_AFTER_MOVE,
+            FileEvent::EVENT_MOVE_SUCCESS,
+            FileEvent::EVENT_MOVE_ERROR,
+        ], $log);
+
+        $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/a.txt', '/b.txt']]);
+
+        $this->assertResult(false, 'File already exists', $response);
+        $this->assertSame([
+            [FileEvent::EVENT_BEFORE_MOVE, '/a.txt', null],
+            [FileEvent::EVENT_AFTER_MOVE, '/t/a.txt', null],
+            [FileEvent::EVENT_BEFORE_MOVE, '/b.txt', null],
+            [FileEvent::EVENT_MOVE_ERROR, null, 'file_already_exists'],
+        ], $log);
+    }
+
     // ------------------------------------------------------------------
     // move: mixed lists
     // ------------------------------------------------------------------
@@ -1162,7 +1189,7 @@ class UploadMoveCopyTest extends ApiTestCase
         $this->assertSame(['/b.txt' => 'BBB', '/d' => null], $this->disk());
     }
 
-    public function testMoveMixedListStopsAtCollidingItemWith500AndKeepsEarlierMoves(): void
+    public function testMoveMixedListStopsAtCollidingItemWithFileAlreadyExistsAndKeepsEarlierMoves(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'AAA');
@@ -1173,7 +1200,8 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['newPath' => '/t', 'items' => ['/a.txt', '/b.txt', '/c.txt']]);
 
-        $this->assertStatus(500, $response);
+        // the items before the colliding one stay moved, the ones after it are not tried; the response reports failure
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame([
             '/b.txt' => 'BBB-SOURCE',
             '/c.txt' => 'CCC',
@@ -1425,7 +1453,7 @@ class UploadMoveCopyTest extends ApiTestCase
     // copy: collisions and failures
     // ------------------------------------------------------------------
 
-    public function testCopyOntoExistingFileFailsWith500AndKeepsBothContents(): void
+    public function testCopyOntoExistingFileAnswersFileAlreadyExistsAndKeepsBothContents(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'SOURCE');
@@ -1434,8 +1462,8 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('copy', ['newPath' => '/d', 'items' => ['/a.txt']]);
 
-        // NOTE: current behaviour, looks unintended: an unhandled exception (HTTP 500) instead of the JSON error
-        $this->assertStatus(500, $response);
+        // nothing is overwritten, the refusal is the module's JSON error
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/a.txt' => 'SOURCE', '/d' => null, '/d/a.txt' => 'TARGET'], $this->disk());
         $this->assertSame([
             '/a.txt' => $this->fileRow(6),
@@ -1444,7 +1472,7 @@ class UploadMoveCopyTest extends ApiTestCase
         ], $this->rows());
     }
 
-    public function testCopyOntoExistingFileWithSameContentFailsWith500AndKeepsBoth(): void
+    public function testCopyOntoExistingFileWithSameContentAnswersFileAlreadyExistsAndKeepsBoth(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'SAME');
@@ -1453,11 +1481,11 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('copy', ['newPath' => '/d', 'items' => ['/a.txt']]);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/a.txt' => 'SAME', '/d' => null, '/d/a.txt' => 'SAME'], $this->disk());
     }
 
-    public function testCopyWithNewFilenameOntoExistingFileFailsWith500AndKeepsBoth(): void
+    public function testCopyWithNewFilenameOntoExistingFileAnswersFileAlreadyExistsAndKeepsBoth(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'SOURCE');
@@ -1466,11 +1494,11 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('copy', ['newPath' => '/d', 'items' => ['/a.txt'], 'newFilename' => 'other.txt']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/a.txt' => 'SOURCE', '/d' => null, '/d/other.txt' => 'TARGET'], $this->disk());
     }
 
-    public function testCopyFileOntoExistingDirectoryWithSameNameFailsWith500AndKeepsBoth(): void
+    public function testCopyFileOntoExistingDirectoryWithSameNameAnswersFileAlreadyExistsAndKeepsBoth(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/b.txt', 'BBB');
@@ -1480,7 +1508,7 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('copy', ['newPath' => '/d', 'items' => ['/b.txt']]);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame([
             '/b.txt' => 'BBB',
             '/d' => null,
@@ -1495,14 +1523,14 @@ class UploadMoveCopyTest extends ApiTestCase
         ], $this->rows());
     }
 
-    public function testCopyFileOntoItselfFailsWith500AndKeepsFile(): void
+    public function testCopyFileOntoItselfAnswersFileAlreadyExistsAndKeepsFile(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'AAA');
 
         $response = $this->apiPost('copy', ['newPath' => '/', 'items' => ['/a.txt']]);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/a.txt' => 'AAA'], $this->disk());
         $this->assertSame(['/a.txt' => $this->fileRow(3)], $this->rows());
     }
@@ -1517,7 +1545,7 @@ class UploadMoveCopyTest extends ApiTestCase
         $response = $this->apiPost('copy', ['newPath' => '/dd', 'items' => ['/a.txt', '/b.txt'], 'newFilename' => 'same.txt']);
 
         // NOTE: current behaviour, looks unintended: one new name for several sources collides with itself
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame(['/a.txt' => 'AAA', '/b.txt' => 'BBB', '/dd' => null, '/dd/same.txt' => 'AAA'], $this->disk());
         $this->assertSame([
             '/a.txt' => $this->fileRow(3),
@@ -1527,7 +1555,7 @@ class UploadMoveCopyTest extends ApiTestCase
         ], $this->rows());
     }
 
-    public function testCopyMixedListStopsAtCollidingItemWith500AndKeepsEarlierCopies(): void
+    public function testCopyMixedListStopsAtCollidingItemWithFileAlreadyExistsAndKeepsEarlierCopies(): void
     {
         $this->actingAsAdmin();
         $this->seedItem('/a.txt', 'AAA');
@@ -1538,7 +1566,8 @@ class UploadMoveCopyTest extends ApiTestCase
 
         $response = $this->apiPost('copy', ['newPath' => '/t', 'items' => ['/a.txt', '/b.txt', '/c.txt']]);
 
-        $this->assertStatus(500, $response);
+        // the items before the colliding one stay copied, the ones after it are not tried; the response reports failure
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertSame([
             '/a.txt' => 'AAA',
             '/b.txt' => 'BBB-SOURCE',
@@ -1554,6 +1583,50 @@ class UploadMoveCopyTest extends ApiTestCase
             '/t' => $this->dirRow(),
             '/t/a.txt' => $this->fileRow(3),
             '/t/b.txt' => $this->fileRow(10),
+        ], $this->rows());
+    }
+
+    public function testCopyOntoExistingItemFiresErrorEventAndNoAfterEventForTheCollidingItem(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedItem('/a.txt', 'A');
+        $this->seedItem('/b.txt', 'B');
+        $this->seedFolder('/t');
+        $this->seedItem('/t/b.txt', 'T');
+        $log = [];
+        $this->recordEvents([
+            FileEvent::EVENT_BEFORE_COPY,
+            FileEvent::EVENT_AFTER_COPY,
+            FileEvent::EVENT_COPY_SUCCESS,
+            FileEvent::EVENT_COPY_ERROR,
+        ], $log);
+
+        $response = $this->apiPost('copy', ['newPath' => '/t', 'items' => ['/a.txt', '/b.txt']]);
+
+        $this->assertResult(false, 'File already exists', $response);
+        $this->assertSame([
+            [FileEvent::EVENT_BEFORE_COPY, '/a.txt', null],
+            [FileEvent::EVENT_AFTER_COPY, '/a.txt', null],
+            [FileEvent::EVENT_BEFORE_COPY, '/b.txt', null],
+            [FileEvent::EVENT_COPY_ERROR, null, 'file_already_exists'],
+        ], $log);
+    }
+
+    public function testCopyOntoExistingFileDoesNotRenewTheRowOfTheExistingTarget(): void
+    {
+        $this->actingAsFileflyUser(7);
+        $this->seedItem('/a.txt', 'A', ['access_owner' => '7']);
+        $this->seedFolder('/t', ['access_owner' => '9']);
+        $this->seedItem('/t/a.txt', 'TARGET', ['access_owner' => '9', 'access_read' => 'R9']);
+
+        $response = $this->apiPost('copy', ['newPath' => '/t', 'items' => ['/a.txt']]);
+
+        $this->assertResult(false, 'File already exists', $response);
+        $this->assertSame(['/a.txt' => 'A', '/t' => null, '/t/a.txt' => 'TARGET'], $this->disk());
+        $this->assertSame([
+            '/a.txt' => $this->fileRow(1, '7'),
+            '/t' => $this->dirRow('9'),
+            '/t/a.txt' => $this->fileRow(6, '9', 'R9'),
         ], $this->rows());
     }
 

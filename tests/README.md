@@ -102,9 +102,13 @@ Assertions:
 - `listedNames(ApiResponse $response): array`: sorted `name`s of a `list` response (asserts 200)
 - `searchHit(string $path): array`: expected shape of one `search` hit for a file (empty `thumbnail` and `mime`)
 
+Events:
+
+- `recordEvents(array $names, array &$log)`: records `[name, filename, errorMessage]` of the given `FileEvent::EVENT_*` of `ApiController` into `$log` (handlers are removed in `tearDown()`)
+
 Helpers that only one test class needs stay private in that class (for example the row/disk summaries of `ListCreateRenameTest` and `UploadMoveCopyTest`, which return different shapes, `seedItem()`/`seedFolder()`, `createOutsideDir()`, `apiPostWithYiiErrorHandler()`); move one into `ApiTestCase` as soon as a second class needs the same behaviour.
 
-Events can be observed with class-level handlers, e.g. `Event::on(ApiController::class, FileEvent::EVENT_AFTER_UPLOAD, ...)`, since the controller is created per request.
+Events can be observed with class-level handlers, e.g. `Event::on(ApiController::class, FileEvent::EVENT_AFTER_UPLOAD, ...)`, since the controller is created per request; `recordEvents()` does that.
 
 ## Module behaviour test authors must know
 
@@ -143,6 +147,7 @@ Responses and errors:
 - [verified] Mutating actions answer HTTP 200 with `{"result": {"success": bool, "error": string}}`, also on failure; `error` is translated via `messages/en.json` (e.g. `File already exists`), unknown keys are returned verbatim (`nopermission`, `exists` verified; `notfound` unverified), no error is `""`.
 - [verified] `createFolder` on an existing target answers with the raw key `exists` (not `File already exists`) and changes no hashmap row: an existing row stays as it is, and an existing item without row gets none (`ListCreateRenameTest::testCreateFolderThatExistsAsDirectoryReportsExistsAndKeepsItsRow`, `testCreateFolderThatExistsAsDirectoryWithoutRowCreatesNoRow`, `testCreateFolderOverExistingFileWithRowKeepsTheRow`).
 - [verified] `upload` and `copy` onto a path that still has a stale row (row without file) renew that row as if it had not existed: type and size of the new file, the acting user as owner, the access columns from `defaultPermissions`; no other row changes (`UploadMoveCopyTest::testUploadOntoStaleHashmapRowOfMissingFileRenewsTheRowForTheNewFile`, `testCopyOntoStaleHashmapRowOfMissingTargetRenewsTheRowForTheCopy`).
+- [verified] `move`, `copy` and `rename` onto an existing file or directory (or onto the source itself) answer HTTP 200 with `success: false` and `error: "File already exists"` (key `file_already_exists`, as for upload), overwrite nothing and change no row; in a list the items before the colliding one stay moved or copied and the items after it are not tried. The action's `*Error` event fires with `errorMessage` `file_already_exists`, no `after*` event for the colliding item (`UploadMoveCopyTest::testMoveMixedListStopsAtCollidingItemWithFileAlreadyExistsAndKeepsEarlierMoves`, `testCopyOntoExistingItemFiresErrorEventAndNoAfterEventForTheCollidingItem`, `ListCreateRenameTest::testRenameOntoExistingItemFiresBeforeAndErrorEventButNoAfterEvent`). A missing source still ends in HTTP 500.
 - [verified] `remove` of a missing item answers HTTP 500, not the `{success,error}` JSON, and leaves a typeless row behind (`RemoveStreamDownloadTest::testRemoveOfMissingItemReturns500AndLeavesAHashmapRowBehind`). A path without leading slash behaves differently from the slash form: the file is deleted, but the row is looked up under the literal path, so the answer is `success: false` and the row stays (`testRemoveOfPathWithoutLeadingSlashDeletesFileButReportsFailureAndKeepsRow`, `SelfHealTest::testRemoveWithoutLeadingSlashDeletesFileButKeepsRow`).
 - [verified] Hashmap rows for auto-created missing folders (upload, move, copy to a missing target) and for repaired non-existent paths (rename, remove or `changePermissions` of a missing item) have `type` NULL (`UploadMoveCopyTest::testMoveToMissingTargetFolderCreatesFolderWithTypelessRow`, `testCopyToMissingFolderCreatesFolderWithTypelessRow`, `testUploadToMissingFolderCreatesFolderAndSucceeds`, `ListCreateRenameTest::testRenameMissingItemAnswers500AndRepairCreatesRowWithoutType`, `PermissionsTest::testChangePermissionsOnMissingItemCreatesRowAndSucceeds`).
 - [verified] Upload failures set HTTP 400; the body still has `success`, `error` and `uploadedFiles` (uploading an existing name: 400, `File already exists`). `uploadedFiles` holds paths without leading slash (`hello.txt`, `d/my-file.txt`).

@@ -3,6 +3,7 @@
 
 namespace hrzg\filefly\tests\api;
 
+use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\tests\support\ApiResponse;
 use hrzg\filefly\tests\support\ApiTestCase;
 
@@ -971,7 +972,7 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertRows(['/a/b' => $this->row('dir'), '/a/b/x.txt' => $this->row('file')]);
     }
 
-    public function testRenameOntoExistingFileKeepsBothFilesAndRowsAndAnswers500(): void
+    public function testRenameOntoExistingFileKeepsBothFilesAndRowsAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'A');
@@ -981,9 +982,8 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/b.txt']);
 
-        // NOTE: current behaviour: refusal is an unhandled exception (HTTP 500, no JSON result); a library
-        // that overwrites silently would break this test on purpose
-        $this->assertStatus(500, $response);
+        // the refusal is the module's JSON error; a library that overwrites silently would break this test on purpose
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a.txt' => 'A', '/b.txt' => 'B']);
         $this->assertRows(['/a.txt' => $this->row('file'), '/b.txt' => $this->row('file')]);
     }
@@ -996,12 +996,12 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/b.txt']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a.txt' => 'A', '/b.txt' => 'B']);
         $this->assertRows(['/a.txt' => $this->row('file', '1')]);
     }
 
-    public function testRenameFileOntoExistingDirectoryKeepsFileAndDirectoryContentAndAnswers500(): void
+    public function testRenameFileOntoExistingDirectoryKeepsFileAndDirectoryContentAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'A');
@@ -1011,12 +1011,12 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/b']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a.txt' => 'A', '/b' => null, '/b/in.txt' => 'I']);
         $this->assertRows(['/a.txt' => $this->row('file'), '/b' => $this->row('dir')]);
     }
 
-    public function testRenameDirectoryOntoExistingDirectoryKeepsBothTreesAndAnswers500(): void
+    public function testRenameDirectoryOntoExistingDirectoryKeepsBothTreesAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a/x.txt', 'X');
@@ -1026,12 +1026,12 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a', 'newItemPath' => '/b']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a' => null, '/a/x.txt' => 'X', '/b' => null, '/b/y.txt' => 'Y']);
         $this->assertRows(['/a' => $this->row('dir'), '/b' => $this->row('dir')]);
     }
 
-    public function testRenameDirectoryOntoExistingEmptyDirectoryKeepsBothAndAnswers500(): void
+    public function testRenameDirectoryOntoExistingEmptyDirectoryKeepsBothAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a/x.txt', 'X');
@@ -1041,12 +1041,12 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a', 'newItemPath' => '/b']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a' => null, '/a/x.txt' => 'X', '/b' => null]);
         $this->assertRows(['/a' => $this->row('dir'), '/b' => $this->row('dir')]);
     }
 
-    public function testRenameDirectoryOntoExistingFileKeepsBothAndAnswers500(): void
+    public function testRenameDirectoryOntoExistingFileKeepsBothAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a/x.txt', 'X');
@@ -1056,9 +1056,31 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a', 'newItemPath' => '/b.txt']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a' => null, '/a/x.txt' => 'X', '/b.txt' => 'B']);
         $this->assertRows(['/a' => $this->row('dir'), '/b.txt' => $this->row('file')]);
+    }
+
+    public function testRenameOntoExistingItemFiresBeforeAndErrorEventButNoAfterEvent(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedFile('/a.txt', 'A');
+        $this->seedFile('/b.txt', 'B');
+        $log = [];
+        $this->recordEvents([
+            FileEvent::EVENT_BEFORE_RENAME,
+            FileEvent::EVENT_AFTER_RENAME,
+            FileEvent::EVENT_RENAME_SUCCESS,
+            FileEvent::EVENT_RENAME_ERROR,
+        ], $log);
+
+        $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/b.txt']);
+
+        $this->assertResult(false, 'File already exists', $response);
+        $this->assertSame([
+            [FileEvent::EVENT_BEFORE_RENAME, '/a.txt', null],
+            [FileEvent::EVENT_RENAME_ERROR, null, 'file_already_exists'],
+        ], $log);
     }
 
     public function testRenameMissingItemAnswers500AndRepairCreatesRowWithoutType(): void
@@ -1085,7 +1107,7 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertRows(['/nope.txt' => $this->row('file')]);
     }
 
-    public function testRenameToSameNameAnswers500AndChangesNothing(): void
+    public function testRenameToSameNameAnswersFileAlreadyExistsAndChangesNothing(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'A');
@@ -1093,7 +1115,7 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/a.txt']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a.txt' => 'A']);
         $this->assertRows(['/a.txt' => $this->row('file')]);
     }
