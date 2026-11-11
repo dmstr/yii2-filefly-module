@@ -10,6 +10,8 @@ FlySystem API for [dmstr/yii2-filemanager-widgets](https://github.com/dmstr/yii2
 Installation
 ------------
 
+Upgrading from 1.x: see [UPGRADE.md](./UPGRADE.md) (Flysystem 3, creocoder/yii2-flysystem 2, filesystem component config, removed API).
+
 #### ENV variables
 
 Variable | Value | Required
@@ -21,7 +23,7 @@ AFM_DELETE_RECURSIVE | default: false | no
 
 i.e. `AFM_FILESYSTEM=fsLocal`
 
-:question: How to configure a filesystem component [Filesystem docs](https://github.com/creocoder/yii2-flysystem/blob/master/README.md)
+:question: How to configure a filesystem component [Filesystem docs](https://github.com/creocoder/yii2-flysystem/blob/master/README.md) (creocoder/yii2-flysystem 2, Flysystem 3; requires the adapter package, e.g. `league/flysystem-aws-s3-v3` or `league/flysystem-ftp`; for local components see the recommended `directory_visibility` in [UPGRADE.md](./UPGRADE.md))
 
 #### Yii config
 
