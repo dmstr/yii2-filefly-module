@@ -82,6 +82,8 @@ The module reaches every filesystem through `hrzg\filefly\components\Storage`, w
 | upload, `writeFile()` | `HeadObject`, `ListObjectsV2`, `PutObject` |
 | copy, `copyFile()` | `HeadObject`, `HeadObject`, `ListObjectsV2`, `HeadObject`, `CopyObject` |
 | move or rename of a file, `move()` | `HeadObject`, `HeadObject`, `ListObjectsV2`, `HeadObject`, `CopyObject`, `DeleteObject` |
+| `lastModified()` of a file (`fs sync`, `list` without listing time) | `HeadObject`, `HeadObject` |
+| `lastModified()` of a directory | `HeadObject`, `ListObjectsV2` |
 
   Moving a file out of its folder, deleting a file and deleting a folder below the root add one `PutObject` (the parent's marker); deleting a folder is one listing plus one `DeleteObjects` per 1000 keys.
 

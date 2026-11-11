@@ -140,6 +140,8 @@ use yii\base\InvalidConfigException;
  * | writeFile() | HeadObject, ListObjectsV2, PutObject |
  * | copyFile() | HeadObject, HeadObject, ListObjectsV2, HeadObject, CopyObject |
  * | move() of a file | HeadObject, HeadObject, ListObjectsV2, HeadObject, CopyObject, DeleteObject |
+ * | lastModified() of a file | HeadObject, HeadObject |
+ * | lastModified() of a directory (`null`) | HeadObject, ListObjectsV2 |
  * | any method with a refused path | none |
  *
  * move() of a file out of its directory adds one PutObject (the parent's marker), deleteFile()
