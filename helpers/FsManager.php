@@ -209,23 +209,7 @@ class FsManager
      */
     public function copyFile($from, $to)
     {
-        list($fromStorage, $fromPath) = $this->resolve($from);
-
-        $buffer = $fromStorage->openFile($fromPath);
-
-        if ($buffer === null) {
-            return false;
-        }
-
-        list($toStorage, $toPath) = $this->resolve($to);
-
-        $result = $toStorage->writeFile($toPath, $buffer);
-
-        if (is_resource($buffer)) {
-            fclose($buffer);
-        }
-
-        return $result;
+        return $this->streamFile($from, $to);
     }
 
     /**
@@ -253,6 +237,35 @@ class FsManager
         }
 
         return false;
+    }
+
+    /**
+     * Open the source for reading, then write it to the target with Storage::writeFile().
+     *
+     * @param string $from
+     * @param string $to
+     *
+     * @return bool
+     */
+    private function streamFile($from, $to)
+    {
+        list($fromStorage, $fromPath) = $this->resolve($from);
+
+        $buffer = $fromStorage->openFile($fromPath);
+
+        if ($buffer === null) {
+            return false;
+        }
+
+        list($toStorage, $toPath) = $this->resolve($to);
+
+        $result = $toStorage->writeFile($toPath, $buffer);
+
+        if (is_resource($buffer)) {
+            fclose($buffer);
+        }
+
+        return $result;
     }
 
     private function parseScheme($uri = '/')
