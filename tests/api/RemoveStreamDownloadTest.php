@@ -630,7 +630,7 @@ class RemoveStreamDownloadTest extends ApiTestCase
         $this->assertSame('hello', $response->body);
     }
 
-    public function testStreamWithDotSegmentsLeavingTheRootDeliversFileFromOutsideTheRoot(): void
+    public function testStreamWithDotSegmentsLeavingTheRootIsAnsweredLikeMissingFile(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'hello');
@@ -638,14 +638,13 @@ class RemoveStreamDownloadTest extends ApiTestCase
 
         $response = $this->apiStream('../outside.txt');
 
-        // NOTE: SECURITY, current behaviour, looks unintended: path traversal. The action talks to the adapter
-        // directly, which does not normalize `..`, so a file next to the storage root is delivered
-        $this->assertStatus(200, $response);
-        $this->assertSame('OUTSIDE', $response->body);
-        $this->assertSame('inline; filename="outside.txt"', $response->header('content-disposition'));
+        // a path that leaves the storage root is answered like a missing file
+        $this->assertStatus(404, $response);
+        $this->assertStringNotContainsString('OUTSIDE', $response->body);
+        $this->assertNull($response->header('content-disposition'));
     }
 
-    public function testStreamWithDotSegmentsClimbingOutOfSubdirectoryDeliversFileFromOutsideTheRoot(): void
+    public function testStreamWithDotSegmentsClimbingOutOfSubdirectoryIsAnsweredLikeMissingFile(): void
     {
         $this->actingAsAdmin();
         $this->seedDir('/d');
@@ -653,9 +652,10 @@ class RemoveStreamDownloadTest extends ApiTestCase
 
         $response = $this->apiStream('d/../../outside.txt');
 
-        // NOTE: SECURITY, current behaviour, looks unintended: path traversal, see the test above
-        $this->assertStatus(200, $response);
-        $this->assertSame('OUTSIDE', $response->body);
+        // a path that leaves the storage root is answered like a missing file
+        $this->assertStatus(404, $response);
+        $this->assertStringNotContainsString('OUTSIDE', $response->body);
+        $this->assertNull($response->header('content-disposition'));
     }
 
     public function testStreamDoesNotUrlDecodePercentSequencesInPath(): void
@@ -1001,7 +1001,7 @@ class RemoveStreamDownloadTest extends ApiTestCase
 
         $response = $this->apiDownload('nope.txt');
 
-        // the message of this 404 contains the disk path, so only the status is pinned
+        // only the status is pinned here, the message is pinned in DownloadErrorMessageTest
         $this->assertStatus(404, $response);
         $this->assertNull($response->header('content-disposition'));
     }
@@ -1028,17 +1028,17 @@ class RemoveStreamDownloadTest extends ApiTestCase
         $this->assertSame('File not found at path: ', $response->exception->getMessage());
     }
 
-    public function testDownloadWithDotSegmentsLeavingTheRootDeliversFileFromOutsideTheRoot(): void
+    public function testDownloadWithDotSegmentsLeavingTheRootIsAnsweredLikeMissingFile(): void
     {
         $this->actingAsAdmin();
         file_put_contents($this->workDir . '/outside.txt', 'OUTSIDE');
 
         $response = $this->apiDownload('../outside.txt');
 
-        // NOTE: SECURITY, current behaviour, looks unintended: path traversal, same as stream
-        $this->assertStatus(200, $response);
-        $this->assertSame('OUTSIDE', $response->body);
-        $this->assertSame('attachment; filename="outside.txt"', $response->header('content-disposition'));
+        // a path that leaves the storage root is answered like a missing file
+        $this->assertStatus(404, $response);
+        $this->assertStringNotContainsString('OUTSIDE', $response->body);
+        $this->assertNull($response->header('content-disposition'));
     }
 
     public function testDownloadWithDotSegmentsInsideRootIsNormalized(): void

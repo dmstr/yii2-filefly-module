@@ -142,12 +142,12 @@ Responses and errors:
 - [verified] Exceptions are rendered by the Yii error handler; in the test environment the body is `<pre>Name: message</pre>`, so assert on `statusCode` and `exception`, not on the body.
 - [verified] `stream`: missing file gives 404 with empty message; `Range: bytes=2-4` gives 206 with the range; active content (SVG) is sent as `attachment` with `X-Content-Type-Options: nosniff` and a sandbox CSP, plain files `inline`; `Expires` and `Cache-Control: public` are set.
 - [verified] `download` honours Range requests like `stream` (206, `Content-Range`): `RemoveStreamDownloadTest::testDownloadHonoursRangeRequestsLikeStream`.
-- [verified] `download` works through `Yii::$app->end()` (body = file content). A missing file gives 404 whose message leaks the absolute disk path (`SplFileInfo::getType(): Lstat failed for /.../fs/nope.txt`); characterise only the status code, the message is Flysystem 1 specific.
+- [verified] `download` works through `Yii::$app->end()` (body = file content). A missing file gives 404 with the message `File not found at path: <requested path>`, pinned by `tests/api/DownloadErrorMessageTest.php`.
 
 Paths:
 
 - [verified] Hashmap paths start with `/`; `list` paths do not.
-- Paths containing `..` segments are not normalised by `stream` and `download`; the current behaviour is pinned by the `...DotSegments...` tests in `RemoveStreamDownloadTest`.
+- [verified] Paths containing `..` segments that leave the storage root are answered like a missing file by `stream` and `download`, pinned by the `...DotSegments...` tests in `RemoveStreamDownloadTest` and by `tests/api/StreamDownloadPathTest.php`.
 - [verified] With `slugNames` (default) upload slugs the base name and lower-cases the extension: `My File.TXT` becomes `my-file.txt`.
 
 Dependencies not declared by the module:
