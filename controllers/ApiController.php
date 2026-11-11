@@ -14,15 +14,13 @@ use hrzg\filefly\components\ContentDeliveryPolicy;
 use hrzg\filefly\components\ContentValidator;
 use hrzg\filefly\components\FileManager;
 use hrzg\filefly\components\Storage;
+use hrzg\filefly\components\storage\InvalidPathException;
 use hrzg\filefly\components\storage\ItemExistsException;
 use hrzg\filefly\components\storage\ItemNotFoundException;
 use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
 use hrzg\filefly\Module as Filefly;
-use League\Flysystem\FileNotFoundException;
-use League\Flysystem\Util;
-use League\Flysystem\Util\MimeType;
 use Yii;
 use yii\di\Instance;
 use yii\filters\AccessControl;
@@ -615,25 +613,23 @@ class ApiController extends WebController
      */
     public function actionDownload($path)
     {
-        $fileSystem = FileManager::fileSystem();
-        $adapter = $fileSystem->getAdapter();
-        $filePath = $this->normalizeAdapterPath($path);
+        $storage = FileManager::storage();
+        $filePath = $this->normalizeDeliveryPath($storage, $path);
 
         try {
-            // Ein einziger getMetadata()-Call statt separater isFile()/getMimetype()/getSize()-Aufrufe
-            $metadata = $adapter->getMetadata($filePath);
+            // one metadata request instead of separate existence, mime type and size requests
+            $metadata = $storage->fileStat($filePath);
 
-            if ($metadata === false || $metadata['type'] !== 'file') {
+            if ($metadata === null || $metadata->getType() !== 'file') {
                 throw new NotFoundHttpException(Yii::t('filefly', 'File not found at path: {path}', [
                     'path' => $path
                 ]));
             }
 
-            // getMetadata() liefert bei vielen Adaptern (u.a. S3) kein 'mimetype'.
-            // Statt eines weiteren HEAD-Requests (getMimetype()) leiten wir den Typ
-            // anhand der Dateiendung ab - kostet keinen zusätzlichen S3-Request.
-            $mimeType = $metadata['mimetype'] ?? (MimeType::detectByFilename($filePath) ?: 'application/octet-stream');
-            $size = $metadata['size'] ?? 0;
+            // many adapters (S3 among them) report no mime type with the metadata; instead of a
+            // further request it is derived from the file extension
+            $mimeType = $metadata->getMimeType() ?? (Storage::mimeTypeByFileName($filePath) ?: 'application/octet-stream');
+            $size = $metadata->getSize() ?? 0;
 
             $this->getDeliveryPolicy()->apply(Yii::$app->response, $filePath, $mimeType);
 
@@ -644,15 +640,13 @@ class ApiController extends WebController
             $headers->add('Content-Transfer-Encoding', 'binary');
             $headers->add('Connection', 'Keep-Alive');
 
-            // Adapter->readStream() liefert ein Array ['type' => ..., 'stream' => resource],
-            // NICHT direkt die Stream-Resource (anders als die Filesystem-Fassade).
-            $streamResult = $adapter->readStream($filePath);
-            if ($streamResult === false || !isset($streamResult['stream'])) {
+            // one read request, without a further existence check
+            $stream = $storage->fileStream($filePath);
+            if ($stream === null) {
                 throw new NotFoundHttpException(Yii::t('filefly', 'File not found at path: {path}', [
                     'path' => $path
                 ]));
             }
-            $stream = $streamResult['stream'];
 
             $this->trigger(FileEvent::EVENT_BEFORE_DOWNLOAD, new FileEvent(['filename' => $path]));
             $response->sendStreamAsFile(
@@ -683,23 +677,21 @@ class ApiController extends WebController
      */
     public function actionStream($path)
     {
-        $fileSystem = FileManager::fileSystem();
-        $adapter = $fileSystem->getAdapter();
-        $filePath = $this->normalizeAdapterPath($path);
+        $storage = FileManager::storage();
+        $filePath = $this->normalizeDeliveryPath($storage, $path);
 
         try {
-            // Ein einziger getMetadata()-Call statt separater isFile()/getMimetype()/getSize()-Aufrufe
-            $metadata = $adapter->getMetadata($filePath);
+            // one metadata request instead of separate existence, mime type and size requests
+            $metadata = $storage->fileStat($filePath);
 
-            if ($metadata === false || $metadata['type'] !== 'file') {
+            if ($metadata === null || $metadata->getType() !== 'file') {
                 throw new NotFoundHttpException();
             }
 
-            // getMetadata() liefert bei vielen Adaptern (u.a. S3) kein 'mimetype'.
-            // Statt eines weiteren HEAD-Requests (getMimetype()) leiten wir den Typ
-            // anhand der Dateiendung ab - kostet keinen zusätzlichen S3-Request.
-            $mimeType = $metadata['mimetype'] ?? (MimeType::detectByFilename($filePath) ?: 'application/octet-stream');
-            $size = $metadata['size'] ?? 0;
+            // many adapters (S3 among them) report no mime type with the metadata; instead of a
+            // further request it is derived from the file extension
+            $mimeType = $metadata->getMimeType() ?? (Storage::mimeTypeByFileName($filePath) ?: 'application/octet-stream');
+            $size = $metadata->getSize() ?? 0;
 
             $forceAttachment = $this->getDeliveryPolicy()->apply(Yii::$app->response, $filePath, $mimeType);
 
@@ -710,13 +702,11 @@ class ApiController extends WebController
             $headers->add('Expires', gmdate('D, d M Y H:i:s', time() + $offset) . ' GMT');
             $headers->add('Cache-Control', 'public');
 
-            // Adapter->readStream() liefert ein Array ['type' => ..., 'stream' => resource],
-            // NICHT direkt die Stream-Resource (anders als die Filesystem-Fassade).
-            $streamResult = $adapter->readStream($filePath);
-            if ($streamResult === false || !isset($streamResult['stream'])) {
+            // one read request, without a further existence check
+            $stream = $storage->fileStream($filePath);
+            if ($stream === null) {
                 throw new NotFoundHttpException();
             }
-            $stream = $streamResult['stream'];
 
             Yii::$app->response->sendStreamAsFile(
                 $stream,
@@ -822,7 +812,7 @@ class ApiController extends WebController
                 $item['thumbnail'] = $this->getItemThumbnail($item);
                 $item['mime'] = '';
                 $result[] = $item;
-            } catch (FileNotFoundException $e) {
+            } catch (ItemNotFoundException $e) {
                 \Yii::warning($e->getMessage(), __METHOD__);
                 continue;
             }
@@ -883,25 +873,24 @@ class ApiController extends WebController
     }
 
     /**
-     * Normalises a requested path exactly like the Flysystem facade does before it delegates to the
-     * adapter (backslashes become `/`, empty and `.` segments are dropped, `..` is resolved, control
-     * characters are rejected).
+     * Normalises a requested path with Storage::normalizePath() (backslashes become `/`, empty and
+     * `.` segments are dropped, `..` is resolved, control characters are rejected).
      *
-     * stream and download call the adapter directly to save requests, which bypasses that
-     * normalisation; without it `..` segments would reach the adapter and leave the storage root.
-     * A path that leaves the root or contains control characters is answered like a missing file,
-     * without echoing the path.
+     * stream and download use the normalised path for the file name, the mime type and the
+     * delivery policy. A path that leaves the root or contains control characters is answered
+     * like a missing file, without echoing the path.
      *
+     * @param Storage $storage
      * @param string $path
      *
      * @return string path relative to the storage root, without leading or trailing slash
      * @throws NotFoundHttpException
      */
-    private function normalizeAdapterPath($path)
+    private function normalizeDeliveryPath(Storage $storage, $path)
     {
         try {
-            return Util::normalizePath($path);
-        } catch (\LogicException $e) {
+            return $storage->normalizePath($path);
+        } catch (InvalidPathException $e) {
             throw new NotFoundHttpException();
         }
     }
