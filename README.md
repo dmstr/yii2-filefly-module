@@ -142,11 +142,15 @@ So if inherited `access_*` permissions should be used, set defaultPermissions to
 - filefly_default_index
 - filefly_api_index
 
-## RBAC Plugins
+## Access control
+
+Access checks and the hashmap maintenance are done by `hrzg\filefly\components\AccessManager`; `FileManager::access()` returns one for the filesystem of the current module, with the methods `check()`, `grantAccess()`, `setAccess()`, `removeAccess()`, `getPermissions()`, `updatePermission()` and `isEmpty()`.
+
+The Flysystem plugins in `hrzg\filefly\plugins` and the magic methods of the same names on `FileManager::fileSystem()` are deprecated since 1.9; they delegate to `AccessManager` and are removed in 2.0 together with Flysystem 1.
 
 Permission checks will ever come after file or folder operation
 
-**GrantPermission**
+**grantAccess**
 ```
 Granted or deny permission
 
@@ -155,7 +159,7 @@ Granted or deny permission
    access field set (is access owner, true, permission denied, false)
 ```
 
-**SetPermission**
+**setAccess**
 ```
 Create or update permission
 
@@ -165,7 +169,7 @@ Create or update permission
 - Multi create and update option
 ```
 
-**RemovePermission**
+**removeAccess**
 ```
 Remove permission
 
