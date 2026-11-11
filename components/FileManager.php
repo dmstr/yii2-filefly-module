@@ -47,6 +47,8 @@ class FileManager extends Component
      * Side effect: switches the access trait and its flash messages off for FileflyHashmap globally.
      *
      * @return Filesystem
+     * @deprecated since 1.9, removed in 2.0 with Flysystem 1: the module itself uses storage() for
+     *             files and access() for permissions; this method is kept for code outside the module
      */
     public static function fileSystem()
     {
@@ -66,6 +68,27 @@ class FileManager extends Component
         self::disableHashmapAccessTrait();
 
         return $fileSystem;
+    }
+
+    /**
+     * The storage facade for the filesystem of the current module: the only way the module reads
+     * and writes files.
+     *
+     * Returns a new instance on every call; it holds no state besides the filesystem component.
+     *
+     * Side effect: switches the access trait and its flash messages off for FileflyHashmap globally,
+     * like fileSystem() and access(). Unlike fileSystem() it registers no plugins on the component.
+     *
+     * @return Storage
+     */
+    public static function storage()
+    {
+        $fsComponent = self::currentFilesystemComponent();
+        $fileSystem = \Yii::$app->{$fsComponent};
+
+        self::disableHashmapAccessTrait();
+
+        return new Storage(['filesystem' => $fileSystem]);
     }
 
     /**
