@@ -37,7 +37,7 @@ class RemoveStreamDownloadTest extends ApiTestCase
     }
 
     // ------------------------------------------------------------------
-    // private helpers (candidates for the harness)
+    // private helpers
     // ------------------------------------------------------------------
 
     /**

@@ -19,7 +19,7 @@ use hrzg\filefly\tests\support\ApiTestCase;
 class UploadMoveCopyTest extends ApiTestCase
 {
     // ------------------------------------------------------------------
-    // private helpers (candidates for the harness)
+    // private helpers
     // ------------------------------------------------------------------
 
     /**
@@ -38,24 +38,6 @@ class UploadMoveCopyTest extends ApiTestCase
     {
         $this->seedDir($path);
         $this->seedHashmapRow($path, 'dir', $access);
-    }
-
-    /**
-     * Whole filesystem as `/path => content` (`null` for directories), sorted by path
-     */
-    private function disk(): array
-    {
-        $tree = [];
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->fsRoot, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST
-        );
-        foreach ($iterator as $file) {
-            $path = substr($file->getPathname(), strlen($this->fsRoot));
-            $tree[$path] = $file->isDir() ? null : file_get_contents($file->getPathname());
-        }
-        ksort($tree);
-        return $tree;
     }
 
     /**
@@ -98,15 +80,6 @@ class UploadMoveCopyTest extends ApiTestCase
     }
 
     /**
-     * Asserts status 200 and the exact `result` of a move/copy response
-     */
-    private function assertResult(bool $success, string $error, ApiResponse $response): void
-    {
-        $this->assertStatus(200, $response);
-        $this->assertSame(['result' => ['success' => $success, 'error' => $error]], $response->json());
-    }
-
-    /**
      * Asserts status 400 and the exact upload `result`
      */
     private function assertUploadFailed(string $error, array $uploadedFiles, ApiResponse $response): void
@@ -125,11 +98,6 @@ class UploadMoveCopyTest extends ApiTestCase
             ['result' => ['success' => true, 'error' => '', 'uploadedFiles' => $uploadedFiles]],
             $response->json()
         );
-    }
-
-    private function actingAsFileflyUser(int $id = 7): void
-    {
-        $this->actingAsUser($id, ['FileflyDefault'], ['filefly_api']);
     }
 
     // ------------------------------------------------------------------

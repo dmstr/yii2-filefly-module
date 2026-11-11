@@ -16,9 +16,6 @@ use hrzg\filefly\tests\support\ApiTestCase;
  */
 class SelfHealTest extends ApiTestCase
 {
-    private const USER_ID = 5;
-    private const OTHER_ID = '7';
-
     // ------------------------------------------------------------------
     // self-heal through list
     // ------------------------------------------------------------------
@@ -641,63 +638,5 @@ class SelfHealTest extends ApiTestCase
         $this->assertFileOnDisk('/closed.txt', 'c');
         $this->assertNotOnDisk('/open.txt');
         $this->assertSame(['/closed.txt'], $this->rowPaths());
-    }
-
-    // ------------------------------------------------------------------
-    // helpers (duplicated from PermissionsTest, candidates for the harness)
-    // ------------------------------------------------------------------
-
-    private function actAsApiUser(): void
-    {
-        foreach (['RoleA', 'RoleB', 'Secret'] as $role) {
-            $this->createRole($role);
-        }
-        $this->actingAsUser(self::USER_ID, ['FileflyDefault', 'RoleA'], ['filefly_api']);
-    }
-
-    private function seedRow(string $path, string $type, ?string $owner, ?string $read, ?string $update, ?string $delete, ?int $size = null): void
-    {
-        $this->seedHashmapRow($path, $type, [
-            'access_owner' => $owner,
-            'access_read' => $read,
-            'access_update' => $update,
-            'access_delete' => $delete,
-        ], $size);
-    }
-
-    private function assertAccess(string $path, ?string $type, ?string $owner, ?string $read, ?string $update, ?string $delete): void
-    {
-        $row = $this->hashmapRow($path);
-        $this->assertNotNull($row, "Expected hashmap row for $path, rows: " . implode(', ', $this->rowPaths()));
-        $this->assertSame(
-            ['type' => $type, 'access_owner' => $owner, 'access_read' => $read, 'access_update' => $update, 'access_delete' => $delete],
-            array_intersect_key($row, array_flip(['type', 'access_owner', 'access_read', 'access_update', 'access_delete'])),
-            "hashmap row of $path"
-        );
-    }
-
-    private function rowPaths(): array
-    {
-        return array_column($this->hashmapRows(), 'path');
-    }
-
-    private function listedNames(ApiResponse $response): array
-    {
-        $this->assertStatus(200, $response);
-        $names = array_column($response->json()['result'], 'name');
-        sort($names);
-        return $names;
-    }
-
-    private function searchHit(string $path): array
-    {
-        return [
-            'path' => $path,
-            'type' => 'file',
-            'extension' => pathinfo($path, PATHINFO_EXTENSION),
-            'id' => $path,
-            'thumbnail' => '',
-            'mime' => '',
-        ];
     }
 }

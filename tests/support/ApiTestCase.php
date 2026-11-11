@@ -27,14 +27,16 @@ use yii\web\Application;
  * auth items in function-static variables that cannot be reset (see tests/README.md).
  *
  * Public helper API (stable, see tests/README.md):
- * - acting as: actingAsAdmin(), actingAsUser(), actingAsGuest(), createRole(), createPermission()
+ * - acting as: actingAsAdmin(), actingAsUser(), actingAsGuest(), actingAsFileflyUser(), actAsApiUser(),
+ *   createRole(), createRoles(), createPermission()
  * - module: configureModule(), setSetting()
  * - requests: apiGet(), apiPost(), apiUpload(), apiStream(), apiDownload(), request()
- * - disk: seedFile(), seedDir(), diskPath(), readFromDisk(), assertFileOnDisk(), assertDirOnDisk(),
+ * - disk: seedFile(), seedDir(), diskPath(), readFromDisk(), disk(), assertFileOnDisk(), assertDirOnDisk(),
  *   assertNotOnDisk()
- * - hashmap: seedHashmapRow(), hashmapRow(), hashmapRows(), assertHashmapRow(), assertNoHashmapRow()
+ * - hashmap: seedHashmapRow(), seedRow(), hashmapRow(), hashmapRows(), rowPaths(), assertHashmapRow(),
+ *   assertAccess(), assertNoHashmapRow()
  * - API seeding: seedFileViaApi(), seedDirViaApi()
- * - assertions: assertStatus(), assertApiSuccess()
+ * - assertions: assertStatus(), assertApiSuccess(), assertResult(), listedNames(), searchHit()
  */
 abstract class ApiTestCase extends TestCase
 {
@@ -47,6 +49,12 @@ abstract class ApiTestCase extends TestCase
     /** id and username of the root user (\dmstr\web\User::$rootUsers), mirrors the phd5 `admin` user */
     public const ADMIN_ID = 1;
     public const ADMIN_USERNAME = 'admin';
+
+    /** id of the plain (non-root) acting user used by actAsApiUser() and most permission tests */
+    public const USER_ID = 5;
+
+    /** id (string, like the hashmap column) of "someone else", the owner of rows seeded for other users */
+    public const OTHER_ID = '7';
 
     /** Accept header sent by the filemanager widget (angular $http default) */
     public const DEFAULT_ACCEPT = 'application/json, text/plain, */*';
@@ -349,6 +357,36 @@ abstract class ApiTestCase extends TestCase
     }
 
     /**
+     * Plain API user: role `FileflyDefault` and the route permission `filefly_api`, nothing else
+     */
+    protected function actingAsFileflyUser(int $id): void
+    {
+        $this->actingAsUser($id, ['FileflyDefault'], ['filefly_api']);
+    }
+
+    /**
+     * Creates the roles `RoleA`, `RoleB` and `Secret` (if missing); they are assigned to nobody by default
+     */
+    protected function createRoles(): void
+    {
+        foreach (['RoleA', 'RoleB', 'Secret'] as $role) {
+            $this->createRole($role);
+        }
+    }
+
+    /**
+     * Acting user USER_ID with FileflyDefault, the route permission `filefly_api` and RoleA (+ extra roles);
+     * creates the roles of createRoles() first
+     *
+     * @param string[] $extraRoles existing roles that are assigned in addition
+     */
+    protected function actAsApiUser(array $extraRoles = []): void
+    {
+        $this->createRoles();
+        $this->actingAsUser(self::USER_ID, array_merge(['FileflyDefault', 'RoleA'], $extraRoles), ['filefly_api']);
+    }
+
+    /**
      * No identity. Guest permissions come from the RBAC role `Guest` (\dmstr\web\User::GUEST_ROLE),
      * which does not exist by default.
      */
@@ -574,6 +612,24 @@ abstract class ApiTestCase extends TestCase
     // ------------------------------------------------------------------
 
     /**
+     * Whole test filesystem as `/path => file content` (`null` for directories), sorted by path
+     */
+    protected function disk(): array
+    {
+        $tree = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($this->fsRoot, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iterator as $info) {
+            $path = substr($info->getPathname(), strlen($this->fsRoot));
+            $tree[$path] = $info->isDir() ? null : file_get_contents($info->getPathname());
+        }
+        ksort($tree, SORT_STRING);
+        return $tree;
+    }
+
+    /**
      * Absolute disk path for an API path (`/a/b.txt` or `a/b.txt`)
      */
     protected function diskPath(string $path): string
@@ -674,6 +730,19 @@ abstract class ApiTestCase extends TestCase
     }
 
     /**
+     * Like seedHashmapRow() with the four access columns as positional arguments (`null` is kept as NULL)
+     */
+    protected function seedRow(string $path, string $type, ?string $owner, ?string $read, ?string $update, ?string $delete, ?int $size = null): void
+    {
+        $this->seedHashmapRow($path, $type, [
+            'access_owner' => $owner,
+            'access_read' => $read,
+            'access_update' => $update,
+            'access_delete' => $delete,
+        ], $size);
+    }
+
+    /**
      * Hashmap row for a path of the test filesystem, `null` if none.
      * All non-null values are strings (as MySQL returns them).
      */
@@ -719,6 +788,30 @@ abstract class ApiTestCase extends TestCase
     protected function assertNoHashmapRow(string $path): void
     {
         $this->assertNull($this->hashmapRow($path), "Expected no hashmap row for $path");
+    }
+
+    /**
+     * Full-row assertion of type and all access columns (strict, `null` means NULL)
+     */
+    protected function assertAccess(string $path, ?string $type, ?string $owner, ?string $read, ?string $update, ?string $delete): void
+    {
+        $row = $this->hashmapRow($path);
+        $this->assertNotNull($row, "Expected hashmap row for $path, rows: " . implode(', ', $this->rowPaths()));
+        $this->assertSame(
+            ['type' => $type, 'access_owner' => $owner, 'access_read' => $read, 'access_update' => $update, 'access_delete' => $delete],
+            array_intersect_key($row, array_flip(['type', 'access_owner', 'access_read', 'access_update', 'access_delete'])),
+            "hashmap row of $path"
+        );
+    }
+
+    /**
+     * Paths of all hashmap rows of the test filesystem, ordered by path
+     *
+     * @return string[]
+     */
+    protected function rowPaths(): array
+    {
+        return array_column($this->hashmapRows(), 'path');
     }
 
     private function stringifyRow(array $row): array
@@ -771,6 +864,43 @@ abstract class ApiTestCase extends TestCase
         $this->assertStatus(200, $response);
         $json = $response->json();
         $this->assertTrue($json['result']['success'] ?? null, $response->describe());
+    }
+
+    /**
+     * Asserts HTTP 200 and the exact result of a mutating action: `{"result": {"success": ..., "error": ...}}`
+     */
+    protected function assertResult(bool $success, string $error, ApiResponse $response): void
+    {
+        $this->assertStatus(200, $response);
+        $this->assertSame(['result' => ['success' => $success, 'error' => $error]], $response->json());
+    }
+
+    /**
+     * Asserts HTTP 200 and returns the sorted `name`s of a `list` response
+     *
+     * @return string[]
+     */
+    protected function listedNames(ApiResponse $response): array
+    {
+        $this->assertStatus(200, $response);
+        $names = array_column($response->json()['result'], 'name');
+        sort($names);
+        return $names;
+    }
+
+    /**
+     * Expected shape of one `search` hit for a file path (with leading slash), with empty thumbnail and mime
+     */
+    protected function searchHit(string $path): array
+    {
+        return [
+            'path' => $path,
+            'type' => 'file',
+            'extension' => pathinfo($path, PATHINFO_EXTENSION),
+            'id' => $path,
+            'thumbnail' => '',
+            'mime' => '',
+        ];
     }
 
     // ------------------------------------------------------------------

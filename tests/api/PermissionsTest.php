@@ -22,9 +22,6 @@ use Yii;
  */
 class PermissionsTest extends ApiTestCase
 {
-    private const USER_ID = 5;
-    private const OTHER_ID = '7';
-
     // ------------------------------------------------------------------
     // access matrix
     // ------------------------------------------------------------------
@@ -1357,7 +1354,7 @@ class PermissionsTest extends ApiTestCase
     }
 
     // ------------------------------------------------------------------
-    // helpers (candidates for the harness)
+    // private helpers
     // ------------------------------------------------------------------
 
     /**
@@ -1378,22 +1375,6 @@ class PermissionsTest extends ApiTestCase
         } finally {
             restore_error_handler();
         }
-    }
-
-    private function createRoles(): void
-    {
-        foreach (['RoleA', 'RoleB', 'Secret'] as $role) {
-            $this->createRole($role);
-        }
-    }
-
-    /**
-     * Acting user id 5 with FileflyDefault, the route permission `filefly_api` and RoleA (+ extra roles)
-     */
-    private function actAsApiUser(array $extraRoles = []): void
-    {
-        $this->createRoles();
-        $this->actingAsUser(self::USER_ID, array_merge(['FileflyDefault', 'RoleA'], $extraRoles), ['filefly_api']);
     }
 
     private function actAsCase(string $actor): void
@@ -1428,55 +1409,6 @@ class PermissionsTest extends ApiTestCase
     private function actorId(string $actor): string
     {
         return $actor === 'root' ? (string)self::ADMIN_ID : (string)self::USER_ID;
-    }
-
-    private function seedRow(string $path, string $type, ?string $owner, ?string $read, ?string $update, ?string $delete, ?int $size = null): void
-    {
-        $this->seedHashmapRow($path, $type, [
-            'access_owner' => $owner,
-            'access_read' => $read,
-            'access_update' => $update,
-            'access_delete' => $delete,
-        ], $size);
-    }
-
-    /**
-     * Full-row assertion of type and all access columns
-     */
-    private function assertAccess(string $path, ?string $type, ?string $owner, ?string $read, ?string $update, ?string $delete): void
-    {
-        $row = $this->hashmapRow($path);
-        $this->assertNotNull($row, "Expected hashmap row for $path, rows: " . implode(', ', $this->rowPaths()));
-        $this->assertSame(
-            ['type' => $type, 'access_owner' => $owner, 'access_read' => $read, 'access_update' => $update, 'access_delete' => $delete],
-            array_intersect_key($row, array_flip(['type', 'access_owner', 'access_read', 'access_update', 'access_delete'])),
-            "hashmap row of $path"
-        );
-    }
-
-    private function rowPaths(): array
-    {
-        return array_column($this->hashmapRows(), 'path');
-    }
-
-    private function listedNames(ApiResponse $response): array
-    {
-        $this->assertStatus(200, $response);
-        $names = array_column($response->json()['result'], 'name');
-        sort($names);
-        return $names;
-    }
-
-    private function searchHit(string $path): array
-    {
-        return [
-            'path' => $path,
-            'type' => 'file',
-            'extension' => pathinfo($path, PATHINFO_EXTENSION),
-            'id' => $path,
-            'thumbnail' => '',
-            'mime' => '',
-        ];
     }
 
     private function permissionItem(array $read, array $update, array $delete): array

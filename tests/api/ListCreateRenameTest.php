@@ -62,37 +62,10 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertSame($expected, $this->rows(), $message ?: 'hashmap rows');
     }
 
-    /**
-     * Whole test filesystem as path => file content (`null` for directories), sorted by path
-     */
-    private function disk(): array
-    {
-        $tree = [];
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->fsRoot, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST
-        );
-        foreach ($iterator as $info) {
-            $path = substr($info->getPathname(), strlen($this->fsRoot));
-            $tree[$path] = $info->isDir() ? null : file_get_contents($info->getPathname());
-        }
-        ksort($tree, SORT_STRING);
-        return $tree;
-    }
-
     private function assertDisk(array $expected): void
     {
         ksort($expected, SORT_STRING);
         $this->assertSame($expected, $this->disk(), 'files on disk');
-    }
-
-    /**
-     * Asserts HTTP 200 and the exact result of a mutating action
-     */
-    private function assertResult(bool $success, string $error, ApiResponse $response): void
-    {
-        $this->assertStatus(200, $response);
-        $this->assertSame(['result' => ['success' => $success, 'error' => $error]], $response->json());
     }
 
     /**
@@ -167,11 +140,6 @@ class ListCreateRenameTest extends ApiTestCase
         foreach (['/docs', '/reports'] as $path) {
             $this->seedHashmapRow($path, 'dir');
         }
-    }
-
-    private function actingAsPlainUser(): void
-    {
-        $this->actingAsUser(5, ['FileflyDefault'], ['filefly_api']);
     }
 
     // ------------------------------------------------------------------
@@ -427,7 +395,7 @@ class ListCreateRenameTest extends ApiTestCase
 
     public function testListAsPlainUserHidesItemsWithoutReadAccessAndRepairsRowsWithDefaultOwner(): void
     {
-        $this->actingAsPlainUser();
+        $this->actingAsFileflyUser(5);
         $this->seedDir('/pub');
         $this->seedHashmapRow('/pub', 'dir', ['access_owner' => '9']);
         $this->seedFile('/pub/open.txt', '1');
@@ -448,7 +416,7 @@ class ListCreateRenameTest extends ApiTestCase
 
     public function testListAsPlainUserOfDirectoryWithoutReadAccessReturnsEmptyResult(): void
     {
-        $this->actingAsPlainUser();
+        $this->actingAsFileflyUser(5);
         $this->seedDir('/pub');
         $this->seedHashmapRow('/pub', 'dir', ['access_owner' => '9', 'access_read' => 'Staff']);
         $this->seedFile('/pub/a.txt', '1');
@@ -655,7 +623,7 @@ class ListCreateRenameTest extends ApiTestCase
 
     public function testCreateFolderAsPlainUserBelowWritableDirectoryIsOwnedByUser(): void
     {
-        $this->actingAsPlainUser();
+        $this->actingAsFileflyUser(5);
         $this->seedDir('/pub');
         $this->seedHashmapRow('/pub', 'dir', ['access_owner' => '9']);
 
@@ -671,7 +639,7 @@ class ListCreateRenameTest extends ApiTestCase
 
     public function testCreateFolderAsPlainUserWithoutUpdateAccessReportsNopermission(): void
     {
-        $this->actingAsPlainUser();
+        $this->actingAsFileflyUser(5);
         $this->seedDir('/pub');
         $this->seedHashmapRow('/pub', 'dir', ['access_owner' => '9', 'access_update' => 'Staff']);
 
@@ -684,7 +652,7 @@ class ListCreateRenameTest extends ApiTestCase
 
     public function testCreateFolderAsPlainUserBelowRootReportsNopermission(): void
     {
-        $this->actingAsPlainUser();
+        $this->actingAsFileflyUser(5);
 
         $response = $this->apiPost('createFolder', ['newPath' => '/top']);
 
@@ -989,7 +957,7 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertRows(['/new/dir/a.txt' => $this->row('file')]);
     }
 
-    public function testRenameFileDoesNotTouchRowOfSiblingWithSamePrefix(): void
+    public function testRenameFileRewritesRowOfSiblingWithSamePrefix(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'A');
@@ -1084,7 +1052,7 @@ class ListCreateRenameTest extends ApiTestCase
 
     public function testRenameAsPlainUserWithoutUpdateAccessReportsPermissionDenied(): void
     {
-        $this->actingAsPlainUser();
+        $this->actingAsFileflyUser(5);
         $this->seedDir('/pub');
         $this->seedHashmapRow('/pub', 'dir', ['access_owner' => '9']);
         $this->seedFile('/pub/a.txt', 'A');
@@ -1102,7 +1070,7 @@ class ListCreateRenameTest extends ApiTestCase
 
     public function testRenameAsOwnerWithoutUpdateRoleSucceeds(): void
     {
-        $this->actingAsPlainUser();
+        $this->actingAsFileflyUser(5);
         $this->seedDir('/pub');
         $this->seedHashmapRow('/pub', 'dir', ['access_owner' => '9']);
         $this->seedFile('/pub/b.txt', 'B');
@@ -1364,7 +1332,7 @@ class ListCreateRenameTest extends ApiTestCase
 
     public function testSearchAsPlainUserHidesItemsWithoutReadAccess(): void
     {
-        $this->actingAsPlainUser();
+        $this->actingAsFileflyUser(5);
         $this->seedDir('/pub');
         $this->seedHashmapRow('/pub', 'dir', ['access_owner' => '9']);
         $this->seedFile('/pub/open.txt', '1');
