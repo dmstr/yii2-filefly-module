@@ -3,7 +3,6 @@
 
 namespace hrzg\filefly\tests\api;
 
-use hrzg\filefly\controllers\ApiController;
 use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\tests\support\ApiResponse;
 use hrzg\filefly\tests\support\ApiTestCase;
@@ -96,20 +95,6 @@ class RemoveStreamDownloadTest extends ApiTestCase
         $this->seedHashmapRow('/full/x.txt', 'file');
         $this->seedHashmapRow('/full/sub', 'dir');
         $this->seedHashmapRow('/full/sub/y.txt', 'file');
-    }
-
-    /**
-     * Records [name, filename, errorMessage] of the given controller events into $log
-     *
-     * @param string[] $names event names
-     */
-    private function recordEvents(array $names, array &$log): void
-    {
-        foreach ($names as $name) {
-            Event::on(ApiController::class, $name, static function (FileEvent $event) use (&$log, $name) {
-                $log[] = [$name, $event->filename, $event->errorMessage];
-            });
-        }
     }
 
     private function removeItems(array $items): ApiResponse

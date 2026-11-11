@@ -19,6 +19,9 @@ use hrzg\filefly\components\storage\StorageItem;
  *   within one filesystem. So the copy gets the current time as modification time, an existing
  *   target is refused with ItemExistsException after the source was opened, and a directory as
  *   source leaves an empty file at the target before the write fails on reading the stream
+ * - replaceFile() streams like copyFile(), but writes with Storage::replaceFile(): an existing FILE
+ *   at the target is replaced, a directory there is refused with ItemExistsException. Only sync()
+ *   uses it
  * - move() is Storage::move() within one filesystem; across filesystems it is copyFile() followed by
  *   deleteFile() of the source, the latter only if the copy reported success
  *
@@ -61,9 +64,11 @@ class FsManager
     }
 
     /**
-     * Copy the files of $src to $dest where the target is missing or older; directories are
-     * skipped (and created implicitly for the files beneath them). The target URI of an item is
-     * `$dest . <path of the item relative to the root of its filesystem>`.
+     * Copy the files of $src to $dest where the target is missing, and replace target files that
+     * are older than their source (modification time); directories are skipped (and created
+     * implicitly for the files beneath them). The target URI of an item is
+     * `$dest . <path of the item relative to the root of its filesystem>`. A directory at the target
+     * of a newer source file is not replaced: replaceFile() throws and the sync aborts.
      *
      * @param string $src
      * @param string $dest
@@ -81,6 +86,7 @@ class FsManager
         \Yii::trace($this->traceable($contents, $srcScheme), __METHOD__);
         foreach ($contents as $entry) {
             $update = false;
+            $replace = false;
             $srcUrl = $srcScheme.'://'.$entry->getPath();
             $destUrl = $dest.$entry->getPath();
 
@@ -93,10 +99,16 @@ class FsManager
                 $update = true;
             } elseif ($manager->lastModified($srcUrl) > $manager->lastModified($dest.$entry->getPath())) {
                 $update = true;
+                $replace = true;
             }
 
             if ($update) {
-                $manager->copyFile($srcUrl, $destUrl);
+                if ($replace) {
+                    // replaces an older target file; a directory at the target is refused (throws)
+                    $manager->replaceFile($srcUrl, $destUrl);
+                } else {
+                    $manager->copyFile($srcUrl, $destUrl);
+                }
                 \Yii::trace("copied file $srcUrl to $destUrl");
                 #$this->stdout($srcUrl."\n");
             } else {
@@ -209,23 +221,21 @@ class FsManager
      */
     public function copyFile($from, $to)
     {
-        list($fromStorage, $fromPath) = $this->resolve($from);
+        return $this->streamFile($from, $to, false);
+    }
 
-        $buffer = $fromStorage->openFile($fromPath);
-
-        if ($buffer === null) {
-            return false;
-        }
-
-        list($toStorage, $toPath) = $this->resolve($to);
-
-        $result = $toStorage->writeFile($toPath, $buffer);
-
-        if (is_resource($buffer)) {
-            fclose($buffer);
-        }
-
-        return $result;
+    /**
+     * Like copyFile(), but an existing FILE at the target is replaced (Storage::replaceFile()); a
+     * directory at the target is refused with ItemExistsException after the source was opened.
+     *
+     * @param string $from
+     * @param string $to
+     *
+     * @return bool `false` if the source could not be opened or the write reported failure
+     */
+    public function replaceFile($from, $to)
+    {
+        return $this->streamFile($from, $to, true);
     }
 
     /**
@@ -253,6 +263,41 @@ class FsManager
         }
 
         return false;
+    }
+
+    /**
+     * Open the source for reading, then write it to the target: Storage::writeFile(), or with
+     * $replace Storage::replaceFile().
+     *
+     * @param string $from
+     * @param string $to
+     * @param bool $replace
+     *
+     * @return bool
+     */
+    private function streamFile($from, $to, $replace)
+    {
+        list($fromStorage, $fromPath) = $this->resolve($from);
+
+        $buffer = $fromStorage->openFile($fromPath);
+
+        if ($buffer === null) {
+            return false;
+        }
+
+        list($toStorage, $toPath) = $this->resolve($to);
+
+        if ($replace) {
+            $result = $toStorage->replaceFile($toPath, $buffer);
+        } else {
+            $result = $toStorage->writeFile($toPath, $buffer);
+        }
+
+        if (is_resource($buffer)) {
+            fclose($buffer);
+        }
+
+        return $result;
     }
 
     private function parseScheme($uri = '/')

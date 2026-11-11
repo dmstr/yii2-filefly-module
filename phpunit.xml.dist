@@ -6,6 +6,8 @@
     <testsuites>
         <testsuite name="filefly">
             <directory>tests</directory>
+            <!-- adapter suite, needs the compose stack: tests/adapters/phpunit.xml -->
+            <exclude>tests/adapters</exclude>
         </testsuite>
     </testsuites>
 </phpunit>

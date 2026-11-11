@@ -3,6 +3,7 @@
 
 namespace hrzg\filefly\tests\api;
 
+use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\tests\support\ApiResponse;
 use hrzg\filefly\tests\support\ApiTestCase;
 use Yii;
@@ -40,6 +41,27 @@ class PermissionsTest extends ApiTestCase
             'root user' => ['root', self::OTHER_ID, 'Secret', true],
             'FileflyAdmin role assigned directly' => ['fileflyAdmin', self::OTHER_ID, 'Secret', true],
             'matching role reached through a parent role' => ['childRole', self::OTHER_ID, 'RoleA', true],
+            'FileflyAdmin only reached through a parent role' => ['indirectFileflyAdmin', self::OTHER_ID, 'Secret', false],
+            'RBAC role Admin of ActiveRecordAccessTrait' => ['rbacAdmin', self::OTHER_ID, 'Secret', true],
+        ];
+    }
+
+    /**
+     * Who may change or read the permissions of an item: [actor, access_owner of the item, value of all
+     * three access columns, allowed]. Only the owner and admins (RBAC `Admin`, `FileflyAdmin` assigned
+     * directly) may; a role or `*` in the access columns does not count.
+     */
+    public function permissionManagementCases(): array
+    {
+        return [
+            'owner of the item' => ['user', '5', 'Secret', true],
+            'owner value numerically equal to user id' => ['user', '05', 'Secret', true],
+            'matching role in access columns' => ['user', self::OTHER_ID, 'RoleA', false],
+            'star in access columns' => ['user', self::OTHER_ID, '*', false],
+            'no match' => ['user', self::OTHER_ID, 'Secret', false],
+            'root user' => ['root', self::OTHER_ID, 'Secret', true],
+            'FileflyAdmin role assigned directly' => ['fileflyAdmin', self::OTHER_ID, 'Secret', true],
+            'matching role reached through a parent role' => ['childRole', self::OTHER_ID, 'RoleA', false],
             'FileflyAdmin only reached through a parent role' => ['indirectFileflyAdmin', self::OTHER_ID, 'Secret', false],
             'RBAC role Admin of ActiveRecordAccessTrait' => ['rbacAdmin', self::OTHER_ID, 'Secret', true],
         ];
@@ -203,12 +225,44 @@ class PermissionsTest extends ApiTestCase
     /**
      * @dataProvider accessCases
      */
-    public function testMoveRequiresUpdateAccessOnDestinationOnly(string $actor, string $owner, string $value, bool $allowed): void
+    public function testRenameIntoOtherFolderRequiresUpdateAccessOnThatFolder(string $actor, string $owner, string $value, bool $allowed): void
+    {
+        $this->actAsCase($actor);
+        $this->seedFile('/d/x.txt', 'x');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        // the item may be updated by everyone, so only the destination folder decides
+        $this->seedRow('/d/x.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret', 1);
+        $this->seedDir('/e');
+        $this->seedRow('/e', 'dir', $owner, 'Secret', $value, 'Secret');
+
+        $response = $this->apiPost('rename', ['item' => '/d/x.txt', 'newItemPath' => '/e/y.txt']);
+
+        $this->assertStatus(200, $response);
+        $this->assertAccess('/e', 'dir', $owner, 'Secret', $value, 'Secret');
+        if ($allowed) {
+            $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+            $this->assertNotOnDisk('/d/x.txt');
+            $this->assertFileOnDisk('/e/y.txt', 'x');
+            $this->assertAccess('/e/y.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret');
+            $this->assertSame(['/d', '/e', '/e/y.txt'], $this->rowPaths());
+        } else {
+            $this->assertSame(['success' => false, 'error' => 'You are not allowed to edit this file'], $response->json()['result']);
+            $this->assertFileOnDisk('/d/x.txt', 'x');
+            $this->assertNotOnDisk('/e/y.txt');
+            $this->assertAccess('/d/x.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret');
+            $this->assertSame(['/d', '/d/x.txt', '/e'], $this->rowPaths());
+        }
+    }
+
+    /**
+     * @dataProvider accessCases
+     */
+    public function testMoveRequiresUpdateAccessOnDestination(string $actor, string $owner, string $value, bool $allowed): void
     {
         $this->actAsCase($actor);
         $this->seedFile('/s.txt', 's');
-        // source is fully closed for the acting user: move does not look at it
-        $this->seedRow('/s.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret', 1);
+        // the source may be updated by everyone, so only the destination decides
+        $this->seedRow('/s.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret', 1);
         $this->seedDir('/d');
         $this->seedRow('/d', 'dir', $owner, 'Secret', $value, 'Secret');
 
@@ -220,11 +274,72 @@ class PermissionsTest extends ApiTestCase
             $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
             $this->assertNotOnDisk('/s.txt');
             $this->assertFileOnDisk('/d/s.txt', 's');
-            $this->assertAccess('/d/s.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+            $this->assertAccess('/d/s.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret');
             $this->assertSame(['/d', '/d/s.txt'], $this->rowPaths());
         } else {
             $this->assertSame(['success' => false, 'error' => 'nopermission'], $response->json()['result']);
             $this->assertFileOnDisk('/s.txt', 's');
+            $this->assertNotOnDisk('/d/s.txt');
+            $this->assertSame(['/d', '/s.txt'], $this->rowPaths());
+            $this->assertAccess('/s.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret');
+        }
+    }
+
+    /**
+     * @dataProvider accessCases
+     */
+    public function testMoveRequiresUpdateAccessOnEachSourceItem(string $actor, string $owner, string $value, bool $allowed): void
+    {
+        $this->actAsCase($actor);
+        $this->seedFile('/s.txt', 's');
+        $this->seedRow('/s.txt', 'file', $owner, 'Secret', $value, 'Secret', 1);
+        // the destination may be updated by everyone, so only the source decides
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
+
+        $response = $this->apiPost('move', ['items' => ['/s.txt'], 'newPath' => '/d']);
+
+        $this->assertStatus(200, $response);
+        if ($allowed) {
+            $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+            $this->assertNotOnDisk('/s.txt');
+            $this->assertFileOnDisk('/d/s.txt', 's');
+            $this->assertAccess('/d/s.txt', 'file', $owner, 'Secret', $value, 'Secret');
+            $this->assertSame(['/d', '/d/s.txt'], $this->rowPaths());
+        } else {
+            $this->assertSame(['success' => false, 'error' => 'nopermission'], $response->json()['result']);
+            $this->assertFileOnDisk('/s.txt', 's');
+            $this->assertNotOnDisk('/d/s.txt');
+            $this->assertAccess('/s.txt', 'file', $owner, 'Secret', $value, 'Secret');
+            $this->assertSame(['/d', '/s.txt'], $this->rowPaths());
+        }
+    }
+
+    /**
+     * @dataProvider accessCases
+     */
+    public function testCopyRequiresUpdateAccessOnDestination(string $actor, string $owner, string $value, bool $allowed): void
+    {
+        $this->actAsCase($actor);
+        $this->seedFile('/s.txt', 's');
+        // the source may be read by everyone, so only the destination decides
+        $this->seedRow('/s.txt', 'file', self::OTHER_ID, '*', 'Secret', 'Secret', 1);
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', $owner, 'Secret', $value, 'Secret');
+
+        $response = $this->apiPost('copy', ['items' => ['/s.txt'], 'newPath' => '/d']);
+
+        $this->assertStatus(200, $response);
+        $this->assertFileOnDisk('/s.txt', 's');
+        $this->assertAccess('/s.txt', 'file', self::OTHER_ID, '*', 'Secret', 'Secret');
+        if ($allowed) {
+            $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+            $this->assertFileOnDisk('/d/s.txt', 's');
+            // the copy belongs to the acting user with default permissions
+            $this->assertAccess('/d/s.txt', 'file', $this->actorId($actor), '*', '*', '*');
+            $this->assertSame(['/d', '/d/s.txt', '/s.txt'], $this->rowPaths());
+        } else {
+            $this->assertSame(['success' => false, 'error' => 'nopermission'], $response->json()['result']);
             $this->assertNotOnDisk('/d/s.txt');
             $this->assertSame(['/d', '/s.txt'], $this->rowPaths());
         }
@@ -233,23 +348,23 @@ class PermissionsTest extends ApiTestCase
     /**
      * @dataProvider accessCases
      */
-    public function testCopyRequiresUpdateAccessOnDestinationOnly(string $actor, string $owner, string $value, bool $allowed): void
+    public function testCopyRequiresReadAccessOnEachSourceItem(string $actor, string $owner, string $value, bool $allowed): void
     {
         $this->actAsCase($actor);
         $this->seedFile('/s.txt', 's');
-        $this->seedRow('/s.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret', 1);
+        $this->seedRow('/s.txt', 'file', $owner, $value, 'Secret', 'Secret', 1);
+        // the destination may be updated by everyone, so only the source decides
         $this->seedDir('/d');
-        $this->seedRow('/d', 'dir', $owner, 'Secret', $value, 'Secret');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
 
         $response = $this->apiPost('copy', ['items' => ['/s.txt'], 'newPath' => '/d']);
 
         $this->assertStatus(200, $response);
         $this->assertFileOnDisk('/s.txt', 's');
-        $this->assertAccess('/s.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        $this->assertAccess('/s.txt', 'file', $owner, $value, 'Secret', 'Secret');
         if ($allowed) {
             $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
             $this->assertFileOnDisk('/d/s.txt', 's');
-            // the copy belongs to the acting user with default permissions
             $this->assertAccess('/d/s.txt', 'file', $this->actorId($actor), '*', '*', '*');
             $this->assertSame(['/d', '/d/s.txt', '/s.txt'], $this->rowPaths());
         } else {
@@ -283,9 +398,9 @@ class PermissionsTest extends ApiTestCase
     }
 
     /**
-     * @dataProvider accessCases
+     * @dataProvider permissionManagementCases
      */
-    public function testChangePermissionsIsAllowedForEveryApiUser(string $actor, string $owner, string $value, bool $allowed): void
+    public function testChangePermissionsIsAllowedOnlyForOwnerAndAdmins(string $actor, string $owner, string $value, bool $allowed): void
     {
         $this->actAsCase($actor);
         $this->seedFile('/x.txt', 'x');
@@ -296,17 +411,21 @@ class PermissionsTest extends ApiTestCase
             'item' => $this->permissionItem(['RoleB'], ['RoleB'], ['RoleB']),
         ]);
 
-        // NOTE: current behaviour, looks unintended: changePermissions checks neither owner nor any access
-        // column, every API user can rewrite the permissions of every item ($allowed is irrelevant)
         $this->assertStatus(200, $response);
-        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
-        $this->assertAccess('/x.txt', 'file', $owner, 'RoleB', 'RoleB', 'RoleB');
+        if ($allowed) {
+            $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+            $this->assertAccess('/x.txt', 'file', $owner, 'RoleB', 'RoleB', 'RoleB');
+        } else {
+            $this->assertSame(['success' => false, 'error' => 'You are not allowed to update this record'], $response->json()['result']);
+            $this->assertAccess('/x.txt', 'file', $owner, $value, $value, $value);
+        }
+        $this->assertSame(['/x.txt'], $this->rowPaths());
     }
 
     /**
-     * @dataProvider accessCases
+     * @dataProvider permissionManagementCases
      */
-    public function testResolvePermissionsIsAllowedForEveryApiUser(string $actor, string $owner, string $value, bool $allowed): void
+    public function testResolvePermissionsIsAllowedOnlyForOwnerAndAdmins(string $actor, string $owner, string $value, bool $allowed): void
     {
         $this->actAsCase($actor);
         $this->seedFile('/x.txt', 'x');
@@ -314,18 +433,22 @@ class PermissionsTest extends ApiTestCase
 
         $response = $this->apiPost('resolvePermissions', ['path' => '/x.txt']);
 
-        // resolvePermissions has no access check either; the structure is pinned in the tests below
+        // the structure of an allowed answer is pinned in the tests below; a denial looks like a missing row
         $this->assertStatus(200, $response);
-        $auth = $response->json()['auth'];
-        $this->assertSame(['read', 'update', 'delete'], array_keys($auth));
+        if ($allowed) {
+            $this->assertSame(['read', 'update', 'delete'], array_keys($response->json()['auth']));
+        } else {
+            $this->assertSame(['auth' => false], $response->json());
+        }
         $this->assertAccess('/x.txt', 'file', $owner, $value, $value, $value);
+        $this->assertSame(['/x.txt'], $this->rowPaths());
     }
 
     // ------------------------------------------------------------------
     // dedicated security pins
     // ------------------------------------------------------------------
 
-    public function testNonOwnerGrantsHimselfReadAccessViaChangePermissions(): void
+    public function testNonOwnerCannotGrantHimselfReadAccessViaChangePermissions(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/private.txt', 'p');
@@ -337,14 +460,12 @@ class PermissionsTest extends ApiTestCase
         ]);
         $list = $this->apiPost('list', ['path' => '/']);
 
-        // NOTE: current behaviour, looks unintended: privilege escalation, roles are not validated against
-        // the caller's roles and ownership is not checked
-        $this->assertSame(['success' => true, 'error' => ''], $change->json()['result']);
-        $this->assertSame(['private.txt'], $this->listedNames($list));
-        $this->assertAccess('/private.txt', 'file', self::OTHER_ID, '*', '*', '*');
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to update this record'], $change->json()['result']);
+        $this->assertSame([], $this->listedNames($list));
+        $this->assertAccess('/private.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
     }
 
-    public function testMoveTakesAnUnreadableFileOfAnotherUserIntoOwnFolder(): void
+    public function testMoveCannotTakeAFileOfAnotherUserWithoutUpdateAccessIntoOwnFolder(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/other/secret.txt', 's');
@@ -355,16 +476,14 @@ class PermissionsTest extends ApiTestCase
 
         $response = $this->apiPost('move', ['items' => ['/other/secret.txt'], 'newPath' => '/mine']);
 
-        // NOTE: current behaviour, looks unintended: the source item is neither read-, update- nor
-        // delete-checked, only the destination folder
-        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
-        $this->assertNotOnDisk('/other/secret.txt');
-        $this->assertFileOnDisk('/mine/secret.txt', 's');
-        $this->assertAccess('/mine/secret.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
-        $this->assertSame(['/mine', '/mine/secret.txt', '/other'], $this->rowPaths());
+        $this->assertSame(['success' => false, 'error' => 'nopermission'], $response->json()['result']);
+        $this->assertFileOnDisk('/other/secret.txt', 's');
+        $this->assertNotOnDisk('/mine/secret.txt');
+        $this->assertAccess('/other/secret.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        $this->assertSame(['/mine', '/other', '/other/secret.txt'], $this->rowPaths());
     }
 
-    public function testCopyMakesAnUnreadableFileOfAnotherUserReadableForTheCopier(): void
+    public function testCopyCannotMakeAnUnreadableFileOfAnotherUserReadableForTheCopier(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/other/secret.txt', 's');
@@ -376,15 +495,13 @@ class PermissionsTest extends ApiTestCase
         $copy = $this->apiPost('copy', ['items' => ['/other/secret.txt'], 'newPath' => '/mine']);
         $list = $this->apiPost('list', ['path' => '/mine']);
 
-        // NOTE: current behaviour, looks unintended: copy does not check read access on the source,
-        // the copy is owned by the copier with default permissions ('*')
-        $this->assertSame(['success' => true, 'error' => ''], $copy->json()['result']);
-        $this->assertFileOnDisk('/mine/secret.txt', 's');
-        $this->assertAccess('/mine/secret.txt', 'file', '5', '*', '*', '*');
-        $this->assertSame(['secret.txt'], $this->listedNames($list));
+        $this->assertSame(['success' => false, 'error' => 'nopermission'], $copy->json()['result']);
+        $this->assertNotOnDisk('/mine/secret.txt');
+        $this->assertSame([], $this->listedNames($list));
+        $this->assertSame(['/mine', '/other', '/other/secret.txt'], $this->rowPaths());
     }
 
-    public function testRenameDoesNotCheckTheDestinationFolder(): void
+    public function testRenameCannotMoveAnItemIntoAFolderWithoutUpdateAccess(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/mine/x.txt', 'x');
@@ -395,11 +512,386 @@ class PermissionsTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/mine/x.txt', 'newItemPath' => '/closed/x.txt']);
 
-        // NOTE: current behaviour, looks unintended: rename works as move into a folder without update access
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to edit this file'], $response->json()['result']);
+        $this->assertFileOnDisk('/mine/x.txt', 'x');
+        $this->assertNotOnDisk('/closed/x.txt');
+        $this->assertAccess('/mine/x.txt', 'file', '5', '*', '*', '*');
+        $this->assertSame(['/closed', '/mine', '/mine/x.txt'], $this->rowPaths());
+    }
+
+    // ------------------------------------------------------------------
+    // source and destination checks of move, copy and rename
+    // ------------------------------------------------------------------
+
+    public function testMoveSourceWithEmptyUpdateColumnInheritsUpdateAccessFromParentRow(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/a/s.txt', 's');
+        $this->seedRow('/a', 'dir', self::OTHER_ID, 'Secret', 'RoleA', 'Secret');
+        $this->seedRow('/a/s.txt', 'file', self::OTHER_ID, 'Secret', '', 'Secret', 1);
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
+
+        $response = $this->apiPost('move', ['items' => ['/a/s.txt'], 'newPath' => '/d']);
+
         $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
-        $this->assertFileOnDisk('/closed/x.txt', 'x');
-        $this->assertAccess('/closed/x.txt', 'file', '5', '*', '*', '*');
-        $this->assertSame(['/closed', '/closed/x.txt', '/mine'], $this->rowPaths());
+        $this->assertFileOnDisk('/d/s.txt', 's');
+        $this->assertSame(['/a', '/d', '/d/s.txt'], $this->rowPaths());
+    }
+
+    public function testMoveSourceWithEmptyUpdateColumnIsDeniedByDenyingParentRow(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/a/s.txt', 's');
+        $this->seedRow('/a', 'dir', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        $this->seedRow('/a/s.txt', 'file', self::OTHER_ID, 'Secret', '', 'Secret', 1);
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
+
+        $response = $this->apiPost('move', ['items' => ['/a/s.txt'], 'newPath' => '/d']);
+
+        $this->assertSame(['success' => false, 'error' => 'nopermission'], $response->json()['result']);
+        $this->assertFileOnDisk('/a/s.txt', 's');
+        $this->assertSame(['/a', '/a/s.txt', '/d'], $this->rowPaths());
+    }
+
+    public function testMoveOfUnindexedSourceIsAllowedThroughTheRepairedRowWithDefaultPermissions(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/s.txt', 's');
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
+
+        $response = $this->apiPost('move', ['items' => ['/s.txt'], 'newPath' => '/d']);
+
+        // the source is repaired first (default update '*'), as rename does for its item
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertFileOnDisk('/d/s.txt', 's');
+        $this->assertAccess('/d/s.txt', 'file', '1', '*', '*', '*');
+    }
+
+    public function testMoveOfListStopsAtTheDeniedSourceKeepsEarlierItemsMovedAndLaterOnesUntouched(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/a.txt', 'a');
+        $this->seedFile('/b.txt', 'b');
+        $this->seedFile('/c.txt', 'c');
+        $this->seedRow('/a.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret', 1);
+        $this->seedRow('/b.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret', 1);
+        $this->seedRow('/c.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret', 1);
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
+        $log = [];
+        $this->recordEvents([
+            FileEvent::EVENT_BEFORE_MOVE,
+            FileEvent::EVENT_AFTER_MOVE,
+            FileEvent::EVENT_MOVE_SUCCESS,
+            FileEvent::EVENT_MOVE_ERROR,
+        ], $log);
+
+        $response = $this->apiPost('move', ['items' => ['/a.txt', '/b.txt', '/c.txt'], 'newPath' => '/d']);
+
+        $this->assertSame(['success' => false, 'error' => 'nopermission'], $response->json()['result']);
+        $this->assertNotOnDisk('/a.txt');
+        $this->assertFileOnDisk('/d/a.txt', 'a');
+        $this->assertFileOnDisk('/b.txt', 'b');
+        $this->assertFileOnDisk('/c.txt', 'c');
+        $this->assertSame(['/b.txt', '/c.txt', '/d', '/d/a.txt'], $this->rowPaths());
+        $this->assertSame([
+            [FileEvent::EVENT_BEFORE_MOVE, '/a.txt', null],
+            [FileEvent::EVENT_AFTER_MOVE, '/d/a.txt', null],
+            [FileEvent::EVENT_BEFORE_MOVE, '/b.txt', null],
+            [FileEvent::EVENT_MOVE_ERROR, null, 'nopermission'],
+        ], $log);
+    }
+
+    public function testCopySourceWithEmptyReadColumnInheritsReadAccessFromParentRow(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/a/s.txt', 's');
+        $this->seedRow('/a', 'dir', self::OTHER_ID, 'RoleA', 'Secret', 'Secret');
+        $this->seedRow('/a/s.txt', 'file', self::OTHER_ID, '', 'Secret', 'Secret', 1);
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
+
+        $response = $this->apiPost('copy', ['items' => ['/a/s.txt'], 'newPath' => '/d']);
+
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertFileOnDisk('/d/s.txt', 's');
+        $this->assertSame(['/a', '/a/s.txt', '/d', '/d/s.txt'], $this->rowPaths());
+    }
+
+    public function testCopySourceWithEmptyReadColumnIsDeniedByDenyingParentRow(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/a/s.txt', 's');
+        $this->seedRow('/a', 'dir', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        $this->seedRow('/a/s.txt', 'file', self::OTHER_ID, '', 'Secret', 'Secret', 1);
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
+
+        $response = $this->apiPost('copy', ['items' => ['/a/s.txt'], 'newPath' => '/d']);
+
+        $this->assertSame(['success' => false, 'error' => 'nopermission'], $response->json()['result']);
+        $this->assertNotOnDisk('/d/s.txt');
+        $this->assertSame(['/a', '/a/s.txt', '/d'], $this->rowPaths());
+    }
+
+    public function testCopyOfUnindexedSourceWithoutRepairIsDenied(): void
+    {
+        $this->configureModule(['repair' => false]);
+        $this->actAsApiUser();
+        $this->seedFile('/s.txt', 's');
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
+
+        $response = $this->apiPost('copy', ['items' => ['/s.txt'], 'newPath' => '/d']);
+
+        // read access needs a row (read does not skip missing rows), and nothing repairs one
+        $this->assertSame(['success' => false, 'error' => 'nopermission'], $response->json()['result']);
+        $this->assertNotOnDisk('/d/s.txt');
+        $this->assertSame(['/d'], $this->rowPaths());
+    }
+
+    public function testCopyOfListStopsAtTheDeniedSourceKeepsEarlierCopiesAndSkipsLaterOnes(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/a.txt', 'a');
+        $this->seedFile('/b.txt', 'b');
+        $this->seedFile('/c.txt', 'c');
+        $this->seedRow('/a.txt', 'file', self::OTHER_ID, '*', 'Secret', 'Secret', 1);
+        $this->seedRow('/b.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret', 1);
+        $this->seedRow('/c.txt', 'file', self::OTHER_ID, '*', 'Secret', 'Secret', 1);
+        $this->seedDir('/d');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
+        $log = [];
+        $this->recordEvents([
+            FileEvent::EVENT_BEFORE_COPY,
+            FileEvent::EVENT_AFTER_COPY,
+            FileEvent::EVENT_COPY_SUCCESS,
+            FileEvent::EVENT_COPY_ERROR,
+        ], $log);
+
+        $response = $this->apiPost('copy', ['items' => ['/a.txt', '/b.txt', '/c.txt'], 'newPath' => '/d']);
+
+        $this->assertSame(['success' => false, 'error' => 'nopermission'], $response->json()['result']);
+        $this->assertFileOnDisk('/d/a.txt', 'a');
+        $this->assertNotOnDisk('/d/b.txt');
+        $this->assertNotOnDisk('/d/c.txt');
+        $this->assertSame(['/a.txt', '/b.txt', '/c.txt', '/d', '/d/a.txt'], $this->rowPaths());
+        $this->assertSame([
+            [FileEvent::EVENT_BEFORE_COPY, '/a.txt', null],
+            [FileEvent::EVENT_AFTER_COPY, '/a.txt', null],
+            [FileEvent::EVENT_BEFORE_COPY, '/b.txt', null],
+            [FileEvent::EVENT_COPY_ERROR, null, 'nopermission'],
+        ], $log);
+    }
+
+    public function testRenameWithinTheSameFolderDoesNotCheckTheFolder(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/closed/x.txt', 'x');
+        $this->seedRow('/closed', 'dir', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        $this->seedRow('/closed/x.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret', 1);
+
+        $response = $this->apiPost('rename', ['item' => '/closed/x.txt', 'newItemPath' => '/closed/y.txt']);
+
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertFileOnDisk('/closed/y.txt', 'x');
+    }
+
+    public function testRenameIntoFolderWithEmptyUpdateColumnInheritsFromParentRow(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/x.txt', 'x');
+        $this->seedRow('/x.txt', 'file', '5', 'Secret', 'Secret', 'Secret', 1);
+        $this->seedDir('/a/b');
+        $this->seedRow('/a', 'dir', self::OTHER_ID, 'Secret', 'RoleA', 'Secret');
+        $this->seedRow('/a/b', 'dir', self::OTHER_ID, 'Secret', '', 'Secret');
+
+        $response = $this->apiPost('rename', ['item' => '/x.txt', 'newItemPath' => '/a/b/x.txt']);
+
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertFileOnDisk('/a/b/x.txt', 'x');
+        $this->assertSame(['/a', '/a/b', '/a/b/x.txt'], $this->rowPaths());
+    }
+
+    public function testRenameIntoFolderWithEmptyUpdateColumnIsDeniedByDenyingParentRow(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/x.txt', 'x');
+        $this->seedRow('/x.txt', 'file', '5', 'Secret', 'Secret', 'Secret', 1);
+        $this->seedDir('/a/b');
+        $this->seedRow('/a', 'dir', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        $this->seedRow('/a/b', 'dir', self::OTHER_ID, 'Secret', '', 'Secret');
+
+        $response = $this->apiPost('rename', ['item' => '/x.txt', 'newItemPath' => '/a/b/x.txt']);
+
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to edit this file'], $response->json()['result']);
+        $this->assertFileOnDisk('/x.txt', 'x');
+        $this->assertSame(['/a', '/a/b', '/x.txt'], $this->rowPaths());
+    }
+
+    public function testRenameIntoUnindexedFolderIsCheckedWithoutRepairingIt(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/x.txt', 'x');
+        $this->seedRow('/x.txt', 'file', '5', 'Secret', 'Secret', 'Secret', 1);
+        $this->seedDir('/a/new');
+        $this->seedRow('/a', 'dir', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+
+        $response = $this->apiPost('rename', ['item' => '/x.txt', 'newItemPath' => '/a/new/x.txt']);
+
+        // like createFolder: the missing row of /a/new is skipped and /a decides; no row is created for /a/new
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to edit this file'], $response->json()['result']);
+        $this->assertFileOnDisk('/x.txt', 'x');
+        $this->assertSame(['/a', '/x.txt'], $this->rowPaths());
+    }
+
+    public function testRenameIntoTheRootFolderIsAllowedWhileRootFolderManageRoleIsNotSet(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/d/x.txt', 'x');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        $this->seedRow('/d/x.txt', 'file', '5', 'Secret', 'Secret', 'Secret', 1);
+
+        $response = $this->apiPost('rename', ['item' => '/d/x.txt', 'newItemPath' => '/x.txt']);
+
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertFileOnDisk('/x.txt', 'x');
+    }
+
+    public function testRenameIntoTheRootFolderRequiresRootFolderManageRole(): void
+    {
+        $this->configureModule(['rootFolderManageRole' => 'Secret']);
+        $this->actAsApiUser();
+        $this->seedFile('/d/x.txt', 'x');
+        $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        $this->seedRow('/d/x.txt', 'file', '5', 'Secret', 'Secret', 'Secret', 1);
+
+        $response = $this->apiPost('rename', ['item' => '/d/x.txt', 'newItemPath' => '/x.txt']);
+
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to edit this file'], $response->json()['result']);
+        $this->assertFileOnDisk('/d/x.txt', 'x');
+    }
+
+    // ------------------------------------------------------------------
+    // who may change and resolve permissions
+    // ------------------------------------------------------------------
+
+    public function testChangePermissionsByOwnerOfTheParentFolderIsDenied(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/mine/x.txt', 'x');
+        $this->seedRow('/mine', 'dir', '5', '*', '*', '*');
+        $this->seedRow('/mine/x.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
+
+        $response = $this->apiPost('changePermissions', [
+            'path' => '/mine/x.txt',
+            'item' => $this->permissionItem(['RoleA'], ['RoleA'], ['RoleA']),
+        ]);
+
+        // ownership is not inherited: only the owner of the item itself counts
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to update this record'], $response->json()['result']);
+        $this->assertAccess('/mine/x.txt', 'file', self::OTHER_ID, '*', '*', '*');
+    }
+
+    public function testChangePermissionsByOwnerIsDeniedForAPathThatIsNotExactlyTheRowPath(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/x.txt', 'x');
+        $this->seedRow('/x.txt', 'file', '5', '*', '*', '*', 1);
+
+        $response = $this->apiPost('changePermissions', [
+            'path' => 'x.txt',
+            'item' => $this->permissionItem(['RoleA'], [], []),
+        ]);
+
+        // the owner is taken from the row the change would write, which is looked up verbatim
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to update this record'], $response->json()['result']);
+        $this->assertAccess('/x.txt', 'file', '5', '*', '*', '*');
+        $this->assertSame(['/x.txt'], $this->rowPaths());
+    }
+
+    public function testChangePermissionsByRbacAdminIsAllowedAlsoWithoutTheFileflyAdminRole(): void
+    {
+        $this->createRoles();
+        $this->createRole('Admin');
+        // without the role FileflyAdmin only the RBAC Admin rule can grant the change
+        Yii::$app->authManager->remove(Yii::$app->authManager->getRole('FileflyAdmin'));
+        $this->actingAsUser(self::USER_ID, ['FileflyDefault', 'Admin'], ['filefly_api']);
+        $this->seedFile('/x.txt', 'x');
+        $this->seedRow('/x.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret', 1);
+
+        $response = $this->apiPost('changePermissions', [
+            'path' => '/x.txt',
+            'item' => $this->permissionItem(['RoleA'], ['RoleA'], ['RoleA']),
+        ]);
+
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertAccess('/x.txt', 'file', self::OTHER_ID, 'RoleA', 'RoleA', 'RoleA');
+    }
+
+    public function testChangePermissionsDenialFiresOnlyTheErrorEvent(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/x.txt', 'x');
+        $this->seedRow('/x.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
+        $log = [];
+        $this->recordEvents([
+            FileEvent::EVENT_BEFORE_CHANGE_PERMISSION,
+            FileEvent::EVENT_AFTER_CHANGE_PERMISSION,
+            FileEvent::EVENT_CHANGE_PERMISSION_SUCCESS,
+            FileEvent::EVENT_CHANGE_PERMISSION_ERROR,
+        ], $log);
+
+        $response = $this->apiPost('changePermissions', [
+            'path' => '/x.txt',
+            'item' => $this->permissionItem(['RoleA'], [], []),
+        ]);
+
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to update this record'], $response->json()['result']);
+        $this->assertSame([[FileEvent::EVENT_CHANGE_PERMISSION_ERROR, null, 'permission_update_denied']], $log);
+    }
+
+    public function testChangePermissionsOfTheRootIsDeniedForNonAdminEvenWithOwnRootRow(): void
+    {
+        $this->actAsApiUser();
+        $this->seedRow('/', 'dir', '5', '*', '*', '*');
+
+        $response = $this->apiPost('changePermissions', [
+            'path' => '/',
+            'item' => $this->permissionItem(['RoleA'], ['RoleA'], ['RoleA']),
+        ]);
+
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to update this record'], $response->json()['result']);
+        $this->assertAccess('/', 'dir', '5', '*', '*', '*');
+        $this->assertSame(['/'], $this->rowPaths());
+    }
+
+    public function testChangePermissionsOfTheRootByFileflyAdminWritesTheRootRow(): void
+    {
+        $this->createRoles();
+        $this->actingAsUser(self::USER_ID, ['FileflyDefault', 'FileflyAdmin'], ['filefly_api']);
+        $this->seedRow('/', 'dir', self::OTHER_ID, '*', '*', '*');
+
+        $response = $this->apiPost('changePermissions', [
+            'path' => '/',
+            'item' => $this->permissionItem(['RoleA'], ['RoleB'], ['Secret']),
+        ]);
+
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertAccess('/', 'dir', self::OTHER_ID, 'RoleA', 'RoleB', 'Secret');
+    }
+
+    public function testResolvePermissionsOfTheRootIsDeniedForNonAdminEvenWithOwnRootRow(): void
+    {
+        $this->actAsApiUser();
+        $this->seedRow('/', 'dir', '5', '*', '*', '*');
+
+        $response = $this->apiPost('resolvePermissions', ['path' => '/']);
+
+        $this->assertSame(['auth' => false], $response->json());
     }
 
     // ------------------------------------------------------------------
@@ -703,8 +1195,9 @@ class PermissionsTest extends ApiTestCase
         $this->seedFile('/d/m.txt', 'm');
         $this->seedFile('/d/c.txt', 'c');
         $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
-        $this->seedRow('/d/m.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret', 1);
-        $this->seedRow('/d/c.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret', 1);
+        // the sources may be moved (update) and copied (read) by everyone, so only `/` is under test
+        $this->seedRow('/d/m.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret', 1);
+        $this->seedRow('/d/c.txt', 'file', self::OTHER_ID, '*', 'Secret', 'Secret', 1);
 
         $upload = $this->apiUpload('/', ['u.txt' => 'u']);
         $move = $this->apiPost('move', ['items' => ['/d/m.txt'], 'newPath' => '/']);
@@ -718,7 +1211,7 @@ class PermissionsTest extends ApiTestCase
         $this->assertFileOnDisk('/m.txt', 'm');
         $this->assertFileOnDisk('/c.txt', 'c');
         $this->assertAccess('/u.txt', 'file', '5', '*', '*', '*');
-        $this->assertAccess('/m.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret');
+        $this->assertAccess('/m.txt', 'file', self::OTHER_ID, 'Secret', '*', 'Secret');
         $this->assertAccess('/c.txt', 'file', '5', '*', '*', '*');
         $this->assertSame(['/c.txt', '/d', '/d/c.txt', '/m.txt', '/u.txt'], $this->rowPaths());
     }
@@ -845,30 +1338,28 @@ class PermissionsTest extends ApiTestCase
         $this->assertAccess('/x.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'RoleA,RoleB');
     }
 
-    public function testChangePermissionsWritesCommaSeparatedValuesThatLockOutTheRoleHolders(): void
+    public function testChangePermissionsWritesCommaSeparatedValuesThatTheAccessCheckCannotMatch(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/x.txt', 'x');
-        $this->seedRow('/x.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
+        $this->seedRow('/x.txt', 'file', '5', '*', '*', '*', 1);
 
         $change = $this->apiPost('changePermissions', [
             'path' => '/x.txt',
             'item' => $this->permissionItem(['RoleA', 'RoleB'], ['RoleB', 'RoleA'], ['RoleA', '*']),
         ]);
-        $list = $this->apiPost('list', ['path' => '/']);
-
         // NOTE: current behaviour, looks unintended: the widget's multi select produces values the access
-        // check cannot match, the user with RoleA loses access to the item he just shared with RoleA
+        // check cannot match, so holders of RoleA or RoleB are locked out of the item (only the owner, who may
+        // change permissions, keeps access; the lock-out itself is pinned by testCommaSeparatedReadValue...)
         $this->assertSame(['success' => true, 'error' => ''], $change->json()['result']);
-        $this->assertAccess('/x.txt', 'file', self::OTHER_ID, 'RoleA,RoleB', 'RoleB,RoleA', 'RoleA,*');
-        $this->assertSame([], $this->listedNames($list));
+        $this->assertAccess('/x.txt', 'file', '5', 'RoleA,RoleB', 'RoleB,RoleA', 'RoleA,*');
     }
 
     // ------------------------------------------------------------------
     // resolvePermissions
     // ------------------------------------------------------------------
 
-    public function testResolvePermissionsForNonOwnerListsOwnRolesWithSelection(): void
+    public function testResolvePermissionsForNonOwnerIsDeniedLikeAMissingRow(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/x.txt', 'x');
@@ -877,15 +1368,11 @@ class PermissionsTest extends ApiTestCase
         $response = $this->apiPost('resolvePermissions', ['path' => '/x.txt']);
 
         $this->assertStatus(200, $response);
-        $this->assertSame(['auth' => [
-            'read' => $this->selection(['*' => false, 'FileflyDefault' => false, 'RoleA' => true]),
-            'update' => $this->selection(['*' => true, 'FileflyDefault' => false, 'RoleA' => false]),
-            'delete' => $this->selection(['*' => false, 'FileflyDefault' => false, 'RoleA' => false]),
-        ]], $response->json());
+        $this->assertSame(['auth' => false], $response->json());
         $this->assertAccess('/x.txt', 'file', self::OTHER_ID, 'RoleA', '*', 'Secret');
     }
 
-    public function testResolvePermissionsForOwnerIsTheSameAsForNonOwner(): void
+    public function testResolvePermissionsForOwnerListsOwnRolesWithSelection(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/x.txt', 'x');
@@ -944,7 +1431,7 @@ class PermissionsTest extends ApiTestCase
     {
         $this->actAsApiUser();
         $this->seedFile('/x.txt', 'x');
-        $this->seedRow('/x.txt', 'file', self::OTHER_ID, '', '', '', 1);
+        $this->seedRow('/x.txt', 'file', '5', '', '', '', 1);
 
         $response = $this->apiPost('resolvePermissions', ['path' => '/x.txt']);
 
@@ -956,14 +1443,14 @@ class PermissionsTest extends ApiTestCase
     {
         $this->actAsApiUser();
         $this->seedFile('/x.txt', 'x');
-        $this->seedRow('/x.txt', 'file', self::OTHER_ID, null, '*', '*', 1);
+        $this->seedRow('/x.txt', 'file', '5', null, '*', '*', 1);
 
         $response = $this->apiPostWithYiiErrorHandler('resolvePermissions', ['path' => '/x.txt']);
 
         // NOTE: current behaviour, looks unintended: explode() on a NULL column raises a PHP deprecation,
         // which the Yii error handler turns into a server error
         $this->assertStatus(500, $response);
-        $this->assertAccess('/x.txt', 'file', self::OTHER_ID, null, '*', '*');
+        $this->assertAccess('/x.txt', 'file', '5', null, '*', '*');
     }
 
     public function testResolvePermissionsWithoutRowReturnsFalseAndDoesNotRepair(): void
@@ -1064,9 +1551,25 @@ class PermissionsTest extends ApiTestCase
         $this->assertAccess('/d/x.txt', 'file', '5', '', '', '');
     }
 
-    public function testChangePermissionsOnFileWithoutRowRepairsItWithDefaultOwner(): void
+    public function testChangePermissionsOnFileWithoutRowIsDeniedForNonAdminAndRepairsNothing(): void
     {
         $this->actAsApiUser();
+        $this->seedFile('/x.txt', 'x');
+
+        $response = $this->apiPost('changePermissions', [
+            'path' => '/x.txt',
+            'item' => $this->permissionItem(['RoleA'], [], []),
+        ]);
+
+        // without a row there is no owner; the check comes before the self-heal, so no row is created
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to update this record'], $response->json()['result']);
+        $this->assertSame([], $this->rowPaths());
+    }
+
+    public function testChangePermissionsOnFileWithoutRowAsFileflyAdminRepairsItWithDefaultOwner(): void
+    {
+        $this->createRoles();
+        $this->actingAsUser(self::USER_ID, ['FileflyDefault', 'FileflyAdmin'], ['filefly_api']);
         $this->seedFile('/x.txt', 'x');
 
         $response = $this->apiPost('changePermissions', [
@@ -1082,7 +1585,7 @@ class PermissionsTest extends ApiTestCase
     public function testChangePermissionsOnFileWithoutRowFailsWithoutRepair(): void
     {
         $this->configureModule(['repair' => false]);
-        $this->actAsApiUser();
+        $this->actingAsAdmin();
         $this->seedFile('/x.txt', 'x');
 
         $response = $this->apiPost('changePermissions', [
@@ -1095,7 +1598,7 @@ class PermissionsTest extends ApiTestCase
         $this->assertSame([], $this->rowPaths());
     }
 
-    public function testChangePermissionsOnMissingItemCreatesRowAndSucceeds(): void
+    public function testChangePermissionsOnMissingItemIsDeniedForNonAdminAndCreatesNoRow(): void
     {
         $this->actAsApiUser();
 
@@ -1104,8 +1607,21 @@ class PermissionsTest extends ApiTestCase
             'item' => $this->permissionItem(['RoleA'], [], []),
         ]);
 
+        $this->assertSame(['success' => false, 'error' => 'You are not allowed to update this record'], $response->json()['result']);
+        $this->assertSame([], $this->rowPaths());
+    }
+
+    public function testChangePermissionsOnMissingItemAsAdminCreatesRowAndSucceeds(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->apiPost('changePermissions', [
+            'path' => '/missing.txt',
+            'item' => $this->permissionItem(['RoleA'], [], []),
+        ]);
+
         // NOTE: current behaviour, looks unintended: self-heal creates a row (type NULL) for a path that does
-        // not exist on disk, and the permission change on it reports success
+        // not exist on disk, and the permission change on it reports success (only admins get this far)
         $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
         $this->assertNotOnDisk('/missing.txt');
         $this->assertAccess('/missing.txt', null, '1', 'RoleA', '', '');
@@ -1114,7 +1630,7 @@ class PermissionsTest extends ApiTestCase
     public function testChangePermissionsOnMissingItemFailsWithoutRepair(): void
     {
         $this->configureModule(['repair' => false]);
-        $this->actAsApiUser();
+        $this->actingAsAdmin();
 
         $response = $this->apiPost('changePermissions', [
             'path' => '/missing.txt',
@@ -1127,7 +1643,7 @@ class PermissionsTest extends ApiTestCase
 
     public function testChangePermissionsMatchesPathExactlyButRepairsTheNormalizedPath(): void
     {
-        $this->actAsApiUser();
+        $this->actingAsAdmin();
         $this->seedFile('/x.txt', 'x');
 
         $response = $this->apiPost('changePermissions', [

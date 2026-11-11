@@ -3,6 +3,7 @@
 
 namespace hrzg\filefly\tests\api;
 
+use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\tests\support\ApiResponse;
 use hrzg\filefly\tests\support\ApiTestCase;
 
@@ -601,7 +602,7 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertRows(['/a/b/c' => $this->row('dir', null, (string)self::ADMIN_ID)]);
     }
 
-    public function testCreateFolderThatExistsAsDirectoryReportsExistsAndMovesItsRowToRoot(): void
+    public function testCreateFolderThatExistsAsDirectoryReportsExistsAndKeepsItsRow(): void
     {
         $this->actingAsAdmin();
         $this->seedDirViaApi('/d');
@@ -610,12 +611,10 @@ class ListCreateRenameTest extends ApiTestCase
 
         $this->assertResult(false, 'exists', $response);
         $this->assertDisk(['/d' => null]);
-        // NOTE: current behaviour, looks unintended: setAccess() runs also on failure with an empty new path,
-        // so the existing row of /d is renamed to "/" (and its former owner is kept)
-        $this->assertRows(['/' => $this->row('dir', null, (string)self::ADMIN_ID)]);
+        $this->assertRows(['/d' => $this->row('dir', null, (string)self::ADMIN_ID)]);
     }
 
-    public function testCreateFolderThatExistsAsDirectoryWithoutRowCreatesRowForExistingDirectory(): void
+    public function testCreateFolderThatExistsAsDirectoryWithoutRowCreatesNoRow(): void
     {
         $this->actingAsAdmin();
         $this->seedDir('/d');
@@ -624,10 +623,24 @@ class ListCreateRenameTest extends ApiTestCase
 
         $this->assertResult(false, 'exists', $response);
         $this->assertDisk(['/d' => null]);
-        $this->assertRows(['/d' => $this->row('dir', null, (string)self::ADMIN_ID)]);
+        // a refused create has no side effect on the hashmap; rows for existing items come from self-heal
+        $this->assertRows([]);
     }
 
-    public function testCreateFolderOverExistingFileReportsExistsAndKeepsFileContent(): void
+    public function testCreateFolderAsPlainUserOverExistingDirectoryWithoutRowDoesNotMakeTheUserItsOwner(): void
+    {
+        $this->actingAsFileflyUser(5);
+        $this->seedDir('/pub/d');
+        $this->seedHashmapRow('/pub', 'dir', ['access_owner' => '9']);
+
+        $response = $this->apiPost('createFolder', ['newPath' => '/pub/d']);
+
+        $this->assertResult(false, 'exists', $response);
+        $this->assertDisk(['/pub' => null, '/pub/d' => null]);
+        $this->assertRows(['/pub' => $this->row('dir', null, '9')]);
+    }
+
+    public function testCreateFolderOverExistingFileReportsExistsAndCreatesNoRow(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/f', 'content');
@@ -636,22 +649,20 @@ class ListCreateRenameTest extends ApiTestCase
 
         $this->assertResult(false, 'exists', $response);
         $this->assertDisk(['/f' => 'content']);
-        // NOTE: current behaviour, looks unintended: a failed create adds a row (type file) for the existing file
-        $this->assertRows(['/f' => $this->row('file', '7', (string)self::ADMIN_ID)]);
+        $this->assertRows([]);
     }
 
-    public function testCreateFolderOverExistingFileWithRowMovesRowToRoot(): void
+    public function testCreateFolderOverExistingFileWithRowKeepsTheRow(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/f', 'xx');
-        $this->seedHashmapRow('/f', 'file', [], 2);
+        $this->seedHashmapRow('/f', 'file', ['access_owner' => '7'], 2);
 
         $response = $this->apiPost('createFolder', ['newPath' => '/f']);
 
         $this->assertResult(false, 'exists', $response);
         $this->assertDisk(['/f' => 'xx']);
-        // NOTE: current behaviour, looks unintended: the row of the file is renamed to "/"
-        $this->assertRows(['/' => $this->row('file', '2')]);
+        $this->assertRows(['/f' => $this->row('file', '2', '7')]);
     }
 
     public function testCreateFolderDoesNotSlugOrNormaliseNames(): void
@@ -859,28 +870,79 @@ class ListCreateRenameTest extends ApiTestCase
         ]);
     }
 
-    public function testRenameDirectoryAlsoRewritesRowsOfSiblingsWithSamePrefix(): void
+    public function testRenameDirectoryKeepsRowsOfSiblingsWithSamePrefix(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/d/x.txt', 'X');
         $this->seedFile('/dd/z.txt', 'Z');
         $this->seedHashmapRow('/d', 'dir');
         $this->seedHashmapRow('/d/x.txt', 'file');
-        $this->seedHashmapRow('/dd', 'dir');
-        $this->seedHashmapRow('/dd/z.txt', 'file');
+        $this->seedHashmapRow('/dd', 'dir', ['access_owner' => '7']);
+        $this->seedHashmapRow('/dd/z.txt', 'file', ['access_owner' => '7']);
 
         $response = $this->apiPost('rename', ['item' => '/d', 'newItemPath' => '/e']);
 
         $this->assertResult(true, '', $response);
         // the unrelated directory /dd keeps its place on disk
         $this->assertDisk(['/e' => null, '/e/x.txt' => 'X', '/dd' => null, '/dd/z.txt' => 'Z']);
-        // NOTE: current behaviour, looks unintended: the rows of /dd and /dd/z.txt match the prefix "/d" and are
-        // rewritten to /ed and /ed/z.txt, so they no longer match the files on disk
+        // only the item's own row and the rows below "/d/" move; /dd and /dd/z.txt merely share the prefix "/d"
         $this->assertRows([
             '/e' => $this->row('dir'),
             '/e/x.txt' => $this->row('file'),
-            '/ed' => $this->row('dir'),
-            '/ed/z.txt' => $this->row('file'),
+            '/dd' => $this->row('dir', null, '7'),
+            '/dd/z.txt' => $this->row('file', null, '7'),
+        ]);
+    }
+
+    public function testRenameDirectoryWithLikeWildcardsInNameKeepsRowsOfSiblingsMatchingTheWildcards(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedFile('/a_%/x.txt', 'X');
+        $this->seedFile('/abc/a_%/y.txt', 'Y');
+        $this->seedHashmapRow('/a_%', 'dir');
+        $this->seedHashmapRow('/a_%/x.txt', 'file');
+        $this->seedHashmapRow('/abc', 'dir', ['access_owner' => '7']);
+        $this->seedHashmapRow('/abc/a_%', 'dir', ['access_owner' => '7']);
+        $this->seedHashmapRow('/abc/a_%/y.txt', 'file', ['access_owner' => '7']);
+
+        $response = $this->apiPost('rename', ['item' => '/a_%', 'newItemPath' => '/e']);
+
+        $this->assertResult(true, '', $response);
+        $this->assertDisk([
+            '/abc' => null,
+            '/abc/a_%' => null,
+            '/abc/a_%/y.txt' => 'Y',
+            '/e' => null,
+            '/e/x.txt' => 'X',
+        ]);
+        // "_" and "%" in the old path are matched literally, not as LIKE wildcards
+        $this->assertRows([
+            '/abc' => $this->row('dir', null, '7'),
+            '/abc/a_%' => $this->row('dir', null, '7'),
+            '/abc/a_%/y.txt' => $this->row('file', null, '7'),
+            '/e' => $this->row('dir'),
+            '/e/x.txt' => $this->row('file'),
+        ]);
+    }
+
+    public function testRenameDirectoryKeepsRowsWhosePathDiffersOnlyInCase(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedFile('/d/x.txt', 'X');
+        $this->seedHashmapRow('/d', 'dir');
+        $this->seedHashmapRow('/d/x.txt', 'file');
+        // rows only: on a case-insensitive host filesystem /D and /d would be the same directory
+        $this->seedHashmapRow('/D/y.txt', 'file', ['access_owner' => '7']);
+
+        $response = $this->apiPost('rename', ['item' => '/d', 'newItemPath' => '/e']);
+
+        $this->assertResult(true, '', $response);
+        $this->assertDisk(['/e' => null, '/e/x.txt' => 'X']);
+        // the prefix is compared case-sensitively, whatever the collation of the database does with LIKE
+        $this->assertRows([
+            '/D/y.txt' => $this->row('file', null, '7'),
+            '/e' => $this->row('dir'),
+            '/e/x.txt' => $this->row('file'),
         ]);
     }
 
@@ -910,7 +972,7 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertRows(['/a/b' => $this->row('dir'), '/a/b/x.txt' => $this->row('file')]);
     }
 
-    public function testRenameOntoExistingFileKeepsBothFilesAndRowsAndAnswers500(): void
+    public function testRenameOntoExistingFileKeepsBothFilesAndRowsAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'A');
@@ -920,9 +982,8 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/b.txt']);
 
-        // NOTE: current behaviour: refusal is an unhandled exception (HTTP 500, no JSON result); a library
-        // that overwrites silently would break this test on purpose
-        $this->assertStatus(500, $response);
+        // the refusal is the module's JSON error; a library that overwrites silently would break this test on purpose
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a.txt' => 'A', '/b.txt' => 'B']);
         $this->assertRows(['/a.txt' => $this->row('file'), '/b.txt' => $this->row('file')]);
     }
@@ -935,12 +996,12 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/b.txt']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a.txt' => 'A', '/b.txt' => 'B']);
         $this->assertRows(['/a.txt' => $this->row('file', '1')]);
     }
 
-    public function testRenameFileOntoExistingDirectoryKeepsFileAndDirectoryContentAndAnswers500(): void
+    public function testRenameFileOntoExistingDirectoryKeepsFileAndDirectoryContentAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'A');
@@ -950,12 +1011,12 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/b']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a.txt' => 'A', '/b' => null, '/b/in.txt' => 'I']);
         $this->assertRows(['/a.txt' => $this->row('file'), '/b' => $this->row('dir')]);
     }
 
-    public function testRenameDirectoryOntoExistingDirectoryKeepsBothTreesAndAnswers500(): void
+    public function testRenameDirectoryOntoExistingDirectoryKeepsBothTreesAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a/x.txt', 'X');
@@ -965,12 +1026,12 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a', 'newItemPath' => '/b']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a' => null, '/a/x.txt' => 'X', '/b' => null, '/b/y.txt' => 'Y']);
         $this->assertRows(['/a' => $this->row('dir'), '/b' => $this->row('dir')]);
     }
 
-    public function testRenameDirectoryOntoExistingEmptyDirectoryKeepsBothAndAnswers500(): void
+    public function testRenameDirectoryOntoExistingEmptyDirectoryKeepsBothAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a/x.txt', 'X');
@@ -980,12 +1041,12 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a', 'newItemPath' => '/b']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a' => null, '/a/x.txt' => 'X', '/b' => null]);
         $this->assertRows(['/a' => $this->row('dir'), '/b' => $this->row('dir')]);
     }
 
-    public function testRenameDirectoryOntoExistingFileKeepsBothAndAnswers500(): void
+    public function testRenameDirectoryOntoExistingFileKeepsBothAndAnswersFileAlreadyExists(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a/x.txt', 'X');
@@ -995,9 +1056,31 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a', 'newItemPath' => '/b.txt']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a' => null, '/a/x.txt' => 'X', '/b.txt' => 'B']);
         $this->assertRows(['/a' => $this->row('dir'), '/b.txt' => $this->row('file')]);
+    }
+
+    public function testRenameOntoExistingItemFiresBeforeAndErrorEventButNoAfterEvent(): void
+    {
+        $this->actingAsAdmin();
+        $this->seedFile('/a.txt', 'A');
+        $this->seedFile('/b.txt', 'B');
+        $log = [];
+        $this->recordEvents([
+            FileEvent::EVENT_BEFORE_RENAME,
+            FileEvent::EVENT_AFTER_RENAME,
+            FileEvent::EVENT_RENAME_SUCCESS,
+            FileEvent::EVENT_RENAME_ERROR,
+        ], $log);
+
+        $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/b.txt']);
+
+        $this->assertResult(false, 'File already exists', $response);
+        $this->assertSame([
+            [FileEvent::EVENT_BEFORE_RENAME, '/a.txt', null],
+            [FileEvent::EVENT_RENAME_ERROR, null, 'file_already_exists'],
+        ], $log);
     }
 
     public function testRenameMissingItemAnswers500AndRepairCreatesRowWithoutType(): void
@@ -1024,7 +1107,7 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertRows(['/nope.txt' => $this->row('file')]);
     }
 
-    public function testRenameToSameNameAnswers500AndChangesNothing(): void
+    public function testRenameToSameNameAnswersFileAlreadyExistsAndChangesNothing(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'A');
@@ -1032,7 +1115,7 @@ class ListCreateRenameTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/a.txt']);
 
-        $this->assertStatus(500, $response);
+        $this->assertResult(false, 'File already exists', $response);
         $this->assertDisk(['/a.txt' => 'A']);
         $this->assertRows(['/a.txt' => $this->row('file')]);
     }
@@ -1091,21 +1174,20 @@ class ListCreateRenameTest extends ApiTestCase
         $this->assertRows(['/new/dir/a.txt' => $this->row('file')]);
     }
 
-    public function testRenameFileRewritesRowOfSiblingWithSamePrefix(): void
+    public function testRenameFileKeepsRowOfSiblingWithSamePrefix(): void
     {
         $this->actingAsAdmin();
         $this->seedFile('/a.txt', 'A');
         $this->seedFile('/a.txt.bak', 'B');
         $this->seedHashmapRow('/a.txt', 'file');
-        $this->seedHashmapRow('/a.txt.bak', 'file');
+        $this->seedHashmapRow('/a.txt.bak', 'file', ['access_owner' => '7']);
 
         $response = $this->apiPost('rename', ['item' => '/a.txt', 'newItemPath' => '/c.txt']);
 
         $this->assertResult(true, '', $response);
         $this->assertDisk(['/c.txt' => 'A', '/a.txt.bak' => 'B']);
-        // NOTE: current behaviour, looks unintended: the prefix match "/a.txt%" also rewrites the row of
-        // "/a.txt.bak" to "/c.txt.bak" although the file stays on disk
-        $this->assertRows(['/c.txt' => $this->row('file'), '/c.txt.bak' => $this->row('file')]);
+        // the row of "/a.txt.bak" stays where its file is
+        $this->assertRows(['/a.txt.bak' => $this->row('file', null, '7'), '/c.txt' => $this->row('file')]);
     }
 
     public function testRenameFileToDeniedExtensionIsRejectedByNameValidator(): void

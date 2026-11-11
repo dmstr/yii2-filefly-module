@@ -1,0 +1,62 @@
+# file generated with AI assistance: Claude Code - [2026-11-12 18:30:00 UTC]
+# Throwaway database servers for running the API test suite against real
+# databases (see ../README.md, "Real databases"). Server state is on tmpfs and
+# disappears with `docker compose down`. No fixed host ports: each server is
+# published to an ephemeral port on 127.0.0.1, read it with
+# `docker compose -p filefly-db port <service> <container port>` or use
+# ./run.sh. Credentials: ./test-credentials.env only.
+name: filefly-db
+
+x-mysql-health: &mysql-health
+  interval: 2s
+  timeout: 5s
+  retries: 60
+
+services:
+  # the production line (phd5 projects use mariadb:10.6)
+  mariadb106:
+    image: mariadb:10.6.24
+    env_file: ./test-credentials.env
+    tmpfs:
+      - /var/lib/mysql
+    ports:
+      - "127.0.0.1::3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      <<: *mysql-health
+
+  # newest MariaDB LTS
+  mariadb118:
+    image: mariadb:11.8.5
+    env_file: ./test-credentials.env
+    tmpfs:
+      - /var/lib/mysql
+    ports:
+      - "127.0.0.1::3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      <<: *mysql-health
+
+  mysql84:
+    image: mysql:8.4.7
+    env_file: ./test-credentials.env
+    tmpfs:
+      - /var/lib/mysql
+    ports:
+      - "127.0.0.1::3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u\"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\" --silent"]
+      <<: *mysql-health
+
+  postgres16:
+    image: postgres:16.11
+    env_file: ./test-credentials.env
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports:
+      - "127.0.0.1::5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 5s
+      retries: 60

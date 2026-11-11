@@ -403,7 +403,8 @@ class SelfHealTest extends ApiTestCase
         ]]);
         $this->actAsApiUser();
         $this->seedFile('/s.txt', 's');
-        $this->seedRow('/s.txt', 'file', self::OTHER_ID, 'Secret', 'Secret', 'Secret', 1);
+        // the acting user may read the source (copy checks read access on it)
+        $this->seedRow('/s.txt', 'file', self::OTHER_ID, 'RoleA', 'Secret', 'Secret', 1);
         $this->seedDir('/d');
         $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', 'RoleA', 'Secret');
 
@@ -423,23 +424,23 @@ class SelfHealTest extends ApiTestCase
         $this->assertAccess('/d', 'dir', self::OTHER_ID, 'Secret', 'RoleA', 'Secret');
     }
 
-    public function testCreateFolderOnExistingIndexedDirectoryRewritesItsRowsToRoot(): void
+    public function testCreateFolderOnExistingIndexedDirectoryKeepsAllRows(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/d/x.txt', 'x');
         $this->seedRow('/d', 'dir', self::OTHER_ID, '*', '*', '*');
-        $this->seedRow('/d/x.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
+        $this->seedRow('/d/x.txt', 'file', self::OTHER_ID, 'RoleA', '*', '*', 1);
         $this->seedFile('/docs.txt', 'o');
         $this->seedRow('/docs.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
 
         $response = $this->apiPost('createFolder', ['newPath' => '/d']);
 
-        // NOTE: current behaviour, looks unintended: on 'exists' createFolder still calls setAccess($path)
-        // without new path, which "renames" every row matching '/d%' by replacing '/d' with '/'
         $this->assertSame(['success' => false, 'error' => 'exists'], $response->json()['result']);
         $this->assertFileOnDisk('/d/x.txt', 'x');
-        $this->assertSame(['/', '/ocs.txt', '/x.txt'], $this->rowPaths());
-        $this->assertAccess('/', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->assertSame(['/d', '/d/x.txt', '/docs.txt'], $this->rowPaths());
+        $this->assertAccess('/d', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->assertAccess('/d/x.txt', 'file', self::OTHER_ID, 'RoleA', '*', '*');
+        $this->assertAccess('/docs.txt', 'file', self::OTHER_ID, '*', '*', '*');
     }
 
     // ------------------------------------------------------------------
@@ -468,7 +469,7 @@ class SelfHealTest extends ApiTestCase
         $this->assertAccess('/z/sub/y.txt', 'file', self::OTHER_ID, '*', 'Secret', '*');
     }
 
-    public function testRenameAlsoRewritesRowsOfSiblingsSharingThePathPrefix(): void
+    public function testRenameKeepsRowsOfSiblingsSharingThePathPrefix(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/a/x.txt', 'x');
@@ -479,15 +480,16 @@ class SelfHealTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a', 'newItemPath' => '/z']);
 
-        // NOTE: current behaviour, looks unintended: rows are selected with LIKE '/a%' (no trailing slash),
-        // so the row of the untouched sibling /ab.txt becomes /zb.txt
+        // only the row of /a and the rows below "/a/" move, the sibling /ab.txt keeps its row
         $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
         $this->assertFileOnDisk('/ab.txt', 'b');
-        $this->assertSame(['/z', '/z/x.txt', '/zb.txt'], $this->rowPaths());
-        $this->assertAccess('/zb.txt', 'file', self::OTHER_ID, 'RoleA', 'RoleA', 'RoleA');
+        $this->assertSame(['/ab.txt', '/z', '/z/x.txt'], $this->rowPaths());
+        $this->assertAccess('/ab.txt', 'file', self::OTHER_ID, 'RoleA', 'RoleA', 'RoleA');
+        $this->assertAccess('/z', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->assertAccess('/z/x.txt', 'file', self::OTHER_ID, '*', '*', '*');
     }
 
-    public function testRenameReplacesEveryOccurrenceOfTheOldPathInChildRows(): void
+    public function testRenameReplacesOnlyTheLeadingOldPathInChildRows(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/a/sub/a.txt', 'x');
@@ -497,18 +499,36 @@ class SelfHealTest extends ApiTestCase
 
         $response = $this->apiPost('rename', ['item' => '/a', 'newItemPath' => '/z']);
 
-        // NOTE: current behaviour, looks unintended: str_replace() rewrites '/a.txt' too, the row no longer
-        // matches the file /z/sub/a.txt on disk
+        // the inner "/a.txt" of the child path stays, so the row still matches the file on disk
         $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
         $this->assertFileOnDisk('/z/sub/a.txt', 'x');
-        $this->assertSame(['/z', '/z/sub', '/z/sub/z.txt'], $this->rowPaths());
+        $this->assertSame(['/z', '/z/sub', '/z/sub/a.txt'], $this->rowPaths());
+        $this->assertAccess('/z/sub/a.txt', 'file', self::OTHER_ID, '*', '*', '*');
+    }
+
+    public function testRenameDirectoryReplacesLeadingOldPathAlsoWhenItRepeatsDeeper(): void
+    {
+        $this->actAsApiUser();
+        $this->seedFile('/z/sub/a/z/x.txt', 'x');
+        $this->seedRow('/z', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->seedRow('/z/sub', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->seedRow('/z/sub/a', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->seedRow('/z/sub/a/z', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->seedRow('/z/sub/a/z/x.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
+
+        $response = $this->apiPost('rename', ['item' => '/z', 'newItemPath' => '/q']);
+
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertFileOnDisk('/q/sub/a/z/x.txt', 'x');
+        $this->assertSame(['/q', '/q/sub', '/q/sub/a', '/q/sub/a/z', '/q/sub/a/z/x.txt'], $this->rowPaths());
     }
 
     public function testMoveDirectoryMovesAllChildRowsAndKeepsTheirAccess(): void
     {
         $this->actAsApiUser();
         $this->seedFile('/a/x.txt', 'x');
-        $this->seedRow('/a', 'dir', self::OTHER_ID, 'RoleA', 'Secret', 'Secret');
+        // the acting user may update the source (move checks update access on it)
+        $this->seedRow('/a', 'dir', self::OTHER_ID, 'RoleA', 'RoleA', 'Secret');
         $this->seedRow('/a/x.txt', 'file', '5', '', 'RoleB', 'Secret', 1);
         $this->seedDir('/d');
         $this->seedRow('/d', 'dir', self::OTHER_ID, 'Secret', '*', 'Secret');
@@ -519,7 +539,7 @@ class SelfHealTest extends ApiTestCase
         $this->assertFileOnDisk('/d/a/x.txt', 'x');
         $this->assertNotOnDisk('/a');
         $this->assertSame(['/d', '/d/a', '/d/a/x.txt'], $this->rowPaths());
-        $this->assertAccess('/d/a', 'dir', self::OTHER_ID, 'RoleA', 'Secret', 'Secret');
+        $this->assertAccess('/d/a', 'dir', self::OTHER_ID, 'RoleA', 'RoleA', 'Secret');
         $this->assertAccess('/d/a/x.txt', 'file', '5', '', 'RoleB', 'Secret');
     }
 
@@ -593,6 +613,45 @@ class SelfHealTest extends ApiTestCase
         $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
         $this->assertNotOnDisk('/a');
         $this->assertSame([], $this->rowPaths());
+    }
+
+    public function testRemoveDirectoryWithLikeWildcardInNameKeepsRowsOfPathsMatchingTheWildcard(): void
+    {
+        $this->configureModule(['deleteRecursive' => true]);
+        $this->actAsApiUser();
+        $this->seedFile('/a_/x.txt', 'x');
+        $this->seedFile('/ab/y.txt', 'y');
+        $this->seedRow('/a_', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->seedRow('/a_/x.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
+        $this->seedRow('/ab', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->seedRow('/ab/y.txt', 'file', self::OTHER_ID, 'RoleA', 'RoleA', 'RoleA', 1);
+
+        $response = $this->apiPost('remove', ['items' => ['/a_']]);
+
+        // "_" is matched literally, so only the rows below "/a_/" go with the directory
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertNotOnDisk('/a_');
+        $this->assertFileOnDisk('/ab/y.txt', 'y');
+        $this->assertSame(['/ab', '/ab/y.txt'], $this->rowPaths());
+        $this->assertAccess('/ab/y.txt', 'file', self::OTHER_ID, 'RoleA', 'RoleA', 'RoleA');
+    }
+
+    public function testRemoveEmptyDirectoryWithLikeWildcardInNameIgnoresRowsOfPathsMatchingTheWildcard(): void
+    {
+        $this->actAsApiUser();
+        $this->seedDir('/a%');
+        $this->seedFile('/abc/y.txt', 'y');
+        $this->seedRow('/a%', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->seedRow('/abc', 'dir', self::OTHER_ID, '*', '*', '*');
+        $this->seedRow('/abc/y.txt', 'file', self::OTHER_ID, '*', '*', '*', 1);
+
+        $response = $this->apiPost('remove', ['items' => ['/a%']]);
+
+        // the emptiness check sees no row below "/a%/", so no error is reported (deleteRecursive is off)
+        $this->assertSame(['success' => true, 'error' => ''], $response->json()['result']);
+        $this->assertNotOnDisk('/a%');
+        $this->assertFileOnDisk('/abc/y.txt', 'y');
+        $this->assertSame(['/abc', '/abc/y.txt'], $this->rowPaths());
     }
 
     public function testRemoveDirectoryWithoutOwnRowAndWithoutRepairAsAdminCountsAsNotEmpty(): void

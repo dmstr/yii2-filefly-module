@@ -17,7 +17,8 @@ namespace hrzg\filefly\components\storage;
  *
  * It is a \LogicException (a caller error, not a storage failure) and deliberately no
  * StorageException: handlers catching storage failures or \RuntimeException do not catch it,
- * exactly like the \LogicException that Flysystem 1 throws for these paths.
+ * exactly like the \LogicException that Flysystem 1 threw for these paths (Flysystem 3 throws
+ * \RuntimeException subclasses, which the facade translates into this class).
  */
 class InvalidPathException extends \InvalidArgumentException
 {

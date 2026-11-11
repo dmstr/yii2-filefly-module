@@ -17,7 +17,7 @@ use yii\base\BaseObject;
 /**
  * Access control and hashmap maintenance for the items of one filesystem component.
  *
- * Replaces the Flysystem plugins in `hrzg\filefly\plugins`. Obtain an instance for the current
+ * Replaced the Flysystem plugins of 1.x (removed in 2.0). Obtain an instance for the current
  * module with FileManager::access(). An instance caches access decisions (grantAccess()), so it
  * should not outlive one request.
  *
@@ -101,10 +101,13 @@ class AccessManager extends BaseObject
     }
 
     /**
-     * Create the row of a new item ($oldItemPath), or move the rows of a renamed item to $newItemPath
+     * `setAccess($path)`: create or renew the row of a newly created item (acting user as owner,
+     * access columns from the defaults; an existing row of exactly this path is overwritten, no
+     * other row changes). `setAccess($oldPath, $newPath)`: move the row of a renamed or moved item
+     * and the rows below it. See HashmapSynchronizer::setAccess().
      *
      * @param string $oldItemPath
-     * @param string $newItemPath
+     * @param string|null $newItemPath
      *
      * @return bool
      */
@@ -124,6 +127,19 @@ class AccessManager extends BaseObject
     public function removeAccess($itemPath = null, $recursive = false)
     {
         return $this->hashmap()->removeAccess($itemPath, $recursive);
+    }
+
+    /**
+     * Whether the current user may read and change the permissions of the item at $path: its owner,
+     * RBAC `Admin` or `FileflyAdmin`. See PermissionResolver::canManagePermissions().
+     *
+     * @param string $path
+     *
+     * @return bool
+     */
+    public function canManagePermissions($path)
+    {
+        return $this->permissions()->canManagePermissions($path);
     }
 
     /**
@@ -149,6 +165,22 @@ class AccessManager extends BaseObject
     public function updatePermission($item, $path)
     {
         return $this->permissions()->updatePermission($item, $path);
+    }
+
+    /**
+     * Whether the path is taken by a row of a different exact path: a row the database considers
+     * equal to $path (case, accents, trailing spaces under the MariaDB/MySQL collations) whose
+     * stored path is not byte for byte $path. Creating actions refuse such a target like an
+     * existing one. See HashmapService::hasConflictingRow().
+     *
+     * @param string $path
+     * @param string|null $ownPath the path of the item that is being moved to $path: its own row does not count
+     *
+     * @return bool
+     */
+    public function hasConflictingRow($path, $ownPath = null)
+    {
+        return $this->hashmap()->hasConflictingRow($path, $ownPath);
     }
 
     /**

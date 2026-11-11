@@ -215,7 +215,8 @@ class FsController extends \yii\console\Controller
     }
 
     /**
-     * Synchronize source to destination
+     * Synchronize source to destination: copies missing files and replaces target files that are
+     * older than their source (`+` for both, `.` for a skipped file); see FsManager::sync()
      *
      * @param $src
      * @param $dest
@@ -241,6 +242,7 @@ class FsController extends \yii\console\Controller
 
         foreach ($contents as $entry) {
             $update = false;
+            $replace = false;
             $srcUrl = $srcScheme . '://' . $entry->getPath();
             $destUrl = $dest . $entry->getPath();
 
@@ -253,10 +255,16 @@ class FsController extends \yii\console\Controller
                 $update = true;
             } else if ($manager->lastModified($srcUrl) > $manager->lastModified($dest . $entry->getPath())) {
                 $update = true;
+                $replace = true;
             }
 
             if ($update) {
-                $manager->copyFile($srcUrl, $destUrl);
+                if ($replace) {
+                    // replaces an older target file; a directory at the target is refused (throws)
+                    $manager->replaceFile($srcUrl, $destUrl);
+                } else {
+                    $manager->copyFile($srcUrl, $destUrl);
+                }
                 $this->stdout("+");
             } else {
                 $this->stdout('.');

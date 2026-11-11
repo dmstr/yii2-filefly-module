@@ -3,10 +3,13 @@
 
 namespace hrzg\filefly\tests\support;
 
+use hrzg\filefly\controllers\ApiController;
+use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
 use PHPUnit\Framework\TestCase;
 use Yii;
+use yii\base\Event;
 use yii\base\ExitException;
 use yii\db\Query;
 use yii\di\Container;
@@ -15,7 +18,8 @@ use yii\web\Application;
 /**
  * Base test case for characterisation tests of the filefly HTTP API (ApiController).
  *
- * Per test it boots a real \yii\web\Application with the filefly module, an sqlite in-memory `db`,
+ * Per test it boots a real \yii\web\Application with the filefly module, an sqlite in-memory `db`
+ * (or a real database, see TestDatabase),
  * a PhpManager `authManager` filled by the module's own RBAC migrations, a \dmstr\web\User `user`
  * component and a local filesystem component `fsTest` rooted in a fresh temp directory.
  *
@@ -119,9 +123,11 @@ abstract class ApiTestCase extends TestCase
 
     protected function tearDown(): void
     {
-        // FileManager::fileSystem() switches these off globally
+        // FileManager::storage() and FileManager::access() switch both off globally, ApiController::actionSearch() the first
         FileflyHashmap::$activeAccessTrait = true;
         FileflyHashmap::$enableFlashMessages = true;
+
+        Event::offAll();
 
         if (Yii::$app !== null && Yii::$app->has('db', true)) {
             Yii::$app->db->close();
@@ -149,6 +155,8 @@ abstract class ApiTestCase extends TestCase
         return [
             'class' => \creocoder\flysystem\LocalFilesystem::class,
             'path' => $this->fsRoot,
+            // directories as Flysystem 1 created them (0755); creocoder's default is 0740
+            'config' => ['directory_visibility' => 'public'],
         ];
     }
 
@@ -225,42 +233,28 @@ abstract class ApiTestCase extends TestCase
     }
 
     /**
-     * sqlite in-memory database. MySQL's NOW(), used by FileflyHashmap's TimestampBehavior,
-     * is registered as a user function.
+     * sqlite in memory by default, a real database when FILEFLY_TEST_DB_DSN is set (TestDatabase)
      */
     private function dbConfig(): array
     {
-        $config = [
-            'class' => \yii\db\Connection::class,
-            'dsn' => 'sqlite::memory:',
-            'on afterOpen' => static function ($event) {
-                $pdo = $event->sender->pdo;
-                $now = static function () {
-                    return date('Y-m-d H:i:s');
-                };
-                if (method_exists($pdo, 'createFunction')) {
-                    $pdo->createFunction('NOW', $now, 0);
-                } else {
-                    $pdo->sqliteCreateFunction('NOW', $now, 0);
-                }
-            },
-        ];
-        if (class_exists(\Pdo\Sqlite::class)) {
-            // PHP >= 8.4: driver specific class, PDO::sqliteCreateFunction() is deprecated in 8.5
-            $config['pdoClass'] = \Pdo\Sqlite::class;
-        }
-        return $config;
+        return TestDatabase::connectionConfig();
     }
 
     /**
      * Creates `filefly_hashmap` as it looks after all migrations in migrations/.
      *
      * The migrations themselves do not run on sqlite: m170815_120101 and m230606_* use
-     * alterColumn(), which yii\db\sqlite\QueryBuilder does not support.
+     * alterColumn(), which yii\db\sqlite\QueryBuilder does not support. On a real database
+     * (TestDatabase) the table comes from the real migrations, applied once per run, and is
+     * only emptied here.
      */
     private function createHashmapSchema(): void
     {
         $db = Yii::$app->db;
+        if (TestDatabase::isReal()) {
+            TestDatabase::resetTable($db);
+            return;
+        }
         $db->createCommand()->createTable('filefly_hashmap', [
             'id' => 'pk',
             'component' => 'string(45) NOT NULL',
@@ -743,33 +737,45 @@ abstract class ApiTestCase extends TestCase
     }
 
     /**
-     * Hashmap row for a path of the test filesystem, `null` if none.
+     * Hashmap row with exactly this path (byte by byte) of the test filesystem, `null` if none.
      * All non-null values are strings (as MySQL returns them).
+     *
+     * The rows are compared in PHP, not by the database: under a case- or accent-insensitive
+     * collation `path = '/D'` also matches `/d`, which is the module's business, not the harness's.
      */
     protected function hashmapRow(string $path): ?array
     {
-        $row = (new Query())
-            ->from('filefly_hashmap')
-            ->where(['component' => self::FS_COMPONENT, 'path' => $this->hashmapPath($path)])
-            ->one(Yii::$app->db);
-        return $row === false ? null : $this->stringifyRow($row);
+        $path = $this->hashmapPath($path);
+        foreach ($this->hashmapRows() as $row) {
+            if ($row['path'] === $path) {
+                return $row;
+            }
+        }
+        return null;
     }
 
     /**
-     * All hashmap rows of the test filesystem ordered by path, optionally only `path LIKE $prefix%`
+     * All hashmap rows of the test filesystem ordered by path (byte order, as sqlite's BINARY
+     * collation), optionally only the rows whose path starts with $prefix (byte by byte)
      *
      * @return array[]
      */
     protected function hashmapRows(?string $prefix = null): array
     {
-        $query = (new Query())
+        $rows = array_map([$this, 'stringifyRow'], (new Query())
             ->from('filefly_hashmap')
             ->where(['component' => self::FS_COMPONENT])
-            ->orderBy(['path' => SORT_ASC]);
+            ->all(Yii::$app->db));
         if ($prefix !== null) {
-            $query->andWhere(['like', 'path', $this->hashmapPath($prefix) . '%', false]);
+            $prefix = $this->hashmapPath($prefix);
+            $rows = array_values(array_filter($rows, static function (array $row) use ($prefix) {
+                return strncmp($row['path'], $prefix, strlen($prefix)) === 0;
+            }));
         }
-        return array_map([$this, 'stringifyRow'], $query->all(Yii::$app->db));
+        usort($rows, static function (array $a, array $b) {
+            return strcmp($a['path'], $b['path']);
+        });
+        return $rows;
     }
 
     /**
@@ -814,12 +820,24 @@ abstract class ApiTestCase extends TestCase
         return array_column($this->hashmapRows(), 'path');
     }
 
+    /**
+     * Column order of every row returned by the hashmap helpers: the order of the sqlite schema
+     * (and of MySQL, where m170323 adds `type` and `size` with AFTER). PostgreSQL appends added
+     * columns at the end, so rows are reordered to stay comparable with assertSame().
+     */
+    private const ROW_COLUMNS = [
+        'id', 'component', 'type', 'path', 'size',
+        'access_owner', 'access_read', 'access_update', 'access_delete', 'created_at', 'updated_at',
+    ];
+
     private function stringifyRow(array $row): array
     {
-        foreach ($row as $column => $value) {
-            $row[$column] = $value === null ? null : (string)$value;
+        $ordered = [];
+        foreach (array_merge(array_intersect(self::ROW_COLUMNS, array_keys($row)), array_keys($row)) as $column) {
+            $value = $row[$column];
+            $ordered[$column] = $value === null ? null : (string)$value;
         }
-        return $row;
+        return $ordered;
     }
 
     // ------------------------------------------------------------------
@@ -886,6 +904,21 @@ abstract class ApiTestCase extends TestCase
         $names = array_column($response->json()['result'], 'name');
         sort($names);
         return $names;
+    }
+
+    /**
+     * Records [name, filename, errorMessage] of the given ApiController events into $log
+     * (class-level handlers, removed in tearDown())
+     *
+     * @param string[] $names event names (FileEvent::EVENT_*)
+     */
+    protected function recordEvents(array $names, array &$log): void
+    {
+        foreach ($names as $name) {
+            Event::on(ApiController::class, $name, static function (FileEvent $event) use (&$log, $name) {
+                $log[] = [$name, $event->filename, $event->errorMessage];
+            });
+        }
     }
 
     /**

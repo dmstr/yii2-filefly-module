@@ -89,57 +89,55 @@ class HashmapSynchronizer extends HashmapService
     }
 
     /**
-     * The full path strings of the file or directory to be set or updated
+     * Create or renew the row of a new item, or move the rows of a renamed or moved item.
      *
-     * Without a row for $oldItemPath a new row is created for $oldItemPath (upload / create),
-     * otherwise every row matching `LIKE '<old>%'` is rewritten to $newItemPath.
+     * - `setAccess($path)` (no new path, or `''`): the item at $path was just created (upload,
+     *   copy, createFolder). Its row gets the type and size of the item, the acting user as owner
+     *   and the access columns from the module's `defaultPermissions`. A row that already exists
+     *   with exactly this path (a stale row whose item was gone) is overwritten the same way, as if
+     *   it had not existed. No other row is touched; this form never renames anything.
+     * - `setAccess($oldPath, $newPath)`: the row of $oldPath and the rows below it are moved to
+     *   $newPath (see updateRecursive()). If $oldPath has no row, nothing is moved and a row is
+     *   created for $oldPath as in the first form (unchanged from earlier versions).
+     * - Rows are matched byte for byte. A row of another path that the database considers equal to
+     *   the path to be written (hasConflictingRow()) is never changed: the first form creates no
+     *   row, the second form moves nothing; both return false.
      *
      * @param string $oldItemPath
-     * @param string $newItemPath
+     * @param string|null $newItemPath
      *
      * @return bool
      */
     public function setAccess($oldItemPath = null, $newItemPath = null)
     {
         $oldItemPath = static::normalizePath($oldItemPath);
-        $newItemPath = static::normalizePath($newItemPath);
-
         $oldHash = $this->findHash($oldItemPath);
 
         // upload / create
-        if (empty($oldHash)) {
-
-            list($type, $size) = $this->readTypeAndSize($oldItemPath, __METHOD__);
-
-            $defaultPermissions = FileflyHashmap::accessDefaults();
-            $newHash = new FileflyHashmap(
-                [
-                    'component'    => $this->component,
-                    'type'         => $type,
-                    'path'         => $oldItemPath,
-                    'size'         => $size,
-                    'access_owner' => \Yii::$app->user->id,
-                    Module::ACCESS_READ   => $defaultPermissions[Module::ACCESS_READ],
-                    Module::ACCESS_UPDATE => $defaultPermissions[Module::ACCESS_UPDATE],
-                    Module::ACCESS_DELETE => $defaultPermissions[Module::ACCESS_DELETE],
-                ]
-            );
-            if (!$newHash->save()) {
-                \Yii::error('Could not save new item [' . $oldItemPath . '] to hash table!', __METHOD__);
-                return false;
-            }
-        } else {
-            return $this->updateRecursive($oldHash->path, $newItemPath);
+        if ($newItemPath === null || $newItemPath === '') {
+            return $this->saveNewItemHash($oldHash !== null ? $oldHash : new FileflyHashmap(), $oldItemPath);
         }
 
-        return true;
+        // rename / move of an item without row
+        if ($oldHash === null) {
+            return $this->saveNewItemHash(new FileflyHashmap(), $oldItemPath);
+        }
+
+        $newItemPath = static::normalizePath($newItemPath);
+        // the row of another item that the database considers equal to the new path is not overwritten
+        if ($this->hasConflictingRow($newItemPath, $oldHash->path)) {
+            \Yii::warning('Not moving the row of [' . $oldItemPath . '], [' . $newItemPath . '] collides with the row of another path', __CLASS__ . '::setAccess');
+            return false;
+        }
+
+        return $this->updateRecursive($oldHash, $oldHash->path, $newItemPath);
     }
 
     /**
      * The full path strings of the file or directory to be removed
      *
      * @param string $itemPath
-     * @param bool $recursive also remove all rows matching `LIKE '<path>/%'`
+     * @param bool $recursive also remove the rows below the item (paths starting with `<path>/`)
      *
      * @return bool
      */
@@ -147,7 +145,7 @@ class HashmapSynchronizer extends HashmapService
     {
         // remove all hashmap entries beneath $itemPath
         if ($recursive) {
-            $items = $this->findHashesLike($itemPath . '/%');
+            $items = $this->findHashesWithPrefix($itemPath . '/');
 
             if (empty($items)) {
                 \Yii::info('Could not find items beneath [' . $itemPath . '] in hash table!', __METHOD__);
@@ -193,7 +191,7 @@ class HashmapSynchronizer extends HashmapService
         }
 
         // find hashmap items beneath this path
-        $items = $this->findHashesLike($item->path . '/%');
+        $items = $this->findHashesWithPrefix($item->path . '/');
 
         // if no items found => dir is empty
         if (empty($items)) {
@@ -223,6 +221,13 @@ class HashmapSynchronizer extends HashmapService
         $hash = $this->findHash($path);
 
         if ($hash === null) {
+            // the path has no row of its own, but the database considers it equal to the path of
+            // another item's row: no row can be inserted next to it, and that row is not taken over
+            if ($this->hasConflictingRow($path)) {
+                \Yii::warning("Not repairing '$path', it collides with the row of another path", __METHOD__);
+                return false;
+            }
+
             \Yii::info("Repairing '$path'", __METHOD__);
 
             $defaultPermissions = FileflyHashmap::accessDefaults();
@@ -251,21 +256,62 @@ class HashmapSynchronizer extends HashmapService
     }
 
     /**
-     * @param string $oldItemPath
-     * @param string $newItemPath
+     * Fill a row for the item at $path as for a newly created item and save it: type and size of
+     * the item (both `null` if it does not exist), the acting user as owner, the access columns
+     * from the module's `defaultPermissions`.
+     *
+     * @param FileflyHashmap $hash a new row, or the existing row with exactly this path
+     * @param string $path
      *
      * @return bool
      */
-    private function updateRecursive($oldItemPath, $newItemPath)
+    private function saveNewItemHash(FileflyHashmap $hash, $path)
     {
-        $items = $this->findHashesLike($oldItemPath . '%');
-
-        if ($items === null) {
+        // a new row next to a row the database considers equal: not inserted (see hasConflictingRow())
+        if ($hash->getIsNewRecord() && $this->hasConflictingRow($path)) {
+            \Yii::warning('Not creating a row for [' . $path . '], it collides with the row of another path', __CLASS__ . '::setAccess');
             return false;
         }
 
+        list($type, $size) = $this->readTypeAndSize($path, __CLASS__ . '::setAccess');
+
+        $defaultPermissions = FileflyHashmap::accessDefaults();
+        $hash->setAttributes([
+            'component'           => $this->component,
+            'type'                => $type,
+            'path'                => $path,
+            'size'                => $size,
+            Module::ACCESS_OWNER  => \Yii::$app->user->id,
+            Module::ACCESS_READ   => $defaultPermissions[Module::ACCESS_READ],
+            Module::ACCESS_UPDATE => $defaultPermissions[Module::ACCESS_UPDATE],
+            Module::ACCESS_DELETE => $defaultPermissions[Module::ACCESS_DELETE],
+        ], false);
+
+        if (!$hash->save()) {
+            \Yii::error('Could not save new item [' . $path . '] to hash table!', __CLASS__ . '::setAccess');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Move the row of an item and the rows below it: the row with exactly $oldItemPath and every row
+     * whose path starts with `<old>/` get the leading $oldItemPath replaced by $newItemPath. Rows that
+     * merely share the prefix (`/dd` for `/d`, `/a.txt.bak` for `/a.txt`) and later occurrences of
+     * the old path inside a child path stay as they are.
+     *
+     * @param FileflyHashmap $itemHash the row with exactly $oldItemPath
+     * @param string $oldItemPath
+     * @param string $newItemPath
+     *
+     * @return bool false as soon as one row could not be saved (the rows saved before stay moved)
+     */
+    private function updateRecursive(FileflyHashmap $itemHash, $oldItemPath, $newItemPath)
+    {
+        $items = array_merge([$itemHash], $this->findHashesWithPrefix($oldItemPath . '/'));
+
         foreach ($items as $item) {
-            $item->path = str_replace($oldItemPath, $newItemPath, $item->path);
+            $item->path = $newItemPath . substr($item->path, strlen($oldItemPath));
 
             if (!$item->save()) {
                 \Yii::error('Could not update item [' . $oldItemPath . '] to hash table!', __METHOD__);

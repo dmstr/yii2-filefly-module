@@ -130,6 +130,36 @@ class PermissionResolver extends HashmapService
     }
 
     /**
+     * Whether the current user may read and change the permissions of the item at $path
+     * (`resolvePermissions`, `changePermissions`): the owner of the item's own row, a user with the
+     * RBAC role of ActiveRecordAccessTrait (`Admin`), or a user with the module's admin bypass
+     * (`FileflyAdmin` among the user's auth items, as in grantAccess()).
+     *
+     * - Roles or `*` in the access columns do not count, and ownership is not inherited: the row with
+     *   exactly this path decides, the row getPermissions() and updatePermission() read and write.
+     * - Without a row there is no owner, so only admins pass. The check creates no row.
+     * - The root (`/`, also given as `` or with extra slashes) is managed by admins only, also when a
+     *   row for `/` names the user as owner.
+     *
+     * @param string $path
+     *
+     * @return bool
+     */
+    public function canManagePermissions($path)
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if (HashmapSynchronizer::normalizeRepairPath($path) === '/') {
+            return false;
+        }
+
+        $hash = $this->findHash($path);
+        return $hash !== null && $this->isOwner($hash);
+    }
+
+    /**
      * Build permissions array for multi selects in permission modal
      *
      * @param string $path
@@ -228,6 +258,32 @@ class PermissionResolver extends HashmapService
             $pos++;
         }
         return $selection;
+    }
+
+    /**
+     * RBAC `Admin` (FileflyHashmap::hasPermission() grants it everything) or the module's admin
+     * bypass `FileflyAdmin` (grantAccess())
+     *
+     * @return bool
+     */
+    private function isAdmin()
+    {
+        return \Yii::$app->user->can(FileflyHashmap::getAdminRole())
+            || array_key_exists(Module::ACCESS_ROLE_ADMIN, FileflyHashmap::getUsersAuthItems());
+    }
+
+    /**
+     * The owner test of FileflyHashmap::hasPermission(): a logged in user whose id equals the
+     * `access_owner` of the row (loose comparison, so `05` matches user 5)
+     *
+     * @param FileflyHashmap $hash
+     *
+     * @return bool
+     */
+    private function isOwner(FileflyHashmap $hash)
+    {
+        return !\Yii::$app->user->isGuest
+            && $hash->getOldAttribute(Module::ACCESS_OWNER) == (string)\Yii::$app->user->getId();
     }
 
     /**

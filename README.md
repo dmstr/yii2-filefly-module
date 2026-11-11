@@ -10,6 +10,8 @@ FlySystem API for [dmstr/yii2-filemanager-widgets](https://github.com/dmstr/yii2
 Installation
 ------------
 
+Upgrading from 1.x: see [UPGRADE.md](./UPGRADE.md) (Flysystem 3, creocoder/yii2-flysystem 2, filesystem component config, removed API).
+
 #### ENV variables
 
 Variable | Value | Required
@@ -21,7 +23,7 @@ AFM_DELETE_RECURSIVE | default: false | no
 
 i.e. `AFM_FILESYSTEM=fsLocal`
 
-:question: How to configure a filesystem component [Filesystem docs](https://github.com/creocoder/yii2-flysystem/blob/master/README.md)
+:question: How to configure a filesystem component [Filesystem docs](https://github.com/creocoder/yii2-flysystem/blob/master/README.md) (creocoder/yii2-flysystem 2, Flysystem 3; requires the adapter package, e.g. `league/flysystem-aws-s3-v3` or `league/flysystem-ftp`; for local components see the recommended `directory_visibility` in [UPGRADE.md](./UPGRADE.md))
 
 #### Yii config
 
@@ -146,9 +148,11 @@ So if inherited `access_*` permissions should be used, set defaultPermissions to
 
 Access checks and the hashmap maintenance are done by `hrzg\filefly\components\AccessManager`; `FileManager::access()` returns one for the filesystem of the current module, with the methods `check()`, `grantAccess()`, `setAccess()`, `removeAccess()`, `getPermissions()`, `updatePermission()` and `isEmpty()`.
 
-The Flysystem plugins in `hrzg\filefly\plugins` and the magic methods of the same names on `FileManager::fileSystem()` are deprecated since 1.9; they delegate to `AccessManager` and are removed in 2.0 together with Flysystem 1.
+The Flysystem plugins in `hrzg\filefly\plugins` and `FileManager::fileSystem()` with its magic methods of the same names were deprecated in 1.9 and are removed in 2.0: use `FileManager::access()` for permissions and the hashmap and `FileManager::storage()` for files.
 
 Permission checks will ever come after file or folder operation
+
+Rights needed per action (besides the route permission and, for POST requests, the role `FileflyDefault`): `list` and `search` read access (`stream` and `download` check no item access); `upload` and `createFolder` update access on the target folder; `rename` update access on the item and, when the item goes to another folder, on that folder; `move` update access on the target folder and on each item; `copy` update access on the target folder and read access on each item; `remove` delete access on each item. `changePermissions` and `resolvePermissions` are allowed only for the owner of the item (`access_owner` of its own record), users with the RBAC role `Admin` and users with `FileflyAdmin` assigned directly; the permissions of `/` are managed by admins only.
 
 **grantAccess**
 ```
@@ -168,6 +172,8 @@ Create or update permission
 
 - Multi create and update option
 ```
+
+`setAccess($path)` (without new path) creates the record of a newly created item (upload, copy, createFolder) with the acting user as owner and the access columns from `defaultPermissions`; a stale record that already exists for exactly this path is overwritten the same way, and no other record changes. A `createFolder` on an existing file or directory changes no record. Moving the records of a renamed or moved item (`setAccess($oldPath, $newPath)`) rewrites exactly the record of `$oldPath` and the records below `$oldPath/`, and replaces only the leading `$oldPath`; records that merely share the prefix (`/dd` for `/d`, `/a.txt.bak` for `/a.txt`) are not touched. `removeAccess()` and `isEmpty()` select the records below an item the same way. `%` and `_` in paths are matched literally.
 
 **removeAccess**
 ```
