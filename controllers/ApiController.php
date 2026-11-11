@@ -169,14 +169,15 @@ class ApiController extends WebController
                 $this->trigger(FileEvent::EVENT_BEFORE_MOVE, new FileEvent(['filename' => $oldPath]));
                 $accessManager->check($oldPath, $this->module->repair);
 
-                if (!$fileSystem->get($oldPath)->isFile() && !$fileSystem->get($oldPath)->isDir()) {
+                $itemType = $this->getItemType($fileSystem, $oldPath);
+                if ($itemType !== 'file' && $itemType !== 'dir') {
                     $errorMessage = 'notfound';
                     break;
                 }
 
                 $destPath = $newPath . '/' . basename($oldPath);
 
-                $moved = $fileSystem->get($oldPath)->rename($destPath);
+                $moved = $fileSystem->rename($oldPath, $destPath);
                 if ($moved === false) {
                     $errorMessage = 'movefailed';
                     break;
@@ -232,7 +233,7 @@ class ApiController extends WebController
                 $this->trigger(FileEvent::EVENT_BEFORE_COPY, new FileEvent(['filename' => $oldPath]));
                 // ensure hashmap entry
                 $accessManager->check($oldPath, $this->module->repair);
-                if (!$fileSystem->get($oldPath)->isFile()) {
+                if ($this->getItemType($fileSystem, $oldPath) !== 'file') {
                     return false;
                 }
 
@@ -244,8 +245,8 @@ class ApiController extends WebController
                 }
 
                 // copy file
-                $copied = $fileSystem->get($oldPath)->copy($filename);
-                if ($copied === false) {
+                $copied = $fileSystem->copy($oldPath, $filename);
+                if (!$copied) {
                     $errorMessage = 'copyfailed';
                 } else {
                     $success = true;
@@ -833,6 +834,23 @@ class ApiController extends WebController
         return $this->asJson($result);
     }
 
+
+    /**
+     * Type of an existing item as the Flysystem 1 handler API reported it with
+     * `$fileSystem->get($path)->getType()`: the `type` of its metadata (`file`, `dir` or whatever
+     * else the adapter reports), or `dir` if the adapter returns no metadata.
+     *
+     * @param \creocoder\flysystem\Filesystem $fileSystem
+     * @param string $path
+     *
+     * @return string
+     * @throws FileNotFoundException if the path does not exist (also for the root)
+     */
+    private function getItemType($fileSystem, $path)
+    {
+        $metadata = $fileSystem->getMetadata($path);
+        return $metadata ? $metadata['type'] : 'dir';
+    }
 
     private function getItemThumbnail(array $item)
     {
