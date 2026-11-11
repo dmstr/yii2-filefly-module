@@ -122,7 +122,7 @@ abstract class ApiTestCase extends TestCase
 
     protected function tearDown(): void
     {
-        // FileManager::fileSystem() switches these off globally
+        // FileManager::storage() and FileManager::access() switch both off globally, ApiController::actionSearch() the first
         FileflyHashmap::$activeAccessTrait = true;
         FileflyHashmap::$enableFlashMessages = true;
 

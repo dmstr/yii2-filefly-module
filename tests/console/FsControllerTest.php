@@ -22,6 +22,32 @@ class FsControllerTest extends ConsoleTestCase
     private const MID = 5000;
     private const NEW = 9000;
 
+    /**
+     * @var string|null temp directory outside both roots (symlink targets), removed in tearDown()
+     */
+    private $outsideDir;
+
+    protected function tearDown(): void
+    {
+        $base = realpath(sys_get_temp_dir());
+        if ($this->outsideDir !== null && strpos($this->outsideDir, $base . '/filefly-outside-') === 0 && is_dir($this->outsideDir)) {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($this->outsideDir, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::CHILD_FIRST
+            );
+            foreach ($iterator as $item) {
+                /** @var \SplFileInfo $item */
+                if ($item->isDir() && !$item->isLink()) {
+                    rmdir($item->getPathname());
+                } else {
+                    unlink($item->getPathname());
+                }
+            }
+            rmdir($this->outsideDir);
+        }
+        parent::tearDown();
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
@@ -137,6 +163,37 @@ class FsControllerTest extends ConsoleTestCase
     public function syncViaProvider(): array
     {
         return ['console action' => ['console'], 'FsManager::sync()' => ['manager']];
+    }
+
+    /**
+     * Creates a fresh temp directory outside both roots with `secret.txt` and `sub/deep.txt`
+     */
+    private function createOutsideDir(): string
+    {
+        $this->outsideDir = realpath(sys_get_temp_dir()) . '/filefly-outside-' . bin2hex(random_bytes(6));
+        mkdir($this->outsideDir . '/sub', 0755, true);
+        file_put_contents($this->outsideDir . '/secret.txt', 'SECRET');
+        file_put_contents($this->outsideDir . '/sub/deep.txt', 'DEEP');
+        return $this->outsideDir;
+    }
+
+    /**
+     * Complete tree of the outside directory as `relative path => content` (directories: DIR)
+     */
+    private function outsideTree(): array
+    {
+        $tree = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($this->outsideDir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iterator as $item) {
+            /** @var \SplFileInfo $item */
+            $relative = substr($item->getPathname(), strlen($this->outsideDir) + 1);
+            $tree[$relative] = $item->isDir() ? self::DIR : file_get_contents($item->getPathname());
+        }
+        ksort($tree);
+        return $tree;
     }
 
     /** deterministic pseudo random content of the given size */
@@ -700,6 +757,31 @@ class FsControllerTest extends ConsoleTestCase
         $this->assertTree('a', []);
     }
 
+    public function testRmOfSymlinkToFileInsideTheRootRemovesOnlyTheLink(): void
+    {
+        $this->seedFile('a', 'x.txt', 'hello');
+        symlink($this->diskPath('a', 'x.txt'), $this->diskPath('a', 'link.txt'));
+
+        $result = $this->runFs('rm', ['a://link.txt']);
+
+        $this->assertOk($result);
+        $this->assertFalse(is_link($this->diskPath('a', 'link.txt')), 'the link is removed');
+        $this->assertTree('a', ['x.txt' => 'hello']);
+    }
+
+    public function testRmOfSymlinkToFileOutsideTheRootRemovesOnlyTheLink(): void
+    {
+        $outside = $this->createOutsideDir();
+        symlink($outside . '/secret.txt', $this->diskPath('a', 'link.txt'));
+
+        $result = $this->runFs('rm', ['a://link.txt']);
+
+        $this->assertOk($result);
+        $this->assertFalse(is_link($this->diskPath('a', 'link.txt')), 'the link is removed');
+        $this->assertTree('a', []);
+        $this->assertSame(['secret.txt' => 'SECRET', 'sub' => self::DIR, 'sub/deep.txt' => 'DEEP'], $this->outsideTree());
+    }
+
     // ------------------------------------------------------------------
     // rmdir
     // ------------------------------------------------------------------
@@ -754,6 +836,43 @@ class FsControllerTest extends ConsoleTestCase
 
         $this->assertThrew($result);
         $this->assertTree('a', ['x.txt' => 'hello', 'd' => self::DIR, 'd/y.txt' => 'yy']);
+    }
+
+    public function testRmdirOfSymlinkToDirectoryInsideTheRootThrowsAndKeepsLinkAndTarget(): void
+    {
+        // Storage::deleteDirectory() refuses a link: the local adapter would delete the target's contents
+        $this->seedFile('a', 'real/x.txt', 'hello');
+        $this->seedFile('a', 'real/sub/y.txt', 'yy');
+        symlink($this->diskPath('a', 'real'), $this->diskPath('a', 'link'));
+
+        $result = $this->runFs('rmdir', ['a://link']);
+
+        $this->assertThrew($result);
+        $this->assertTrue(is_link($this->diskPath('a', 'link')), 'the link is kept');
+        $this->assertSame($this->diskPath('a', 'real'), readlink($this->diskPath('a', 'link')));
+        // tree() does not descend into the link, it lists it as a directory
+        $this->assertTree('a', [
+            'link' => self::DIR,
+            'real' => self::DIR,
+            'real/sub' => self::DIR,
+            'real/sub/y.txt' => 'yy',
+            'real/x.txt' => 'hello',
+        ]);
+    }
+
+    public function testRmdirOfSymlinkToDirectoryOutsideTheRootThrowsAndKeepsLinkAndTarget(): void
+    {
+        $outside = $this->createOutsideDir();
+        $this->seedFile('a', 'keep.txt', 'k');
+        symlink($outside, $this->diskPath('a', 'escape'));
+
+        $result = $this->runFs('rmdir', ['a://escape']);
+
+        $this->assertThrew($result);
+        $this->assertTrue(is_link($this->diskPath('a', 'escape')), 'the link is kept');
+        $this->assertSame($outside, readlink($this->diskPath('a', 'escape')));
+        $this->assertTree('a', ['escape' => self::DIR, 'keep.txt' => 'k']);
+        $this->assertSame(['secret.txt' => 'SECRET', 'sub' => self::DIR, 'sub/deep.txt' => 'DEEP'], $this->outsideTree());
     }
 
     // ------------------------------------------------------------------
