@@ -4,7 +4,7 @@
 
 ## Install and run
 
-`yiisoft/yii2` needs bower assets, so `composer.json` declares the asset-packagist repository. `league/flysystem` 1.x is affected by advisory `PKSA-w9tt-7782-78jx` (CVE-2026-102601, all versions `<=3.35.2`, no 1.x fix), which Composer >= 2.9 blocks; `composer.json` ignores exactly this advisory in `config.audit.ignore` until the Flysystem 3 migration removes the package.
+`yiisoft/yii2` needs bower assets, so `composer.json` declares the asset-packagist repository. `composer.json` requires `league/flysystem` `^3.35.3`, because advisory `PKSA-w9tt-7782-78jx` (CVE-2026-102601) affects all versions `<=3.35.2` and every 1.x release; no advisory is ignored.
 
 ```bash
 composer install
@@ -26,11 +26,11 @@ docker run --rm --entrypoint sh --user "$(id -u):$(id -g)" \
   -c 'vendor/bin/phpunit --cache-result-file=/tmp/phpunit.cache'
 ```
 
-Tested with PHP 8.5.1, Composer 2.9.2, PHPUnit 9.6.38, yiisoft/yii2 2.0.55, league/flysystem 1.1.10, creocoder/yii2-flysystem 1.2.0, dmstr/yii2-active-record-permissions 1.3.2, dmstr/yii2-web 1.1.3.
+Tested with PHP 8.5.1 (macOS) and 8.4 (Linux, `dmstr/phd5-app:5.11.3`), Composer 2.11.2, PHPUnit 9.6.38, yiisoft/yii2 2.0.55, league/flysystem 3.36.0, league/flysystem-local 3.35.3, league/mime-type-detection 1.17.0, creocoder/yii2-flysystem 2.0.0, dmstr/yii2-active-record-permissions 1.3.2, dmstr/yii2-web 1.1.3.
 
 Every test in `tests/api/` runs in its own PHP process (see "Process isolation" below); one isolated test takes roughly 0.05 to 0.1 s. Tests in `tests/console/` share one process (see "Console harness").
 
-`tests/bootstrap.php` compiles all classes of league/flysystem 1.x with `E_DEPRECATED` masked: on PHP >= 8.4 they raise compile-time "implicitly nullable parameter" deprecations, which an isolated process prints to stderr and PHPUnit turns into a test error. Deprecations from any other code (including the module) still fail the test.
+`tests/bootstrap.php` masks no diagnostics: a deprecation from any code (the module or a dependency) that an isolated process prints to stderr fails the test.
 
 ## Harness
 
@@ -38,7 +38,7 @@ Every test in `tests/api/` runs in its own PHP process (see "Process isolation" 
 
 - module `filefly` (`hrzg\filefly\Module`, `filesystem => 'fsTest'`)
 - `db`: sqlite in memory, table `filefly_hashmap` created in its final migrated form (the migrations themselves use `alterColumn()`, which sqlite does not support); MySQL's `NOW()` (used by the model's `TimestampBehavior`) is registered as sqlite function
-- `fsTest`: `creocoder\flysystem\LocalFilesystem` rooted in a fresh temp directory (`$this->fsRoot`); this config lives only in `filesystemComponentConfig()`
+- `fsTest`: `creocoder\flysystem\LocalFilesystem` (creocoder/yii2-flysystem 2, Flysystem 3) rooted in a fresh temp directory (`$this->fsRoot`), with the default `linkHandling` (`DISALLOW_LINKS`) and `config => ['directory_visibility' => 'public']`, so that new directories get `0755` as with Flysystem 1 (creocoder's default is `0740`); this is the configuration `UPGRADE.md` recommends to applications, and it lives only in `filesystemComponentConfig()`
 - `authManager`: `yii\rbac\PhpManager`, filled by running the module's RBAC migrations (`FileflyAdmin`, `FileflyApi`, `FileflyDefault`, `FileflyPermissions`)
 - `user`: `dmstr\web\User` without session, root user `admin` (id 1) like in phd5
 - `settings`: in-memory stand-in for pheme/yii2-settings (`TestSettings`)
@@ -176,7 +176,7 @@ Dependencies not declared by the module:
 Error handler and PHP diagnostics:
 
 - [unverified] `tests/bootstrap.php` sets `YII_ENABLE_ERROR_HANDLER=false`, so Yii does not replace PHPUnit's handlers. A PHP warning or notice then becomes an exception through PHPUnit (HTTP 500 in the harness), while a deprecation is only printed and fails the isolated test process (PHPUnit 9.6 does not convert deprecations by default, `phpunit.xml` does not change that). No test pins the default path directly; the tests that need production-like handling (`resolvePermissions` with a NULL column, `changePermissions` without `item` or `path`) use the private `PermissionsTest::apiPostWithYiiErrorHandler()`, which installs a handler like Yii's that turns every reported error into an `ErrorException`.
-- [verified] `cp` and `mv` of a directory in the console differ by OS: copying a directory through a stream raises the PHP notice `Read of 8192 bytes failed with errno=21 Is a directory` on macOS, which the harness turns into an exception (exit code `null`, no output), while Linux raises no notice, the copy returns false and the action ends with exit code 1 and the output `Copy failed` / `Move failed`. Both leave an empty file named like the directory at the target and keep the source. `FsControllerTest::testCpOfDirectoryFailsAndLeavesAnEmptyFileAtTheTarget` and `testMvOfDirectoryFailsKeepsSourceAndLeavesAnEmptyFileAtTheTarget` accept exactly these two outcomes.
+- [verified] `cp` and `mv` of a directory in the console: copying a directory through a stream fails while the content is read. With Flysystem 1 this differed by OS (macOS raised the PHP notice `Read of 8192 bytes failed with errno=21 Is a directory`, which the harness turned into an exception, Linux returned false); the Flysystem 3 local adapter silences the notice, so on both systems the write reports failure and the action ends with exit code 1 and the output `Copy failed` / `Move failed`. An empty file named like the directory is left at the target and the source is kept. `FsControllerTest::testCpOfDirectoryFailsAndLeavesAnEmptyFileAtTheTarget` and `testMvOfDirectoryFailsKeepsSourceAndLeavesAnEmptyFileAtTheTarget` still accept both outcomes (exception, or exit code 1).
 
 Deliberately not pinned (environment dependent):
 
@@ -191,11 +191,11 @@ Deliberately not pinned (environment dependent):
 
 `hrzg\filefly\tests\support\ConsoleTestCase` is separate from `ApiTestCase` and covers the console command `fs` (`FsController`) and `FsManager::sync()`. It boots per test a real `yii\console\Application` with the filefly module and two local filesystems rooted in fresh temp directories, mounted as the schemes `a://` and `b://` (`filesystemComponents`); the controller id `fs` is mapped to a `CapturingFsController` through `controllerMap`.
 
-- `runFs(string $action, array $args = [], array $options = []): ConsoleResult`: runs `fs/<action>` non-interactively (`confirm()` is answered with yes); `ConsoleResult` has `exitCode`, `stdout`, `stderr` and `exception` (class name of a thrown exception, the exit code is then `null`). Tests assert only that an action threw, never the Flysystem exception class.
+- `runFs(string $action, array $args = [], array $options = []): ConsoleResult`: runs `fs/<action>` non-interactively (`confirm()` is answered with yes); `ConsoleResult` has `exitCode`, `stdout`, `stderr` and `exception` (class name of a thrown exception, the exit code is then `null`). Tests assert only that an action threw, never the exception class (neither the module's nor Flysystem's).
 - `fsManager(): FsManager`: a fresh `FsManager` bound to the module, to call `sync()` directly.
 - Disk helpers take the scheme first, paths are relative to the root of that filesystem: `seedFile($scheme, $path, $content = '', ?$mtime = null)`, `seedDir()`, `touchPath()`, `mtime()`, `readFromDisk()`, `diskPath()`, `hash()`.
 - Tree helpers: `tree($scheme)` is the complete tree of one root as sorted `path => sha1` map (directories are `ConsoleTestCase::DIR`, paths have no leading slash); `assertTree($scheme, $expectedContents)` takes plain file contents; `snapshot()` captures both roots and `assertTreeUnchanged($snapshot)` compares them again.
-- `filesystemComponentConfig(string $root)` is the single Flysystem-version specific line of the harness (`LocalFilesystem` of creocoder/yii2-flysystem); change only this method when the adapter changes.
+- `filesystemComponentConfig(string $root)` is the single Flysystem-version specific part of the harness (`LocalFilesystem` of creocoder/yii2-flysystem 2, configured like `fsTest` of the API harness); change only this method when the adapter changes.
 - No process isolation: the console code has no function-static caches (the API harness needs one process per test because the permission code caches the user's auth items that way), and `tearDown()` drops `Yii::$app` and resets the DI container, so tests run in one process. Mtimes are set with `touch()`, never with `sleep()`.
 - `CapturingFsController` only redirects `stdout()` and `stderr()` into static buffers (reset by `runFs()`); everything else is the real `FsController`.
 - Never assume a listing order: it is the order of the adapter, so tests compare entries sorted or as a multiset of tokens.
