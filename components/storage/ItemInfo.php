@@ -48,8 +48,8 @@ class ItemInfo
     }
 
     /**
-     * `file`, `dir`, or another type the adapter reports (local adapter: `fifo`, `char`, `block`,
-     * `socket`, `unknown`; never `link`, see Storage), `null` if not reported
+     * `file` or `dir` (Flysystem 3 knows no other types; a FIFO or socket counts as missing, a
+     * link is never reported, see Storage)
      *
      * @return string|null
      */
@@ -69,8 +69,8 @@ class ItemInfo
     }
 
     /**
-     * Mime type as reported by the adapter in the same request; the local adapter never reports
-     * one here (`null`), some remote adapters do
+     * Mime type as reported by the adapter in the same request; always `null` on Flysystem 3,
+     * callers derive it from the file name (Storage::mimeTypeByFileName())
      *
      * @return string|null
      */
