@@ -1,127 +1,144 @@
 <?php
+// file generated with AI assistance: Claude Code - [2026-11-12 12:00:00 UTC]
 /**
- * Tests für die Flysystem-Mechanik hinter ApiController::actionStream()
- * und ApiController::actionDownload() (siehe Basecamp-Ticket: S3-HEAD-Requests
- * pro Auslieferung reduzieren).
+ * The storage calls behind ApiController::actionStream() and ApiController::actionDownload():
+ * one metadata request (Storage::fileStat()) and one read (Storage::fileStream()) per delivery,
+ * instead of separate existence, mime type and size requests, which cost one HEAD request each on
+ * S3.
  *
- * Diese Tests laufen gegen einen lokalen Flysystem-Adapter statt gegen S3,
- * um unabhängig von echten Cloud-Credentials verifizieren zu können, dass:
- *   1. getMetadata() die für den Fix benötigten Felder liefert (type, size)
- *   2. readStream() auf Adapter-Ebene ein Array liefert, aus dem der
- *      Stream unter dem Schlüssel 'stream' ausgepackt werden muss
- *   3. das bisherige 404-Verhalten bei fehlenden Dateien erhalten bleibt
- *   4. die Mimetype-Ermittlung per Dateiendung (ohne zusätzlichen Request)
- *      sinnvolle Werte liefert
+ * Runs against the local filesystem component, so no cloud credentials are needed, and checks
+ * that:
+ *   1. fileStat() reports what the actions need (type and size) and no mime type
+ *   2. fileStream() returns a readable stream resource
+ *   3. a missing path, a directory and the root end as "not found" (null or an exception)
+ *   4. the mime type by file name (no request) gives sensible values
  */
 
 namespace hrzg\filefly\tests;
 
-use League\Flysystem\Adapter\Local;
-use League\Flysystem\Filesystem;
-use League\Flysystem\Util\MimeType;
+use creocoder\flysystem\LocalFilesystem;
+use hrzg\filefly\components\Storage;
 use PHPUnit\Framework\TestCase;
+
+// BaseObject::__construct() needs the Yii class for configuration
+if (!class_exists('Yii', false)) {
+    require_once dirname(__DIR__) . '/vendor/yiisoft/yii2/Yii.php';
+}
 
 class StreamMetadataTest extends TestCase
 {
     private string $testDir;
-    private $adapter;
+
+    private Storage $storage;
 
     protected function setUp(): void
     {
         $this->testDir = sys_get_temp_dir() . '/filefly-test-' . uniqid();
-        mkdir($this->testDir);
+        mkdir($this->testDir . '/dir', 0755, true);
         file_put_contents($this->testDir . '/hello.txt', 'Hello Filefly Test');
 
-        $filesystem = new Filesystem(new Local($this->testDir));
-        $this->adapter = $filesystem->getAdapter();
+        $this->storage = new Storage(['filesystem' => new LocalFilesystem(['path' => $this->testDir])]);
     }
 
     protected function tearDown(): void
     {
         @unlink($this->testDir . '/hello.txt');
+        @rmdir($this->testDir . '/dir');
         @rmdir($this->testDir);
     }
 
     /**
-     * Ein einzelner getMetadata()-Aufruf muss type und size liefern -
-     * genau das, was actionStream()/actionDownload() statt der drei
-     * separaten Aufrufe (isFile(), getMimetype(), getSize()) nutzt.
+     * One fileStat() call delivers type and size, which actionStream()/actionDownload() use
+     * instead of separate isFile(), mime type and size requests.
      */
-    public function testGetMetadataReturnsTypeAndSize(): void
+    public function testFileStatReturnsTypeAndSize(): void
     {
-        $metadata = $this->adapter->getMetadata('hello.txt');
+        $info = $this->storage->fileStat('hello.txt');
 
-        $this->assertIsArray($metadata);
-        $this->assertSame('file', $metadata['type']);
-        $this->assertSame(18, $metadata['size']); // "Hello Filefly Test" = 18 Zeichen
+        $this->assertNotNull($info);
+        $this->assertSame('file', $info->getType());
+        $this->assertSame(18, $info->getFileSize()); // "Hello Filefly Test" = 18 characters
     }
 
     /**
-     * Kritischer Fix-Punkt: adapter->readStream() liefert auf Adapter-Ebene
-     * ein Array ['type' => ..., 'stream' => resource], NICHT direkt die
-     * Stream-Resource. Wird das nicht beachtet, bricht der Download.
+     * fileStream() returns the stream resource itself, ready for Response::sendStreamAsFile().
      */
-    public function testReadStreamMustBeUnwrappedFromArray(): void
+    public function testFileStreamReturnsReadableStream(): void
     {
-        $streamResult = $this->adapter->readStream('hello.txt');
+        $stream = $this->storage->fileStream('/hello.txt');
 
-        $this->assertIsArray($streamResult, 'readStream() auf Adapter-Ebene muss ein Array liefern');
-        $this->assertArrayHasKey('stream', $streamResult);
-        $this->assertIsResource($streamResult['stream']);
-
-        $content = stream_get_contents($streamResult['stream']);
-        fclose($streamResult['stream']);
+        $this->assertIsResource($stream);
+        $content = stream_get_contents($stream);
+        fclose($stream);
 
         $this->assertSame('Hello Filefly Test', $content);
     }
 
     /**
-     * 404-Verhalten: Bei fehlender Datei muss der Code (via äußerem
-     * catch(Exception)) weiterhin auf einen "nicht gefunden"-Fall
-     * abbilden können. Der Local-Adapter wirft dafür eine Exception
-     * statt false zurückzugeben - unser Code muss beide Fälle abdecken.
+     * Not found: the actions map `null` and every exception to NotFoundHttpException, so a
+     * missing path, a directory and the root must end in one of the two.
+     *
+     * @dataProvider notFoundPaths
      */
-    public function testMissingFileTriggersExceptionOrFalse(): void
+    public function testMissingFileDirectoryAndRootAreNotFound(string $path): void
     {
         $threwException = false;
         $result = null;
 
         try {
-            $result = $this->adapter->getMetadata('does-not-exist.txt');
+            $result = $this->storage->fileStat($path);
         } catch (\Throwable $e) {
             $threwException = true;
         }
 
         $this->assertTrue(
-            $threwException || $result === false,
-            'Fehlende Datei muss entweder eine Exception werfen oder false liefern, ' .
-            'damit der Controller korrekt auf NotFoundHttpException abbilden kann'
+            $threwException || $result === null,
+            'fileStat() must return null or throw, so that the controller can answer with NotFoundHttpException'
         );
     }
 
-    /**
-     * Mimetype-Fallback per Dateiendung (kein zusätzlicher S3-Request):
-     * League\Flysystem\Util\MimeType::detectByFilename() muss sinnvolle
-     * Werte für gängige Dateitypen liefern.
-     */
-    public function testMimeTypeDetectionByFilename(): void
+    public function notFoundPaths(): array
     {
-        $this->assertSame('text/plain', MimeType::detectByFilename('hello.txt'));
-        $this->assertSame('image/jpeg', MimeType::detectByFilename('photo.jpg'));
-        $this->assertSame('application/pdf', MimeType::detectByFilename('document.pdf'));
+        return [
+            'missing file' => ['does-not-exist.txt'],
+            'directory' => ['dir'],
+            'root' => ['/'],
+        ];
     }
 
     /**
-     * getMetadata() liefert bei diesem Adapter kein 'mimetype'-Feld -
-     * bestätigt, dass der Fallback in actionStream()/actionDownload()
-     * tatsächlich greifen wird (Regressions-Absicherung: falls eine
-     * künftige Flysystem-Version das Feld doch mitliefert, soll dieser
-     * Test auffallen und wir können den Fallback ggf. entfernen).
+     * fileStream() of a missing file fails with an exception (the actions answer 404).
      */
-    public function testGetMetadataDoesNotIncludeMimetype(): void
+    public function testFileStreamOfMissingFileThrows(): void
     {
-        $metadata = $this->adapter->getMetadata('hello.txt');
+        $this->expectException(\RuntimeException::class);
 
-        $this->assertArrayNotHasKey('mimetype', $metadata);
+        $this->storage->fileStream('does-not-exist.txt');
+    }
+
+    /**
+     * Mime type by file extension (no request): Storage::mimeTypeByFileName() must give sensible
+     * values for common file types and text/plain for unknown ones.
+     */
+    public function testMimeTypeDetectionByFilename(): void
+    {
+        $this->assertSame('text/plain', Storage::mimeTypeByFileName('hello.txt'));
+        $this->assertSame('image/jpeg', Storage::mimeTypeByFileName('photo.jpg'));
+        $this->assertSame('image/jpeg', Storage::mimeTypeByFileName('PHOTO.JPG'));
+        $this->assertSame('application/pdf', Storage::mimeTypeByFileName('document.pdf'));
+        $this->assertSame('text/plain', Storage::mimeTypeByFileName('no-extension'));
+        $this->assertSame('text/plain', Storage::mimeTypeByFileName('unknown.zzzz'));
+    }
+
+    /**
+     * fileStat() reports no mime type, so the fallback by file name in actionStream()/
+     * actionDownload() applies (regression guard: if the storage ever reports one in the same
+     * request, this test fails and the fallback can be reconsidered).
+     */
+    public function testFileStatDoesNotIncludeMimetype(): void
+    {
+        $info = $this->storage->fileStat('hello.txt');
+
+        $this->assertNull($info->getMimeType());
     }
 }

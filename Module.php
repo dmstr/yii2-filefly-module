@@ -8,8 +8,8 @@
  */
 namespace hrzg\filefly;
 
-use creocoder\flysystem\Filesystem;
 use dmstr\web\traits\AccessBehaviorTrait;
+use hrzg\filefly\components\Storage;
 use hrzg\filefly\components\UploadValidator;
 use hrzg\filefly\helpers\FsManager;
 use yii\web\HttpException;
@@ -75,7 +75,10 @@ class Module extends \yii\base\Module
     public $filesystem;
 
     /**
-     * @var \creocoder\flysystem\Filesystem default filesystem
+     * The component named by $filesystem, set in beforeAction(): a creocoder\flysystem\Filesystem
+     * (creocoder/yii2-flysystem 2) or any League\Flysystem\FilesystemOperator (see Storage::$filesystem)
+     *
+     * @var \creocoder\flysystem\Filesystem|\League\Flysystem\FilesystemOperator default filesystem
      */
     public $filesystemComponent;
 
@@ -254,10 +257,10 @@ class Module extends \yii\base\Module
             // get the component object
             $this->filesystemComponent = \Yii::$app->{$fsComponentName};
 
-            if ( ! $this->filesystemComponent instanceof Filesystem) {
+            if (!Storage::accepts($this->filesystemComponent)) {
                 \Yii::$app->session->addFlash(
                     'error',
-                    'Filesystem component is no instance of creocoder\flysystem\Filesystem'
+                    'Filesystem component is neither a creocoder\flysystem\Filesystem nor a League\Flysystem\FilesystemOperator'
                 );
                 \Yii::error('Invalid filesystem component.', __METHOD__);
             }

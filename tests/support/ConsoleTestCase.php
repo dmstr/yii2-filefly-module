@@ -136,6 +136,8 @@ abstract class ConsoleTestCase extends TestCase
         return [
             'class' => \creocoder\flysystem\LocalFilesystem::class,
             'path' => $root,
+            // directories as Flysystem 1 created them (0755); creocoder's default is 0740
+            'config' => ['directory_visibility' => 'public'],
         ];
     }
 

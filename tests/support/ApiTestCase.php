@@ -154,6 +154,8 @@ abstract class ApiTestCase extends TestCase
         return [
             'class' => \creocoder\flysystem\LocalFilesystem::class,
             'path' => $this->fsRoot,
+            // directories as Flysystem 1 created them (0755); creocoder's default is 0740
+            'config' => ['directory_visibility' => 'public'],
         ];
     }
 
