@@ -13,7 +13,9 @@ use Exception;
 use hrzg\filefly\components\ContentDeliveryPolicy;
 use hrzg\filefly\components\ContentValidator;
 use hrzg\filefly\components\FileManager;
+use hrzg\filefly\components\Storage;
 use hrzg\filefly\components\storage\ItemExistsException;
+use hrzg\filefly\components\storage\ItemNotFoundException;
 use hrzg\filefly\events\FileEvent;
 use hrzg\filefly\models\FileflyHashmap;
 use hrzg\filefly\Module;
@@ -153,7 +155,7 @@ class ApiController extends WebController
     public function actionMove($newPath, $items)
     {
         $paths = json_decode($items, true);
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $success = false;
         $errorMessage = '';
@@ -169,7 +171,7 @@ class ApiController extends WebController
                 $this->trigger(FileEvent::EVENT_BEFORE_MOVE, new FileEvent(['filename' => $oldPath]));
                 $accessManager->check($oldPath, $this->module->repair);
 
-                $itemType = $this->getItemType($fileSystem, $oldPath);
+                $itemType = $this->getItemType($storage, $oldPath);
                 if ($itemType !== 'file' && $itemType !== 'dir') {
                     $errorMessage = 'notfound';
                     break;
@@ -177,7 +179,7 @@ class ApiController extends WebController
 
                 $destPath = $newPath . '/' . basename($oldPath);
 
-                $moved = $fileSystem->rename($oldPath, $destPath);
+                $moved = $storage->move($oldPath, $destPath);
                 if ($moved === false) {
                     $errorMessage = 'movefailed';
                     break;
@@ -217,7 +219,7 @@ class ApiController extends WebController
     public function actionCopy($items, $newPath, $newFilename = null)
     {
         $paths = json_decode($items, true);
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $success = false;
         $errorMessage = '';
@@ -233,7 +235,7 @@ class ApiController extends WebController
                 $this->trigger(FileEvent::EVENT_BEFORE_COPY, new FileEvent(['filename' => $oldPath]));
                 // ensure hashmap entry
                 $accessManager->check($oldPath, $this->module->repair);
-                if ($this->getItemType($fileSystem, $oldPath) !== 'file') {
+                if ($this->getItemType($storage, $oldPath) !== 'file') {
                     return false;
                 }
 
@@ -245,7 +247,7 @@ class ApiController extends WebController
                 }
 
                 // copy file
-                $copied = $fileSystem->copy($oldPath, $filename);
+                $copied = $storage->copy($oldPath, $filename);
                 if (!$copied) {
                     $errorMessage = 'copyfailed';
                 } else {
@@ -325,7 +327,7 @@ class ApiController extends WebController
      */
     public function actionRename($item, $newItemPath)
     {
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $success = false;
         $errorMessage = '';
@@ -333,7 +335,7 @@ class ApiController extends WebController
 
         if (!$accessManager->grantAccess($item, FileManager::ACCESS_UPDATE)) {
             $errorMessage = 'permission_edit_denied';
-        } elseif (($itemType = $this->getItemType($fileSystem, $item)) === 'file' && ($validationError = $this->module->getUploadValidator()->validateFileName(basename($newItemPath))) !== null) {
+        } elseif (($itemType = $this->getItemType($storage, $item)) === 'file' && ($validationError = $this->module->getUploadValidator()->validateFileName(basename($newItemPath))) !== null) {
             $errorMessage = $validationError;
         } else {
 
@@ -341,7 +343,7 @@ class ApiController extends WebController
                 $errorMessage = 'file_not_found';
             }
             $this->trigger(FileEvent::EVENT_BEFORE_RENAME, new FileEvent(['filename' => $item]));
-            if ($fileSystem->rename($item, $newItemPath)) {
+            if ($storage->move($item, $newItemPath)) {
                 $success = true;
                 $accessManager->setAccess($item, $newItemPath);
             } else {
@@ -542,7 +544,7 @@ class ApiController extends WebController
     public function actionRemove($items)
     {
         $paths = json_decode($items, true);
-        $fileSystem = FileManager::fileSystem();
+        $storage = FileManager::storage();
         $accessManager = FileManager::access();
         $anyDeniedPerm = false;
         $success = false;
@@ -556,18 +558,18 @@ class ApiController extends WebController
                 continue;
             }
 
-            $itemType = $this->getItemType($fileSystem, $path);
+            $itemType = $this->getItemType($storage, $path);
             if ($itemType === 'dir') {
                 if (!$this->module->deleteRecursive && $accessManager->isEmpty($path) === false) {
                     $errorMessage = 'permission_delete_denied';
                 }
 
-                $removed = $fileSystem->deleteDir($path);
+                $removed = $storage->deleteDirectory($path);
             } elseif ($itemType === 'file') {
-                $removed = $fileSystem->delete($path);
+                $removed = $storage->delete($path);
             } else {
                 // any other type got a directory handler from the Flysystem 1 handler API, whose delete() is deleteDir()
-                $removed = $fileSystem->deleteDir($path);
+                $removed = $storage->deleteDirectory($path);
             }
 
             if ($removed === false) {
@@ -838,19 +840,19 @@ class ApiController extends WebController
 
     /**
      * Type of an existing item as the Flysystem 1 handler API reported it with
-     * `$fileSystem->get($path)->getType()`: the `type` of its metadata (`file`, `dir` or whatever
-     * else the adapter reports), or `dir` if the adapter returns no metadata.
+     * `$fileSystem->get($path)->getType()`: the type in its item info (`file`, `dir` or whatever
+     * else the adapter reports), or `dir` if the storage returns no item info.
      *
-     * @param \creocoder\flysystem\Filesystem $fileSystem
+     * @param Storage $storage
      * @param string $path
      *
-     * @return string
-     * @throws FileNotFoundException if the path does not exist (also for the root)
+     * @return string|null
+     * @throws ItemNotFoundException if the path does not exist (also for the root)
      */
-    private function getItemType($fileSystem, $path)
+    private function getItemType(Storage $storage, $path)
     {
-        $metadata = $fileSystem->getMetadata($path);
-        return $metadata ? $metadata['type'] : 'dir';
+        $info = $storage->itemInfo($path);
+        return $info !== null ? $info->getType() : 'dir';
     }
 
     private function getItemThumbnail(array $item)
