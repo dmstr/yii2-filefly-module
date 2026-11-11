@@ -88,17 +88,18 @@ class FsController extends \yii\console\Controller
 
 
                     $line = sprintf("%s  %s\t%s\t%s",
-                        substr($file['type'], 0, 1),
-                        str_pad(ArrayHelper::getValue($file, 'size', 'n/a'), 10, " "),
-                        str_pad(ArrayHelper::getValue($file, 'timestamp', 'n/a'), 10, " "),
-                        $file['path']);
+                        substr($file->getType(), 0, 1),
+                        str_pad($file->getSize() ?? 'n/a', 10, " "),
+                        str_pad($file->getTimestamp() ?? 'n/a', 10, " "),
+                        $file->getPath());
                     $this->stdout("{$line}\n");
                 } else {
-                    $this->stdout(str_pad((string)($file['path']), 10, " ") . "\t");
+                    $this->stdout(str_pad((string)($file->getPath()), 10, " ") . "\t");
                 }
             }
             $this->stdout("\n");
         } catch (\RuntimeException $e) {
+            // includes StorageException, e.g. for a link the adapter refuses
             $this->stderr("{$e->getMessage()}\n", Console::FG_RED);
             return ExitCode::UNSPECIFIED_ERROR;
         }
@@ -116,7 +117,7 @@ class FsController extends \yii\console\Controller
     {
         $this->manager->mount($this->parseScheme($uri));
 
-        $success = $this->manager->createDir($uri);
+        $success = $this->manager->createDirectory($uri);
 
         if (!$success) {
             $this->stderr('Creation of directory failed');
@@ -131,7 +132,7 @@ class FsController extends \yii\console\Controller
      * @param $src
      * @param $dest
      *
-     * @throws \League\Flysystem\FileExistsException
+     * @throws \hrzg\filefly\components\storage\ItemExistsException
      * @return int
      */
     public function actionCp($src, $dest)
@@ -177,7 +178,7 @@ class FsController extends \yii\console\Controller
      *
      * @param $uri
      *
-     * @throws \League\Flysystem\FileNotFoundException
+     * @throws \hrzg\filefly\components\storage\ItemNotFoundException
      * @return int
      */
     public function actionRm($uri)
@@ -204,7 +205,7 @@ class FsController extends \yii\console\Controller
     {
         if ($this->confirm("Do you want delete the directory '$uri' ?")) {
             $this->manager->mount($this->parseScheme($uri));
-            $success = $this->manager->deleteDir($uri);
+            $success = $this->manager->deleteDirectory($uri);
             if (!$success) {
                 $this->stderr('Deletion of directory failed');
                 return ExitCode::UNSPECIFIED_ERROR;
@@ -219,8 +220,8 @@ class FsController extends \yii\console\Controller
      * @param $src
      * @param $dest
      *
-     * @throws \League\Flysystem\FileExistsException
-     * @throws \League\Flysystem\FileNotFoundException
+     * @throws \hrzg\filefly\components\storage\ItemExistsException
+     * @throws \hrzg\filefly\components\storage\ItemNotFoundException
      * @return int
      */
     public function actionSync($src, $dest)
@@ -231,6 +232,7 @@ class FsController extends \yii\console\Controller
         $this->manager->mount($this->parseScheme($src));
         $this->manager->mount($this->parseScheme($dest));
 
+        $srcScheme = $manager->schemeOf($src);
         $contents = $manager->listContents($src, $this->recursive);
 
         if (!$this->confirm('Sync ' . count($contents) . ' files(s)?')) {
@@ -239,17 +241,17 @@ class FsController extends \yii\console\Controller
 
         foreach ($contents as $entry) {
             $update = false;
-            $srcUrl = $entry['filesystem'] . '://' . $entry['path'];
-            $destUrl = $dest . $entry['path'];
+            $srcUrl = $srcScheme . '://' . $entry->getPath();
+            $destUrl = $dest . $entry->getPath();
 
-            if ($entry['type'] === 'dir') {
-                $this->stdout("Skipped directory '{$entry['path']}'\n");
+            if ($entry->getType() === 'dir') {
+                $this->stdout("Skipped directory '{$entry->getPath()}'\n");
                 continue;
             }
 
-            if (!$manager->has($destUrl)) {
+            if (!$manager->exists($destUrl)) {
                 $update = true;
-            } else if ($manager->getTimestamp($srcUrl) > $manager->getTimestamp($dest . $entry['path'])) {
+            } else if ($manager->lastModified($srcUrl) > $manager->lastModified($dest . $entry->getPath())) {
                 $update = true;
             }
 
