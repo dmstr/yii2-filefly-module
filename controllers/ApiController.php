@@ -33,9 +33,7 @@ use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 /**
- * --- PUBLIC PROPERTIES ---
- *
- * @property Module $module
+ * @extends WebController<Module>
  */
 class ApiController extends WebController
 {
@@ -234,7 +232,7 @@ class ApiController extends WebController
     /**
      * @param $items
      * @param $newPath
-     * @param null $newFilename
+     * @param string|null $newFilename
      *
      * @return bool|Response
      */
@@ -687,7 +685,7 @@ class ApiController extends WebController
     /**
      * @param $path
      *
-     * @return bool
+     * @return void
      * @throws \yii\base\ExitException
      * @throws NotFoundHttpException
      */
@@ -751,7 +749,7 @@ class ApiController extends WebController
     /**
      * @param $path
      *
-     * @return bool
+     * @return void
      * @throws \yii\base\ExitException
      * @throws NotFoundHttpException
      */
@@ -819,8 +817,8 @@ class ApiController extends WebController
     }
 
     /**
-     * @param null $path
-     * @param null $item
+     * @param string|null $path
+     * @param string|null $item
      * @return Response
      */
     public function actionChangePermissions($path = null, $item = null)
@@ -872,10 +870,10 @@ class ApiController extends WebController
 
     /**
      * @param string $q search string
-     * @param null $limit limit result
+     * @param int|string|null $limit limit result
      * @param bool $only_files limit result to files, default true
      * @param int $q_limit limit items in the db query that will be checked for read access, default 1000
-     * @param null $basePath optional basePath for the search, if set a `LIKE basePath%` condition will be added
+     * @param string|null $basePath optional basePath for the search, if set a `LIKE basePath%` condition will be added
      *
      * @return Response
      */

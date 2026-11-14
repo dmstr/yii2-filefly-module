@@ -10,6 +10,7 @@
 namespace hrzg\filefly\components;
 
 use hrzg\filefly\models\FileflyHashmap;
+use hrzg\filefly\Module;
 use yii\base\Component;
 
 /**
@@ -79,8 +80,12 @@ class FileManager extends Component
      */
     private static function currentFilesystemComponent()
     {
-        $currentModule = \Yii::$app->controller->module->id;
-        return \Yii::$app->getModule($currentModule)->filesystem;
+        $currentModuleId = \Yii::$app->controller->module->id;
+
+        /** @var Module $currentModule */
+        $currentModule = \Yii::$app->getModule($currentModuleId);
+
+        return $currentModule->filesystem;
     }
 
     /**

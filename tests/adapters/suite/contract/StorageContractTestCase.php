@@ -32,17 +32,17 @@ abstract class StorageContractTestCase extends TestCase
     protected const LARGE_SIZE = 8 * 1024 * 1024 + 7;
 
     /**
-     * @var FilesystemComponent component under test, rooted at the test root
+     * @var FilesystemComponent|null component under test, rooted at the test root
      */
     protected $component;
 
     /**
-     * @var FilesystemOperator the component's Flysystem operator, for seeding and inspection
+     * @var FilesystemOperator|null the component's Flysystem operator, for seeding and inspection
      */
     protected $raw;
 
     /**
-     * @var Storage the facade under test
+     * @var Storage|null the facade under test
      */
     protected $storage;
 
@@ -930,6 +930,7 @@ abstract class StorageContractTestCase extends TestCase
     public function testWriteFileWithoutStreamIsRefused(): void
     {
         $this->assertThrows(\InvalidArgumentException::class, function () {
+            // @phpstan-ignore argument.type (We are checking the processing of incorrect data)
             $this->storage->writeFile('x.txt', 'not a stream');
         });
         $this->assertTree([]);

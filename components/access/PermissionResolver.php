@@ -47,8 +47,10 @@ class PermissionResolver extends HashmapService
 
         // in root path allow access depending on module setting
         if ($path === '/') {
-            $currentModule = \Yii::$app->controller->module->id;
-            $rootFolderManageRole = \Yii::$app->getModule($currentModule)->rootFolderManageRole;
+            $currentModuleId = \Yii::$app->controller->module->id;
+            /** @var Module $currentModule */
+            $currentModule = \Yii::$app->getModule($currentModuleId);
+            $rootFolderManageRole = $currentModule->rootFolderManageRole;
             if ($rootFolderManageRole && $permissionType !== 'access_read') {
                 return \Yii::$app->user->can($rootFolderManageRole);
             } else {
@@ -71,10 +73,7 @@ class PermissionResolver extends HashmapService
                 return null;
             }
 
-            if ($hash !== null) {
-                return $hash->hasPermission($permissionType);
-            }
-            return false;
+            return $hash->hasPermission($permissionType);
         }
 
         // build path iterator list
@@ -291,7 +290,7 @@ class PermissionResolver extends HashmapService
      *
      * @param string $path
      *
-     * @return string[]
+     * @return non-empty-list<string>
      */
     private function buildIterator($path)
     {

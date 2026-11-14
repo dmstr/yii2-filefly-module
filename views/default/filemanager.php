@@ -1,4 +1,9 @@
 <?php
+/**
+ * @var yii\web\View&object{
+ *   context: hrzg\filefly\controllers\DefaultController
+ * } $this
+ */
 
 use yii\helpers\ArrayHelper;
 use yii\helpers\Html;

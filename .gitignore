@@ -11,3 +11,6 @@ composer.lock
 
 # OS
 .DS_Store
+
+# PHPStan
+phpstan.neon

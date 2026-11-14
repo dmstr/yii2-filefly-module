@@ -21,7 +21,7 @@ use Yii;
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
  *
  * @property-read \hrzg\filefly\helpers\FsManager $manager
- * @property-read callable $thumbnailCallback
+ * @property-read callable|null $thumbnailCallback
  * @property-read \hrzg\filefly\components\UploadValidator $uploadValidator
  */
 class Module extends \yii\base\Module
@@ -132,7 +132,7 @@ class Module extends \yii\base\Module
 
     /**
      * Offset (in seconds) for Expires Header in stream action, default: 1 week
-     * @var int
+     * @var int|null
      */
     public $streamExpireOffset = 604800;
 
@@ -175,7 +175,7 @@ class Module extends \yii\base\Module
     private $_manager;
 
     /**
-     * @var callable $thumbnailCallback
+     * @var null|callable $thumbnailCallback
      *
      * Example:
      *
@@ -201,7 +201,7 @@ class Module extends \yii\base\Module
      * optional callback that can define the preview URL for an item
      * if not set the default filemanager downloadURL will be used
      *
-     * @var
+     * @var null|callable
      */
     public $previewCallback;
 
