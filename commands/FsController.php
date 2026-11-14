@@ -22,7 +22,7 @@ class FsController extends \yii\console\Controller
     public $long = false;
 
     /**
-     * @var $manager FsManager
+     * @var FsManager
      */
     private $manager;
 

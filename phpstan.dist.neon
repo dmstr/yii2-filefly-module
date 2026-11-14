@@ -1,0 +1,54 @@
+includes:
+    - vendor/mspirkov/yii2-phpstan/extension.neon
+
+parameters:
+    level: 5
+
+    treatPhpDocTypesAsCertain: false
+
+    paths:
+        - Module.php
+        - commands
+        - components
+        - controllers
+        - events
+        - helpers
+        - migrations
+        - models
+        - views
+        - tests
+
+    excludePaths:
+        # standalone project with its own composer.json, not part of the module
+        - tests/adapters/probe
+
+    bootstrapFiles:
+        - vendor/yiisoft/yii2/Yii.php
+
+    mspirkovYii2:
+        enableAllRules: false
+        enableValidationRules: true
+        yiiAppTypes:
+            -
+                paths:
+                    - controllers
+                    - views
+                type: yii\web\Application
+                nullable: false
+            -
+                paths:
+                    - commands
+                type: yii\console\Application
+                nullable: false
+        applicationConfigs:
+            -
+                paths:
+                    - .
+                files:
+                    - tools/phpstan/config.php
+
+    ignoreErrors:
+        # The type needs to be corrected in the package "dmstr/yii2-active-record-permissions"
+        -
+            message: '#^Parameter \#1 \$action of method hrzg\\filefly\\models\\FileflyHashmap\:\:hasPermission\(\) expects null, string given\.$#'
+            identifier: argument.type

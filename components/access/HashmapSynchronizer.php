@@ -151,7 +151,7 @@ class HashmapSynchronizer extends HashmapService
                 \Yii::info('Could not find items beneath [' . $itemPath . '] in hash table!', __METHOD__);
             } else {
                 foreach ($items as $item) {
-                    /** @var $item FileflyHashmap */
+                    /** @var FileflyHashmap $item */
                     if (!$item->delete()) {
                         \Yii::error('Could not delete item [' . $item->path . '] in hash table!', __METHOD__);
                         return false;

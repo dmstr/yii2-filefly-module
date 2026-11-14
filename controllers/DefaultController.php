@@ -8,12 +8,14 @@
  */
 namespace hrzg\filefly\controllers;
 
+use hrzg\filefly\Module;
 use yii\web\Controller;
 
 /**
  * Class DefaultController
  * @package hrzg\filefly\controllers
  * @author Christopher Stebe <c.stebe@herzogkommunikation.de>
+ * @extends Controller<Module>
  */
 class DefaultController extends Controller
 {

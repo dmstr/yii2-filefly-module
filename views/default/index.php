@@ -1,6 +1,8 @@
 <?php
 /**
- * @var yii\web\View $this
+ * @var yii\web\View&object{
+ *   context: hrzg\filefly\controllers\DefaultController
+ * } $this
  */
 
 use hrzg\filefly\Module;

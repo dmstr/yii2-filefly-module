@@ -20,11 +20,11 @@ use Yii;
 use yii\helpers\Html;
 use yii\widgets\Pjax;
 
-/* @var $this \yii\web\View */
-/* @var $content string */
+/** @var \yii\web\View $this */
+/** @var string $content */
 
 $this->title .= ' - ' . getenv('APP_TITLE');
-$this->title = (getenv('APP_PAGES_TITLE_PREFIX') ?? '') . $this->title;
+$this->title = (getenv('APP_PAGES_TITLE_PREFIX') ?: '') . $this->title;
 
 SettingsAsset::register($this);
 
